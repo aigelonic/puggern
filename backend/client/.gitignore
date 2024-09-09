@@ -5,6 +5,9 @@
 /.pnp
 .pnp.js
 .yarn/*
+!.yarn/releases
+!.yarn/plugins
+.pnp.*
 
 
 # testing
@@ -23,3 +26,4 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
