@@ -1,0 +1,11 @@
+{
+    "files": {
+      "ignore": ["build"]
+    },
+    "rules": {
+      "format": {
+        "quote_style": "double"
+      }
+    }
+  }
+  
