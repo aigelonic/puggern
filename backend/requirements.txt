@@ -41,4 +41,4 @@ rsa==4.9
 sqlparse==0.5.1
 uritemplate==4.1.1
 urllib3==2.2.2
-Werkzeug==3.0.4
+Werkzeug==3.0.6
