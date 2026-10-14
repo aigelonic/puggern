@@ -1,0 +1,78 @@
+name: PR title
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions: {}
+
+jobs:
+  conventional-title:
+    name: Conventional Commit PR title
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Validate title and validator examples
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+          import sys
+
+          types = "feat|fix|docs|refactor|test|perf|build|ci|chore|revert"
+          pattern = re.compile(
+              rf"({types})(?:\([^()\s]+\))?!?: [^\r\n]*\S[^\r\n]*"
+          )
+
+          def valid(title):
+              return pattern.fullmatch(title) is not None
+
+          valid_examples = [
+              f"{kind}: describe change" for kind in types.split("|")
+          ] + [
+              "feat(words): add practice",
+              "feat!: change storage format",
+              "fix(state)!: reset saved progress",
+              "docs: explain café practice",
+              'chore: treat $(echo unsafe) and "quotes" as data',
+              "chore: treat `echo unsafe` as data",
+          ]
+          invalid_examples = [
+              "",
+              "feat",
+              "feat:missing space",
+              "feat: ",
+              "feat:   ",
+              "feat!: ",
+              "feat(words)!: ",
+              "feat(words)!: \t",
+              "feature: unsupported type",
+              "Feat: uppercase type",
+              "feat(): empty scope",
+              "feat(two words): invalid scope",
+              "feat((words)): nested scope",
+              "feat!:missing space",
+              "feat!(words): misplaced marker",
+              "feat!!: duplicate marker",
+              " feat: leading space",
+              "feat: first line\nsecond line",
+              "feat: trailing newline\n",
+              "feat: carriage return\r",
+          ]
+          for expected, examples in [(True, valid_examples), (False, invalid_examples)]:
+              for index, example in enumerate(examples):
+                  if valid(example) != expected:
+                      raise RuntimeError(f"Validator example {expected}/{index} failed")
+          print(f"Passed {len(valid_examples) + len(invalid_examples)} validator examples.")
+
+          if not valid(os.environ["PR_TITLE"]):
+              print(
+                  "::error::Use type(scope)!: description, with optional scope and !. "
+                  f"Allowed types: {types}. Description must not be blank."
+              )
+              sys.exit(1)
+          print("PR title follows Conventional Commits.")
+          PY
