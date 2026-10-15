@@ -1,0 +1,7 @@
+.git
+.github
+docs
+README.md
+AGENTS.md
+**/node_modules
+**/.DS_Store

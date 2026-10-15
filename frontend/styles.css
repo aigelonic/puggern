@@ -1,0 +1,42 @@
+:root {
+  color-scheme: light;
+  font-family: Georgia, "Times New Roman", serif;
+  background: #f7f5ef;
+  color: #25332e;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+}
+
+.app-shell {
+  display: grid;
+  min-height: 100vh;
+  align-content: center;
+  justify-items: center;
+  gap: 0.5rem;
+  padding: 2rem;
+  text-align: center;
+}
+
+h1 {
+  margin: 0;
+  font-size: 2.5rem;
+}
+
+p {
+  margin: 0;
+  font-family: "Trebuchet MS", sans-serif;
+  line-height: 1.5;
+}
+
+#connection-status {
+  margin-top: 1rem;
+  color: #53665d;
+}
