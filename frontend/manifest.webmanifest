@@ -1,7 +1,7 @@
 {
   "name": "Puggern",
   "short_name": "Puggern",
-  "description": "An offline-friendly place to practice words.",
+  "description": "Et ordtreningsspill som fungerer uten nett.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

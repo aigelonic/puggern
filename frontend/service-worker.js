@@ -7,6 +7,7 @@ const APP_SHELL = [
   './icons/pug-192.png',
   './icons/pug-512.png',
   './src/main.mjs',
+  './src/learning.mjs',
 ];
 
 self.addEventListener('install', (event) => {
