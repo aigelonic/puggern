@@ -38,8 +38,18 @@
 - Run relevant existing checks after changes, starting with targeted tests.
 - Add focused regression tests for changed behavior when practical.
 - Self-review the full diff before requesting human review.
+- Before creating any PR (including drafts), complete the independent local review below; self-review and post-PR review do not satisfy this gate.
 - Do not self-approve or auto-merge as the implementing agent.
 - Record any meaningful test failures, skipped checks, or unresolved blockers in the PR description.
+
+### Independent local review gate
+
+- After implementation and relevant checks, invoke the [Local Review agent](.github/agents/local-review.agent.md) in a separate agent context. Prefer a different model when available; a separate reviewer agent is required even when only the same model is available.
+- If the runtime cannot invoke that custom agent, use an available independent review agent with the same review instructions. If no independent reviewer is available, stop before PR creation and report the blocker; never substitute the implementing agent's own review.
+- Give the reviewer the task and acceptance criteria, intended PR base branch, full diff against the merge base (including committed, staged, unstaged, and intended untracked files), and check commands/results. Include relevant context and known limitations, not just a summary of the edits.
+- Fix actionable findings and rerun affected checks. Have the independent reviewer recheck fixes and the final diff; any subsequent change invalidates the prior pass until reviewed.
+- Do not create the PR until the reviewer explicitly reports `PASS` for the final state. Unresolved critical/high-severity findings block a pass. Other actionable findings must be fixed or explicitly accepted by the user with the rationale recorded.
+- This gate applies to all PR changes, including documentation and agent instructions. A local pass is not a GitHub approval and does not replace CI or human review.
 
 ## Commits and pull requests
 
@@ -51,6 +61,7 @@
   - non-goals,
   - relevant risks or migrations,
   - test commands and results, or reasons checks were not run,
+  - independent local review evidence: reviewer agent/model (if known), reviewed base and final commit/worktree state, verdict, findings and resolutions or user-accepted risks, and recheck results,
   - links to related issues only when they exist.
 - Use closing keywords only when the linked issue is actually resolved; otherwise mark it as related work.
 
