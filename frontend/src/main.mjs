@@ -258,22 +258,30 @@ function finishSession() {
   const firstTryCount = session.learned.filter((id) => !session.mistakes[id]).length;
   document.querySelector('#completion-message').textContent =
     `Du lærte ${session.learned.length} øveoppføringer. ${firstTryCount} riktige på første forsøk.`;
+  document.querySelector('#completion-practiced-count').textContent = String(
+    session.learned.length,
+  );
+  document.querySelector('#completion-first-try-count').textContent = String(firstTryCount);
 
   const hardestWords = document.querySelector('#hardest-words');
-  hardestWords.replaceChildren();
-  Object.entries(session.mistakes)
+  const wordsNeedingPractice = Object.entries(session.mistakes)
     .filter(([, count]) => count > 0)
     .sort((left, right) => right[1] - left[1])
-    .forEach(([id, count]) => {
-      const word = words.find((item) => item.id === id);
-      if (!word) return;
+    .map(([id, count]) => ({ word: words.find((item) => item.id === id), count }))
+    .filter(({ word }) => word);
+  document.querySelector('#completion-extra-practice-count').textContent = String(
+    wordsNeedingPractice.length,
+  );
+  hardestWords.replaceChildren();
+  if (wordsNeedingPractice.length > 0) {
+    wordsNeedingPractice.forEach(({ word, count }) => {
       const item = document.createElement('li');
       item.textContent = `${word.prompt} → ${word.answer} · ${count} feilsvar`;
       hardestWords.append(item);
     });
-  if (hardestWords.childElementCount === 0) {
+  } else {
     const item = document.createElement('li');
-    item.textContent = 'Ingen vanskelige ord denne gangen.';
+    item.textContent = 'Ingen ord trengte ekstra øving denne gangen.';
     hardestWords.append(item);
   }
   showView(completeView);
@@ -687,6 +695,7 @@ document.querySelector('#completion-sets-button').addEventListener('click', () =
 });
 document.querySelector('#completion-new-set-button').addEventListener('click', () => {
   showView(setupView);
+  renderWordSets();
   openEditor();
 });
 

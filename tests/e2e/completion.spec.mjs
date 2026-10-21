@@ -45,7 +45,9 @@ for (const { source, direction, count } of [
       await answer(page, answers[await page.locator('#prompt').textContent()]);
     }
     await expectCompletion(page, count, count);
-    await expect(page.locator('#hardest-words')).toHaveText('Ingen vanskelige ord denne gangen.');
+    await expect(page.locator('#hardest-words')).toHaveText(
+      'Ingen ord trengte ekstra øving denne gangen.',
+    );
     await page.reload();
     await expectCompletion(page, count, count);
     await page.getByRole('button', { name: 'Øv på samme sett igjen' }).click();
