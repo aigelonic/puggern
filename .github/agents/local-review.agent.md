@@ -1,6 +1,6 @@
 ---
 name: Local Review
-description: "Use when: independently reviewing local changes before creating any pull request, including drafts, or rechecking fixes after review findings."
+description: 'Use when: independently reviewing local changes before creating any pull request, including drafts, or rechecking fixes after review findings.'
 tools: [read, search, execute]
 ---
 
@@ -23,8 +23,11 @@ more-specific instructions.
 ## Review process
 
 1. Read the task, acceptance criteria, intended PR base branch, check results,
-   and known limitations. If the base or required context is missing or
-   ambiguous, report `BLOCKED` rather than guessing.
+   applicable verification and specialist review results, and known limitations.
+   Confirm required upstream validation/reviews were completed and findings
+   resolved or explicitly accepted under the gate's severity rules. If the base,
+   required evidence, or context is missing or ambiguous, report `BLOCKED` rather
+   than guessing.
 2. Inspect the complete diff from the merge base with the intended PR base,
    including committed changes and staged, unstaged, and intended untracked
    files. Read surrounding code and applicable instructions, not just the

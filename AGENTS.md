@@ -42,6 +42,16 @@
 - Do not self-approve or auto-merge as the implementing agent.
 - Record any meaningful test failures, skipped checks, or unresolved blockers in the PR description.
 
+### Verification and specialist reviews
+
+- For behavior changes, bug fixes, and final executable validation, use the [Verification agent](.github/agents/verification.agent.md) to run relevant existing checks and verify acceptance criteria. Documentation-only changes need only applicable documentation/format checks.
+- Use the [Security Review agent](.github/agents/security-review.agent.md) for security-sensitive changes, such as authorization, untrusted input, sensitive data, or dependency changes.
+- Use the [UI / Accessibility Review agent](.github/agents/ui-accessibility-review.agent.md) for user-facing UI changes, including keyboard, focus, responsive layout, and reduced-motion behavior.
+- Give each agent the task, acceptance criteria, intended PR base, complete change scope, and relevant check results. Run only applicable specialists; do not add unrelated handoffs.
+- These agents report evidence and findings without fixing the implementation. The implementing agent owns fixes and reruns affected validation/reviews. They must not recursively invoke this workflow.
+- If a custom agent cannot be invoked, use an available separate agent with the same instructions. If required verification or an applicable review cannot be completed, report the blocker and stop before PR creation.
+- Complete applicable verification and specialist reviews before the independent local review. Pass their results, limitations, and finding resolutions to the local reviewer; they do not replace its final pass.
+
 ### Independent local review gate
 
 - After implementation and relevant checks, invoke the [Local Review agent](.github/agents/local-review.agent.md) in a separate agent context. Prefer a different model when available; a separate reviewer agent is required even when only the same model is available.
@@ -61,6 +71,7 @@
   - non-goals,
   - relevant risks or migrations,
   - test commands and results, or reasons checks were not run,
+  - applicable verification and specialist review results, including limitations and finding resolutions,
   - independent local review evidence: reviewer agent/model (if known), reviewed base and final commit/worktree state, verdict, findings and resolutions or user-accepted risks, and recheck results,
   - links to related issues only when they exist.
 - Use closing keywords only when the linked issue is actually resolved; otherwise mark it as related work.
