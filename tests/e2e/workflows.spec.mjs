@@ -26,7 +26,42 @@ test('creates a set and practices a missed word until it is learned', async ({ p
   }
 
   await expect(page.getByRole('heading', { name: 'Godt jobbet!' })).toBeVisible();
-  await expect(page.getByText('eple · 1 forsøk')).toBeVisible();
+  await expect(page.locator('#completion-practiced-count')).toHaveText('1');
+  await expect(page.locator('#completion-first-try-count')).toHaveText('0');
+  await expect(page.locator('#completion-extra-practice-count')).toHaveText('1');
+  await expect(page.getByText('En rød frukt → eple')).toBeVisible();
+});
+
+test('completes a single-entry session immediately and supports restart and return to sets', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Nytt ordsett' }).click();
+  await page.getByLabel('Navn på ordsettet').fill('Frukt');
+  await page.getByLabel('Hint og svar').fill('En rød frukt\teple');
+  await page.getByRole('button', { name: 'Lagre og start øving' }).click();
+  await page.getByLabel('Stavingen din').fill('eple');
+  await page.getByRole('button', { name: 'Sjekk svaret' }).click();
+
+  const heading = page.getByRole('heading', { name: 'Godt jobbet!' });
+  await expect(heading).toBeVisible();
+  await expect(page.locator('#completion-practiced-count')).toHaveText('1');
+  await expect(page.locator('#completion-first-try-count')).toHaveText('1');
+  await expect(page.locator('#completion-extra-practice-count')).toHaveText('0');
+  await expect(page.locator('#answer')).toBeHidden();
+  await expect
+    .poll(() => page.evaluate(() => document.activeElement?.id))
+    .toBe('completion-heading');
+  await expect(page.getByText('Ingen ord trengte ekstra øving denne gangen.')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Øv på nytt' }).click();
+  await expect(page.getByRole('heading', { name: 'En rød frukt' })).toBeVisible();
+  await expect(page.getByText('0 av 1 lært')).toBeVisible();
+  await page.getByLabel('Stavingen din').fill('eple');
+  await page.getByRole('button', { name: 'Sjekk svaret' }).click();
+  await page.locator('#completion-back-button').click();
+  await expect(page.getByRole('heading', { name: 'Ordsettene dine' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Frukt' })).toBeVisible();
 });
 
 test('reloads and resumes a saved session during its correction step', async ({ page }) => {
@@ -45,6 +80,17 @@ test('reloads and resumes a saved session during its correction step', async ({ 
   await expect(page.getByRole('heading', { name: 'En rød frukt' })).toBeVisible();
   await expect(page.getByLabel('Skriv ordet én gang')).toBeVisible();
   await expect(page.getByText(/Riktig stavemåte er eple/)).toBeVisible();
+
+  await page.getByLabel('Skriv ordet én gang').fill('eple');
+  await page.getByRole('button', { name: 'Sjekk svaret' }).click();
+  await expect(page.getByText('Takk! Dette ordet kommer tilbake litt senere.')).toBeVisible();
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await page.getByLabel('Stavingen din').fill('eple');
+    await page.getByRole('button', { name: 'Sjekk svaret' }).click();
+  }
+  await expect(page.getByRole('heading', { name: 'Godt jobbet!' })).toBeVisible();
+  await expect(page.locator('#completion-first-try-count')).toHaveText('0');
+  await expect(page.locator('#completion-extra-practice-count')).toHaveText('1');
 });
 
 test('refreshes word-set actions after saving progress and returning to the list', async ({
@@ -244,6 +290,27 @@ test('opens the cached app shell when offline', async ({ page, context }) => {
   await expect(page.getByRole('button', { name: 'Nytt ordsett' })).toBeVisible();
 });
 
+test('completes a practice session while offline', async ({ page, context }) => {
+  await page.goto('/');
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await page.reload();
+  await expect
+    .poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null))
+    .toBe(true);
+  await context.setOffline(true);
+  await page.reload();
+
+  await page.getByRole('button', { name: 'Nytt ordsett' }).click();
+  await page.getByLabel('Navn på ordsettet').fill('Frukt');
+  await page.getByLabel('Hint og svar').fill('En rød frukt\teple');
+  await page.getByRole('button', { name: 'Lagre og start øving' }).click();
+  await page.getByLabel('Stavingen din').fill('eple');
+  await page.getByRole('button', { name: 'Sjekk svaret' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Godt jobbet!' })).toBeVisible();
+  await expect(page.locator('#completion-first-try-count')).toHaveText('1');
+});
+
 test('creates and practices a saved word set in both directions', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Nytt ordsett' }).click();
@@ -268,6 +335,9 @@ test('creates and practices a saved word set in both directions', async ({ page 
     if (attempt === 0) await expect(page.getByText('Riktig! Fortsett slik.')).toBeVisible();
   }
   await expect(page.getByRole('heading', { name: 'Godt jobbet!' })).toBeVisible();
+  await expect(page.locator('#completion-practiced-count')).toHaveText('2');
+  await expect(page.locator('#completion-first-try-count')).toHaveText('2');
+  await expect(page.locator('#completion-extra-practice-count')).toHaveText('0');
 });
 
 test('highlights malformed entries and supports set editing, duplication, archiving, and deletion', async ({
