@@ -290,6 +290,47 @@ test('opens the cached app shell when offline', async ({ page, context }) => {
   await expect(page.getByRole('button', { name: 'Nytt ordsett' })).toBeVisible();
 });
 
+test('loads completion actions with a populated v2 cache', async ({ page }) => {
+  await page.goto('/');
+  await expect
+    .poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null))
+    .toBe(true);
+
+  await page.evaluate(async () => {
+    const oldCache = await caches.open('puggern-app-shell-v2');
+    await oldCache.addAll([
+      './',
+      './index.html',
+      './styles.css',
+      './manifest.webmanifest',
+      './icons/pug-192.png',
+      './icons/pug-512.png',
+      './src/learning.mjs',
+      './src/word-sets.mjs',
+    ]);
+    await oldCache.put(
+      './src/main.mjs',
+      new Response("throw new Error('stale v2 module was loaded');", {
+        headers: { 'Content-Type': 'text/javascript' },
+      }),
+    );
+
+    const currentCache = await caches.open('puggern-app-shell-v4');
+    await currentCache.delete('./src/main.mjs');
+  });
+  await page.reload();
+
+  await page.getByRole('button', { name: 'Nytt ordsett' }).click();
+  await page.getByLabel('Navn på ordsettet').fill('Frukt');
+  await page.getByLabel('Hint og svar').fill('En rød frukt\teple');
+  await page.getByRole('button', { name: 'Lagre og start øving' }).click();
+  await page.getByLabel('Stavingen din').fill('eple');
+  await page.getByRole('button', { name: 'Sjekk svaret' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Godt jobbet!' })).toBeVisible();
+  await expect(page.locator('#completion-first-try-count')).toHaveText('1');
+});
+
 test('completes a practice session while offline', async ({ page, context }) => {
   await page.goto('/');
   await page.evaluate(() => navigator.serviceWorker.ready);
