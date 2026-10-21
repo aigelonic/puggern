@@ -1,42 +1,308 @@
 :root {
   color-scheme: light;
   font-family: Georgia, "Times New Roman", serif;
-  background: #f7f5ef;
-  color: #25332e;
+  color: #263a32;
+  background: #f4f2e9;
+  font-synthesis: none;
 }
 
 * {
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
+  background-image: radial-gradient(#d6d8c9 0.7px, transparent 0.7px);
+  background-size: 18px 18px;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
 }
 
 .app-shell {
-  display: grid;
+  width: min(100% - 2rem, 760px);
   min-height: 100vh;
-  align-content: center;
-  justify-items: center;
+  margin: 0 auto;
+  padding: 1.5rem 0 3rem;
+}
+
+.app-header,
+.practice-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
   gap: 0.5rem;
-  padding: 2rem;
-  text-align: center;
+  color: #263a32;
+  font-size: 1.55rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.brand span {
+  color: #dc694d;
+}
+
+#connection-status,
+.field-help,
+.check-option,
+.feedback,
+.text-button,
+label {
+  font-family: "Trebuchet MS", sans-serif;
+}
+
+#connection-status {
+  color: #587064;
+  font-size: 0.85rem;
+}
+
+.view {
+  width: min(100%, 600px);
+  margin: clamp(3rem, 11vh, 7rem) auto 0;
+}
+
+.eyebrow {
+  margin: 0 0 0.65rem;
+  color: #b4533d;
+  font-family: "Trebuchet MS", sans-serif;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
 }
 
 h1 {
   margin: 0;
-  font-size: 2.5rem;
+  font-size: 4rem;
+  font-weight: 500;
+  line-height: 1.05;
 }
 
-p {
-  margin: 0;
+.intro {
+  max-width: 38rem;
+  margin: 1rem 0 2rem;
+  color: #52665d;
   font-family: "Trebuchet MS", sans-serif;
-  line-height: 1.5;
+  font-size: 1.05rem;
+  line-height: 1.55;
 }
 
-#connection-status {
-  margin-top: 1rem;
-  color: #53665d;
+form > label,
+#answer-label {
+  display: block;
+  margin: 0 0 0.55rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+textarea,
+input[type="text"] {
+  display: block;
+  width: 100%;
+  border: 1px solid #aeb8a9;
+  border-radius: 5px;
+  background: #fffefa;
+  color: #263a32;
+  outline: none;
+}
+
+textarea {
+  min-height: 9rem;
+  padding: 0.9rem 1rem;
+  font-family: "Trebuchet MS", sans-serif;
+  line-height: 1.65;
+  resize: vertical;
+}
+
+input[type="text"] {
+  min-height: 3.6rem;
+  padding: 0.7rem 0.9rem;
+  font-size: 1.35rem;
+}
+
+textarea:focus,
+input[type="text"]:focus {
+  border-color: #347457;
+  box-shadow: 0 0 0 3px #3474572b;
+}
+
+.field-help {
+  margin: 0.45rem 0 1.15rem;
+  color: #64766d;
+  font-size: 0.85rem;
+}
+
+.settings-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 1.5rem;
+  margin: 1.1rem 0 1.4rem;
+}
+
+.check-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #40574c;
+  font-size: 0.9rem;
+}
+
+.check-option input {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: #347457;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.button {
+  min-height: 2.9rem;
+  padding: 0.65rem 1rem;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: "Trebuchet MS", sans-serif;
+  font-weight: 700;
+}
+
+.button span {
+  margin-left: 0.35rem;
+}
+
+.primary {
+  background: #286448;
+  color: white;
+}
+
+.primary:hover {
+  background: #1f5139;
+}
+
+.secondary {
+  border-color: #aeb8a9;
+  background: #fffefa;
+  color: #263a32;
+}
+
+.secondary:hover {
+  background: #e9ede4;
+}
+
+.button:focus-visible,
+.text-button:focus-visible {
+  outline: 3px solid #dc694d;
+  outline-offset: 3px;
+}
+
+.feedback {
+  min-height: 1.5rem;
+  margin: 0.75rem 0 1rem;
+  color: #286448;
+  line-height: 1.45;
+}
+
+.feedback.error {
+  color: #a33f2d;
+}
+
+.practice-view {
+  margin-top: clamp(2rem, 8vh, 5rem);
+}
+
+.practice-topline {
+  margin-bottom: clamp(3rem, 12vh, 7rem);
+}
+
+.practice-topline .eyebrow {
+  margin: 0;
+}
+
+.text-button {
+  padding: 0.25rem 0;
+  border: 0;
+  background: transparent;
+  color: #40574c;
+  cursor: pointer;
+}
+
+.practice-view h1 {
+  min-height: 1.1em;
+  margin-bottom: 2.2rem;
+  font-size: 3.5rem;
+}
+
+.practice-view .button {
+  margin-top: 0.3rem;
+}
+
+.complete-view h2 {
+  margin: 2rem 0 0.7rem;
+  font-size: 1.2rem;
+}
+
+#hardest-words {
+  margin: 0 0 2rem;
+  padding-left: 1.2rem;
+  color: #52665d;
+  font-family: "Trebuchet MS", sans-serif;
+  line-height: 1.8;
+}
+
+@media (max-width: 480px) {
+  .app-shell {
+    width: min(100% - 1.25rem, 760px);
+    padding-top: 1rem;
+  }
+
+  .app-header {
+    align-items: flex-start;
+  }
+
+  #connection-status {
+    max-width: 12rem;
+    text-align: right;
+  }
+
+  .view {
+    margin-top: 3rem;
+  }
+
+  h1 {
+    font-size: 2.55rem;
+  }
+
+  .practice-view h1 {
+    font-size: 2.4rem;
+  }
+
+  .practice-topline {
+    margin-bottom: 3rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
 }

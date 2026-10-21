@@ -124,6 +124,11 @@ celerybeat.pid
 # SageMath parsed files
 *.sage.py
 
+# Node.js and Playwright
+node_modules/
+playwright-report/
+test-results/
+
 # Environments
 .env
 .venv

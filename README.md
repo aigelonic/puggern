@@ -13,6 +13,25 @@ python3 -m http.server 8000 --directory frontend
 Then open <http://localhost:8000>. Service workers require HTTPS in production;
 `localhost` is treated as a secure context for development.
 
+Word sets use one clue and spelling per line, separated by a tab. Progress is
+saved in browser storage on this device. The current progress format is version
+1; corrupt or unsupported versions are ignored rather than resumed.
+
+## Tests
+
+Use Node.js 24 and npm. Install the development dependency and Chromium once,
+then run the unit and browser suites:
+
+```sh
+npm ci
+npx playwright install --with-deps chromium
+npm test
+```
+
+`npm run test:unit` runs the no-dependency core tests. `npm run test:e2e` runs
+the browser workflows against a temporary static server. GitHub Actions runs
+both suites for pull requests and pushes to `main`.
+
 ## Server Deployment
 
 The production image serves the static app with unprivileged NGINX. On a server
