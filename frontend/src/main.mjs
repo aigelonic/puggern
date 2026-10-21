@@ -226,26 +226,38 @@ function renderPractice(message = '') {
 }
 
 function finishSession() {
-  document.querySelector('#completion-message').textContent = `Du øvde på ${words.length} ord.`;
+  document.querySelector('#completion-message').textContent =
+    `Du fullførte alle ${session.learned.length} øvingsoppgavene.`;
+  document.querySelector('#completion-practiced-count').textContent = String(
+    session.learned.length,
+  );
+  document.querySelector('#completion-first-try-count').textContent = String(
+    session.learned.filter((id) => !session.mistakes[id]).length,
+  );
 
   const hardestWords = document.querySelector('#hardest-words');
-  hardestWords.replaceChildren();
-  Object.entries(session.mistakes)
+  const wordsNeedingPractice = Object.entries(session.mistakes)
     .filter(([, count]) => count > 0)
     .sort((left, right) => right[1] - left[1])
-    .forEach(([id, count]) => {
-      const word = words.find((item) => item.id === id);
-      if (!word) return;
+    .map(([id]) => words.find((item) => item.id === id))
+    .filter(Boolean);
+  document.querySelector('#completion-extra-practice-count').textContent = String(
+    wordsNeedingPractice.length,
+  );
+  hardestWords.replaceChildren();
+  if (wordsNeedingPractice.length > 0) {
+    wordsNeedingPractice.forEach((word) => {
       const item = document.createElement('li');
-      item.textContent = `${word.answer} · ${count} forsøk`;
+      item.textContent = `${word.prompt} → ${word.answer}`;
       hardestWords.append(item);
     });
-  if (hardestWords.childElementCount === 0) {
+  } else {
     const item = document.createElement('li');
-    item.textContent = 'Ingen vanskelige ord denne gangen.';
+    item.textContent = 'Ingen ord trengte ekstra øving denne gangen.';
     hardestWords.append(item);
   }
   showView(completeView);
+  document.querySelector('#completion-heading').focus();
 }
 
 function makeButton(label, action, className = 'button secondary') {
@@ -631,12 +643,16 @@ document.querySelector('#back-button').addEventListener('click', () => {
   showView(setupView);
   renderWordSets();
 });
+document.querySelector('#completion-restart-button').addEventListener('click', () => {
+  startSession(words, createSession(words, Math.random, session.settings), currentSetId);
+});
 document.querySelector('#completion-back-button').addEventListener('click', () => {
   showView(setupView);
-  renderWordSets();
+  document.querySelector('#saved-sets-title').focus();
 });
 document.querySelector('#completion-new-set-button').addEventListener('click', () => {
   showView(setupView);
+  renderWordSets();
   openEditor();
 });
 

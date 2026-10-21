@@ -429,6 +429,38 @@ select:focus {
   font-size: 1.2rem;
 }
 
+.completion-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+  font-family: 'Trebuchet MS', sans-serif;
+}
+
+.completion-stats div {
+  padding: 0.9rem;
+  border: 1px solid #d0d6ca;
+  border-radius: 5px;
+  background: #fffefa;
+}
+
+.completion-stats dt {
+  color: #52665d;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.completion-stats dd {
+  margin: 0.4rem 0 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.complete-view h1:focus {
+  outline: 3px solid #dc694d;
+  outline-offset: 4px;
+}
+
 #hardest-words {
   margin: 0 0 2rem;
   padding-left: 1.2rem;
@@ -481,6 +513,10 @@ select:focus {
   }
 
   .preview-row {
+    grid-template-columns: 1fr;
+  }
+
+  .completion-stats {
     grid-template-columns: 1fr;
   }
 }

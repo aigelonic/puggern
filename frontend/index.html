@@ -55,7 +55,7 @@
           </form>
         </section>
         <div class="saved-sets-heading">
-          <h2 id="saved-sets-title">Ordsettene dine</h2>
+          <h2 id="saved-sets-title" tabindex="-1">Ordsettene dine</h2>
           <button id="archive-toggle" class="text-button" type="button">Vis arkiv</button>
         </div>
         <p id="setup-error" class="feedback error" role="alert" hidden></p>
@@ -133,16 +133,35 @@
 
       <section id="complete-view" class="view complete-view" hidden>
         <p class="eyebrow">Øving fullført</p>
-        <h1>Godt jobbet!</h1>
+        <h1 id="completion-heading" tabindex="-1">Godt jobbet!</h1>
         <p id="completion-message" class="intro"></p>
+        <dl class="completion-stats">
+          <div>
+            <dt>Øvingsoppgaver lært</dt>
+            <dd id="completion-practiced-count">0</dd>
+          </div>
+          <div>
+            <dt>Riktig på første forsøk</dt>
+            <dd id="completion-first-try-count">0</dd>
+          </div>
+          <div>
+            <dt>Trengte mer øving</dt>
+            <dd id="completion-extra-practice-count">0</dd>
+          </div>
+        </dl>
         <h2>Ord det kan være lurt å øve mer på</h2>
         <ul id="hardest-words"></ul>
-        <button id="completion-back-button" class="button secondary" type="button">
-          Til ordsettene
-        </button>
-        <button id="completion-new-set-button" class="button primary" type="button">
-          Lag et nytt ordsett <span aria-hidden="true">&#8594;</span>
-        </button>
+        <div class="actions">
+          <button id="completion-restart-button" class="button primary" type="button">
+            Øv på nytt
+          </button>
+          <button id="completion-back-button" class="button secondary" type="button">
+            Til ordsettene
+          </button>
+          <button id="completion-new-set-button" class="button secondary" type="button">
+            Lag et nytt ordsett <span aria-hidden="true">&#8594;</span>
+          </button>
+        </div>
       </section>
     </main>
     <script type="module" src="./src/main.mjs?v=4"></script>
