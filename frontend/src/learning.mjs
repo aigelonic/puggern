@@ -141,27 +141,52 @@ export function loadProgress(storage) {
 
   try {
     const progress = JSON.parse(stored);
-    if (
-      progress.version !== PROGRESS_VERSION ||
-      !Array.isArray(progress.words) ||
-      progress.words.some(
-        (word) =>
-          typeof word.id !== 'string' ||
-          typeof word.prompt !== 'string' ||
-          typeof word.answer !== 'string',
-      ) ||
-      !progress.session ||
-      !Array.isArray(progress.session.queue) ||
-      progress.session.queue.some((id) => !progress.words.some((word) => word.id === id)) ||
-      typeof progress.session.correction !== 'boolean' ||
-      !Array.isArray(progress.session.learned) ||
-      !progress.session.mistakes ||
-      typeof progress.session.mistakes !== 'object'
-    ) {
-      return null;
-    }
-    return progress;
+    return isValidProgress(progress) ? progress : null;
   } catch {
     return null;
   }
+}
+
+export function isValidProgress(progress) {
+  return (
+    progress?.version === PROGRESS_VERSION &&
+    Array.isArray(progress.words) &&
+    progress.words.length > 0 &&
+    progress.words.length <= MAX_WORDS_PER_SET * 2 &&
+    new Set(progress.words.map((word) => word?.id)).size === progress.words.length &&
+    progress.words.every(
+      (word) =>
+        word &&
+        typeof word.id === 'string' &&
+        word.id.length > 0 &&
+        typeof word.prompt === 'string' &&
+        word.prompt.length > 0 &&
+        word.prompt.length <= MAX_WORD_LENGTH &&
+        typeof word.answer === 'string' &&
+        word.answer.length > 0 &&
+        word.answer.length <= MAX_WORD_LENGTH,
+    ) &&
+    progress.session &&
+    Array.isArray(progress.session.queue) &&
+    progress.session.queue.every((id) => progress.words.some((word) => word.id === id)) &&
+    typeof progress.session.correction === 'boolean' &&
+    Array.isArray(progress.session.learned) &&
+    new Set(progress.session.learned).size === progress.session.learned.length &&
+    progress.session.learned.every((id) => progress.words.some((word) => word.id === id)) &&
+    progress.session.mistakes &&
+    typeof progress.session.mistakes === 'object' &&
+    !Array.isArray(progress.session.mistakes) &&
+    Object.entries(progress.session.mistakes).every(
+      ([id, count]) =>
+        progress.words.some((word) => word.id === id) && Number.isInteger(count) && count >= 0,
+    ) &&
+    progress.session.settings &&
+    typeof progress.session.settings === 'object' &&
+    !Array.isArray(progress.session.settings) &&
+    ['caseSensitive', 'accentSensitive'].every(
+      (setting) =>
+        progress.session.settings[setting] === undefined ||
+        typeof progress.session.settings[setting] === 'boolean',
+    )
+  );
 }
