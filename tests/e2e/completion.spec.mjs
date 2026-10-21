@@ -102,3 +102,28 @@ test('shows completion even when saving the final answer fails', async ({ page }
   await page.getByRole('button', { name: 'Til ordsettene' }).click();
   await expect(page.getByRole('button', { name: 'Fortsett øvingen' })).toBeHidden();
 });
+
+test('restores continue when storage recovers during an unfinished session', async ({ page }) => {
+  await startSet(page);
+  await page.evaluate(() => {
+    const setItem = Storage.prototype.setItem;
+    let failOnce = true;
+    Storage.prototype.setItem = function (...args) {
+      if (failOnce) {
+        failOnce = false;
+        throw new DOMException('Storage full', 'QuotaExceededError');
+      }
+      return setItem.apply(this, args);
+    };
+  });
+  await answer(page, 'wrong');
+  await expect(page.getByRole('alert')).toContainText('Fremgangen kunne ikke lagres');
+  await answer(page, 'dog');
+  await expect(page.locator('#progress-warning')).toBeHidden();
+  await page.locator('#back-button').click();
+  await page.getByRole('button', { name: 'Fortsett øvingen' }).click();
+  await expect(page.locator('#progress-label')).toHaveText('0 av 1 lært · 2 oppgaver igjen');
+  await answer(page, 'dog');
+  await answer(page, 'dog');
+  await expectCompletion(page, 1, 0);
+});

@@ -68,20 +68,19 @@ function persistProgress() {
   try {
     saveProgress(window.localStorage, session, words);
     warning.hidden = true;
-    return true;
+    resumeButton.hidden = session.queue.length === 0;
   } catch {
     warning.textContent =
       'Fremgangen kunne ikke lagres på denne enheten. Du kan fortsette å øve, men fremgangen kan gå tapt når du laster siden på nytt.';
     warning.hidden = false;
     resumeButton.hidden = true;
-    return false;
   }
 }
 
 function startSession(nextWords, nextSession) {
   words = nextWords;
   session = nextSession;
-  resumeButton.hidden = !persistProgress() || session.queue.length === 0;
+  persistProgress();
   renderPractice();
 }
 
