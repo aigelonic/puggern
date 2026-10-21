@@ -127,3 +127,18 @@ test('restores continue when storage recovers during an unfinished session', asy
   await answer(page, 'dog');
   await expectCompletion(page, 1, 0);
 });
+
+test('resumes an unfinished in-memory session after saving fails', async ({ page }) => {
+  await startSet(page);
+  await page.evaluate(() => {
+    Storage.prototype.setItem = () => {
+      throw new DOMException('Storage full', 'QuotaExceededError');
+    };
+  });
+  await answer(page, 'wrong');
+  await expect(page.getByRole('alert')).toContainText('Fremgangen kunne ikke lagres');
+  await page.locator('#back-button').click();
+  await page.getByRole('button', { name: 'Fortsett øvingen' }).click();
+  await expect(page.getByLabel('Skriv ordet én gang')).toBeFocused();
+  await expect(page.locator('#progress-label')).toHaveText('0 av 1 lært · 1 oppgaver igjen');
+});

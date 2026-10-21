@@ -53,6 +53,7 @@ test('loads the latest saved progress when resuming and hides a stale resume but
   await page.getByLabel('Hint og svar').fill('En rød frukt\teple');
   await page.getByRole('button', { name: 'Lagre og start øving' }).click();
   await page.getByRole('button', { name: 'Ordsett' }).click();
+  await page.reload();
 
   await page.evaluate(() => {
     localStorage.setItem(
@@ -68,6 +69,7 @@ test('loads the latest saved progress when resuming and hides a stale resume but
   await expect(page.getByRole('heading', { name: 'Oppdatert hint' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Ordsett' }).click();
+  await page.reload();
   await page.evaluate(() => localStorage.removeItem('puggern.progress'));
   await page.getByRole('button', { name: 'Fortsett øvingen' }).click();
   await expect(page.getByRole('button', { name: 'Fortsett øvingen' })).toBeHidden();

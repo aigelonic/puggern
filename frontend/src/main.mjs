@@ -73,7 +73,7 @@ function persistProgress() {
     warning.textContent =
       'Fremgangen kunne ikke lagres på denne enheten. Du kan fortsette å øve, men fremgangen kan gå tapt når du laster siden på nytt.';
     warning.hidden = false;
-    resumeButton.hidden = true;
+    resumeButton.hidden = session.queue.length === 0;
   }
 }
 
@@ -385,6 +385,10 @@ if (savedProgress?.session.queue.length === 0) {
   finishSession();
 }
 resumeButton.addEventListener('click', () => {
+  if (session?.queue.length > 0) {
+    startSession(words, session);
+    return;
+  }
   const progress = loadProgress(window.localStorage);
   if (!progress) {
     resumeButton.hidden = true;
