@@ -19,8 +19,10 @@ test('creates a set and practices a missed word until it is learned', async ({ p
   await expect(page.getByText('Takk! Dette ordet kommer tilbake litt senere.')).toBeVisible();
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
+    if (attempt > 0) await expect(page.getByText('Riktig! Fortsett slik.')).toBeVisible();
     await page.getByLabel('Stavingen din').fill('eple');
     await page.getByRole('button', { name: 'Sjekk svaret' }).click();
+    if (attempt === 0) await expect(page.getByText('Riktig! Fortsett slik.')).toBeVisible();
   }
 
   await expect(page.getByRole('heading', { name: 'Godt jobbet!' })).toBeVisible();
@@ -35,6 +37,7 @@ test('reloads and resumes a saved session during its correction step', async ({ 
   await page.getByRole('button', { name: 'Lagre og start øving' }).click();
   await page.getByLabel('Stavingen din').fill('pære');
   await page.getByRole('button', { name: 'Sjekk svaret' }).click();
+  await expect(page.getByText(/Riktig stavemåte er eple/)).toBeVisible();
 
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Frukt' })).toBeVisible();
@@ -42,6 +45,73 @@ test('reloads and resumes a saved session during its correction step', async ({ 
   await expect(page.getByRole('heading', { name: 'En rød frukt' })).toBeVisible();
   await expect(page.getByLabel('Skriv ordet én gang')).toBeVisible();
   await expect(page.getByText(/Riktig stavemåte er eple/)).toBeVisible();
+});
+
+test('refreshes word-set actions after saving progress and returning to the list', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Nytt ordsett' }).click();
+  await page.getByLabel('Navn på ordsettet').fill('Frukt');
+  await page.getByLabel('Hint og svar').fill('En rød frukt\teple');
+  await page.getByRole('button', { name: 'Lagre og start øving' }).click();
+  await expect(page.getByRole('heading', { name: 'En rød frukt' })).toBeVisible();
+  await page.getByLabel('Stavingen din').fill('pære');
+  await page.getByRole('button', { name: 'Sjekk svaret' }).click();
+  await expect(page.getByText(/Riktig stavemåte er eple/)).toBeVisible();
+  await page.getByRole('button', { name: 'Ordsett' }).click();
+
+  const set = page.getByRole('listitem').filter({ hasText: 'Frukt' });
+  await expect(set.getByRole('button', { name: 'Fortsett øvingen' })).toBeVisible();
+  await expect(set.getByRole('button', { name: 'Start øving' })).toHaveCount(0);
+});
+
+test('preserves concurrent profile and progress changes across tabs', async ({ page, context }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Nytt ordsett' }).click();
+  await page.getByLabel('Navn på ordsettet').fill('Frukt');
+  await page.getByLabel('Hint og svar').fill('En rød frukt\teple');
+  await page.getByRole('button', { name: 'Lagre og start øving' }).click();
+  await page.getByLabel('Stavingen din').fill('pære');
+  await page.getByRole('button', { name: 'Sjekk svaret' }).click();
+  await expect(page.getByText(/Riktig stavemåte er eple/)).toBeVisible();
+
+  const otherPage = await context.newPage();
+  await otherPage.goto('/');
+  await otherPage.getByRole('button', { name: 'Nytt ordsett' }).click();
+  await otherPage.getByLabel('Navn på ordsettet').fill('Dyr');
+  await otherPage.getByLabel('Hint og svar').fill('Bjeffer\thund');
+  await otherPage.getByRole('button', { name: 'Lagre og start øving' }).click();
+  await otherPage.getByLabel('Stavingen din').fill('katt');
+  await otherPage.getByRole('button', { name: 'Sjekk svaret' }).click();
+  await expect(otherPage.getByText(/Riktig stavemåte er hund/)).toBeVisible();
+  await otherPage.getByRole('button', { name: 'Ordsett' }).click();
+  await otherPage.getByRole('button', { name: 'Legg til profil' }).click();
+  await otherPage.getByLabel('Navn', { exact: true }).fill('Ada');
+  await otherPage.getByRole('button', { name: 'Lagre profil' }).click();
+  await expect(otherPage.getByLabel('Profil').locator('option', { hasText: 'Ada' })).toHaveCount(1);
+
+  await page.getByLabel('Skriv ordet én gang').fill('eple');
+  await page.getByRole('button', { name: 'Sjekk svaret' }).click();
+  await expect(page.getByText('Takk! Dette ordet kommer tilbake litt senere.')).toBeVisible();
+  await page.getByRole('button', { name: 'Ordsett' }).click();
+  await page.reload();
+  await page.getByLabel('Profil').selectOption({ label: 'Min profil' });
+
+  await expect(page.getByLabel('Profil').locator('option:checked')).toHaveText('Min profil');
+  await expect(
+    page
+      .getByRole('listitem')
+      .filter({ hasText: 'Frukt' })
+      .getByRole('button', { name: 'Fortsett øvingen' }),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByRole('listitem')
+      .filter({ hasText: 'Dyr' })
+      .getByRole('button', { name: 'Fortsett øvingen' }),
+  ).toBeVisible();
+  await expect(page.getByLabel('Profil').locator('option', { hasText: 'Ada' })).toHaveCount(1);
 });
 
 test('loads the latest saved progress when resuming and hides a stale continue action', async ({
@@ -52,6 +122,7 @@ test('loads the latest saved progress when resuming and hides a stale continue a
   await page.getByLabel('Navn på ordsettet').fill('Frukt');
   await page.getByLabel('Hint og svar').fill('En rød frukt\teple');
   await page.getByRole('button', { name: 'Lagre og start øving' }).click();
+  await expect(page.getByRole('heading', { name: 'En rød frukt' })).toBeVisible();
   await page.getByRole('button', { name: 'Ordsett' }).click();
 
   await page.evaluate(() => {
@@ -96,12 +167,14 @@ test('keeps each profile progress separate and offers continue or restart', asyn
   await page.getByRole('button', { name: 'Lagre og start øving' }).click();
   await page.getByLabel('Stavingen din').fill('pære');
   await page.getByRole('button', { name: 'Sjekk svaret' }).click();
+  await expect(page.getByText(/Riktig stavemåte er eple/)).toBeVisible();
   await page.getByRole('button', { name: 'Ordsett' }).click();
 
   await page.getByRole('button', { name: 'Legg til profil' }).click();
   await page.getByLabel('Navn', { exact: true }).fill('Ada');
   await page.getByLabel('Valgfri emoji').fill('🐶');
   await page.getByRole('button', { name: 'Lagre profil' }).click();
+  await expect(page.getByLabel('Profil').locator('option', { hasText: 'Ada' })).toHaveCount(1);
   await page.reload();
 
   let set = page.getByRole('listitem').filter({ hasText: 'Frukt' });
@@ -124,6 +197,7 @@ test('migrates an older in-progress session into the default profile', async ({ 
   await page.getByRole('button', { name: 'Lagre og start øving' }).click();
   await page.getByLabel('Stavingen din').fill('pære');
   await page.getByRole('button', { name: 'Sjekk svaret' }).click();
+  await expect(page.getByText(/Riktig stavemåte er eple/)).toBeVisible();
   await page.getByRole('button', { name: 'Ordsett' }).click();
   await page.evaluate(() => {
     const state = JSON.parse(localStorage.getItem('puggern.profile-state'));
@@ -187,9 +261,11 @@ test('creates and practices a saved word set in both directions', async ({ page 
   await expect(page.getByText('0 av 2 lært')).toBeVisible();
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
+    if (attempt > 0) await expect(page.getByText('Riktig! Fortsett slik.')).toBeVisible();
     const currentPrompt = await page.locator('#prompt').textContent();
     await page.getByLabel('Stavingen din').fill(currentPrompt === 'hund' ? 'hound' : 'hund');
     await page.getByRole('button', { name: 'Sjekk svaret' }).click();
+    if (attempt === 0) await expect(page.getByText('Riktig! Fortsett slik.')).toBeVisible();
   }
   await expect(page.getByRole('heading', { name: 'Godt jobbet!' })).toBeVisible();
 });

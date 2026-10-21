@@ -8,16 +8,17 @@ import {
   PROGRESS_VERSION,
   submitAnswer,
   wordsForDirection,
-} from './learning.mjs';
+} from './learning.mjs?v=4';
 import {
   createProfileState,
   loadProfileState,
   MAX_PROFILE_AVATAR_LENGTH,
   MAX_PROFILE_NAME_LENGTH,
   MAX_PROFILES,
+  PROFILE_STATE_KEY,
   saveProfileState,
-} from './profiles.mjs';
-import { loadWordSets, saveWordSets, MAX_WORD_SET_NAME_LENGTH } from './word-sets.mjs';
+} from './profiles.mjs?v=4';
+import { loadWordSets, saveWordSets, MAX_WORD_SET_NAME_LENGTH } from './word-sets.mjs?v=4';
 
 const status = document.querySelector('#connection-status');
 const appError = document.querySelector('#app-error');
@@ -37,6 +38,7 @@ const profileNameInput = document.querySelector('#profile-name');
 const profileAvatarInput = document.querySelector('#profile-avatar');
 const newProfileButton = document.querySelector('#new-profile-button');
 const answerForm = document.querySelector('#answer-form');
+const answerButton = answerForm.querySelector('button[type="submit"]');
 const answerInput = document.querySelector('#answer');
 const feedback = document.querySelector('#feedback');
 const progressLabel = document.querySelector('#progress-label');
@@ -52,38 +54,62 @@ let editorRows = [];
 let words = [];
 let session = null;
 let currentSetId = null;
+let currentProfileId = null;
 
 function setAppError(message) {
   appError.textContent = message;
   appError.hidden = !message;
 }
 
-if (!profileState) {
-  profileState = createProfileState();
-  const legacyProgress = loadProgress(window.localStorage);
-  const matchingSet = legacyProgress
-    ? wordSets.find(
-        (set) =>
-          JSON.stringify(wordsForDirection(set.words, set.direction)) ===
-          JSON.stringify(legacyProgress.words),
-      )
-    : null;
-  if (matchingSet) {
-    profileState.progress[profileState.activeProfileId][matchingSet.id] = legacyProgress;
+async function withProfileStateLock(operation) {
+  if (navigator.locks?.request) {
+    return navigator.locks.request(PROFILE_STATE_KEY, operation);
   }
+  return operation();
+}
+
+async function initializeProfileState() {
   try {
-    saveProfileState(window.localStorage, profileState);
-    if (matchingSet) window.localStorage.removeItem('puggern.progress');
+    await withProfileStateLock(() => {
+      profileState = loadProfileState(window.localStorage);
+      if (profileState) return;
+
+      profileState = createProfileState();
+      const legacyProgress = loadProgress(window.localStorage);
+      const matchingSet = legacyProgress
+        ? wordSets.find(
+            (set) =>
+              JSON.stringify(wordsForDirection(set.words, set.direction)) ===
+              JSON.stringify(legacyProgress.words),
+          )
+        : null;
+      if (matchingSet) {
+        profileState.progress[profileState.activeProfileId][matchingSet.id] = legacyProgress;
+      }
+      try {
+        saveProfileState(window.localStorage, profileState);
+        if (matchingSet) window.localStorage.removeItem('puggern.progress');
+      } catch (error) {
+        setAppError(`Kunne ikke lagre profiler og øving: ${error.message}`);
+      }
+    });
   } catch (error) {
-    setAppError(`Kunne ikke lagre profiler og øving: ${error.message}`);
+    setAppError(`Kunne ikke laste profiler og øving: ${error.message}`);
   }
 }
 
-function persistProfileState(nextState, action) {
+await initializeProfileState();
+
+async function persistProfileState(updateState, action) {
   try {
-    saveProfileState(window.localStorage, nextState);
-    profileState = nextState;
+    await withProfileStateLock(() => {
+      const latestState = loadProfileState(window.localStorage) ?? profileState;
+      const nextState = updateState(latestState);
+      saveProfileState(window.localStorage, nextState);
+      profileState = nextState;
+    });
     setAppError('');
+    renderProfiles();
     return true;
   } catch (error) {
     setAppError(`Kunne ikke ${action}: ${error.message}`);
@@ -134,38 +160,47 @@ function settingsFromForm() {
   };
 }
 
-function persistProgress() {
-  const progressBySet = activeProfileProgress();
-  const nextState = {
-    ...profileState,
-    progress: {
-      ...profileState.progress,
-      [profileState.activeProfileId]: {
-        ...progressBySet,
-        [currentSetId]: { version: PROGRESS_VERSION, session, words },
+async function persistProgress() {
+  const progress = { version: PROGRESS_VERSION, session, words };
+  const saved = await persistProfileState(
+    (state) => ({
+      ...state,
+      progress: {
+        ...state.progress,
+        [currentProfileId]: {
+          ...(state.progress[currentProfileId] ?? {}),
+          [currentSetId]: progress,
+        },
       },
-    },
-  };
-  persistProfileState(nextState, 'lagre øvingsfremgangen');
+    }),
+    'lagre øvingsfremgangen',
+  );
+  if (saved) renderWordSets();
+  return saved;
 }
 
-function startSession(nextWords, nextSession, setId) {
+async function startSession(nextWords, nextSession, setId) {
   words = nextWords;
   session = nextSession;
   currentSetId = setId;
-  persistProgress();
+  currentProfileId = profileState.activeProfileId;
+  await persistProgress();
   renderPractice();
 }
 
-function startWordSet(set) {
+async function startWordSet(set) {
   const practiceWords = wordsForDirection(set.words, set.direction);
-  startSession(practiceWords, createSession(practiceWords, Math.random, set.settings), set.id);
+  await startSession(
+    practiceWords,
+    createSession(practiceWords, Math.random, set.settings),
+    set.id,
+  );
 }
 
-function continueWordSet(set) {
+async function continueWordSet(set) {
   const progress = activeProfileProgress()[set.id];
   if (!progress) return;
-  startSession(progress.words, progress.session, set.id);
+  await startSession(progress.words, progress.session, set.id);
 }
 
 function renderPractice(message = '') {
@@ -465,24 +500,39 @@ function deleteWordSet(set) {
     )
   )
     return;
-  const progress = Object.fromEntries(
-    Object.entries(profileState.progress).map(([profileId, sets]) => {
-      const remaining = { ...sets };
-      delete remaining[set.id];
-      return [profileId, remaining];
+  persistProfileState(
+    (state) => ({
+      ...state,
+      progress: Object.fromEntries(
+        Object.entries(state.progress).map(([profileId, sets]) => {
+          const remaining = { ...sets };
+          delete remaining[set.id];
+          return [profileId, remaining];
+        }),
+      ),
     }),
+    'fjerne øvingsfremgangen',
   );
-  persistProfileState({ ...profileState, progress }, 'fjerne øvingsfremgangen');
 }
+
+window.addEventListener('storage', (event) => {
+  if (event.key !== PROFILE_STATE_KEY) return;
+  const latestState = loadProfileState(window.localStorage);
+  if (!latestState) return;
+  profileState = latestState;
+  renderProfiles();
+  renderWordSets();
+});
 
 window.addEventListener('online', updateConnectionStatus);
 window.addEventListener('offline', updateConnectionStatus);
 updateConnectionStatus();
 renderProfiles();
 renderWordSets();
-profileSelect.addEventListener('change', () => {
-  const nextState = { ...profileState, activeProfileId: profileSelect.value };
-  if (persistProfileState(nextState, 'bytte profil')) renderWordSets();
+profileSelect.addEventListener('change', async () => {
+  const activeProfileId = profileSelect.value;
+  if (await persistProfileState((state) => ({ ...state, activeProfileId }), 'bytte profil'))
+    renderWordSets();
   else renderProfiles();
 });
 newProfileButton.addEventListener('click', () => {
@@ -494,7 +544,7 @@ document.querySelector('#cancel-profile-button').addEventListener('click', () =>
   profileNameInput.value = '';
   profileAvatarInput.value = '';
 });
-profileForm.addEventListener('submit', (event) => {
+profileForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const name = profileNameInput.value.trim();
   const avatar = profileAvatarInput.value.trim();
@@ -507,18 +557,20 @@ profileForm.addEventListener('submit', (event) => {
     setAppError('Profilnavnet eller emojien er for lang.');
     return;
   }
-  if (profileState.profiles.length >= MAX_PROFILES) {
-    setAppError(`Du kan ha maksimalt ${MAX_PROFILES} profiler.`);
-    return;
-  }
   const profile = { id: crypto.randomUUID(), name, avatar };
-  const nextState = {
-    ...profileState,
-    activeProfileId: profile.id,
-    profiles: [...profileState.profiles, profile],
-    progress: { ...profileState.progress, [profile.id]: {} },
-  };
-  if (persistProfileState(nextState, 'lagre profilen')) {
+  if (
+    await persistProfileState((state) => {
+      if (state.profiles.length >= MAX_PROFILES) {
+        throw new Error(`Du kan ha maksimalt ${MAX_PROFILES} profiler.`);
+      }
+      return {
+        ...state,
+        activeProfileId: profile.id,
+        profiles: [...state.profiles, profile],
+        progress: { ...state.progress, [profile.id]: {} },
+      };
+    }, 'lagre profilen')
+  ) {
     renderProfiles();
     renderWordSets();
     profileForm.hidden = true;
@@ -543,31 +595,42 @@ wordSetForm.addEventListener('submit', (event) => {
 });
 document.querySelector('#save-and-start-button').addEventListener('click', () => saveEditor(true));
 
-answerForm.addEventListener('submit', (event) => {
+answerForm.addEventListener('submit', async (event) => {
   event.preventDefault();
-  const outcome = submitAnswer(session, answerInput.value, words, session.settings);
-  session = outcome.session;
-  persistProgress();
+  if (answerButton.disabled) return;
+  answerButton.disabled = true;
+  answerInput.readOnly = true;
+  try {
+    const outcome = submitAnswer(session, answerInput.value, words, session.settings);
+    session = outcome.session;
+    await persistProgress();
 
-  if (outcome.result === 'incorrect') {
-    const word = currentWord(session, words);
-    renderPractice(
-      `Riktig stavemåte er ${word.answer}. Skriv ordet én gang, så kommer det tilbake senere.`,
-    );
-    return;
+    if (outcome.result === 'incorrect') {
+      const word = currentWord(session, words);
+      renderPractice(
+        `Riktig stavemåte er ${word.answer}. Skriv ordet én gang, så kommer det tilbake senere.`,
+      );
+      return;
+    }
+    if (outcome.result === 'retry-scheduled') {
+      renderPractice('Takk! Dette ordet kommer tilbake litt senere.');
+      return;
+    }
+    if (outcome.result === 'complete') {
+      finishSession();
+      return;
+    }
+    renderPractice('Riktig! Fortsett slik.');
+  } finally {
+    answerButton.disabled = false;
+    answerInput.readOnly = false;
   }
-  if (outcome.result === 'retry-scheduled') {
-    renderPractice('Takk! Dette ordet kommer tilbake litt senere.');
-    return;
-  }
-  if (outcome.result === 'complete') {
-    finishSession();
-    return;
-  }
-  renderPractice('Riktig! Fortsett slik.');
 });
 
-document.querySelector('#back-button').addEventListener('click', () => showView(setupView));
+document.querySelector('#back-button').addEventListener('click', () => {
+  showView(setupView);
+  renderWordSets();
+});
 document.querySelector('#completion-back-button').addEventListener('click', () => {
   showView(setupView);
   renderWordSets();
@@ -578,7 +641,9 @@ document.querySelector('#completion-new-set-button').addEventListener('click', (
 });
 
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
+  const registerServiceWorker = () => {
     navigator.serviceWorker.register('./service-worker.js').catch(() => {});
-  });
+  };
+  if (document.readyState === 'complete') registerServiceWorker();
+  else window.addEventListener('load', registerServiceWorker, { once: true });
 }
