@@ -648,7 +648,6 @@ document.querySelector('#completion-restart-button').addEventListener('click', (
 });
 document.querySelector('#completion-back-button').addEventListener('click', () => {
   showView(setupView);
-  renderWordSets();
   document.querySelector('#saved-sets-title').focus();
 });
 document.querySelector('#completion-new-set-button').addEventListener('click', () => {
