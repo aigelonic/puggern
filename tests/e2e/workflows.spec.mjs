@@ -42,6 +42,30 @@ test('reloads and resumes a saved session during its correction step', async ({ 
   await expect(page.getByText(/Riktig stavemåte er eple/)).toBeVisible();
 });
 
+test('loads the latest saved progress when resuming and hides a stale resume button', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Nytt ordsett' }).click();
+  await page.getByLabel('Navn på ordsettet').fill('Frukt');
+  await page.getByLabel('Hint og svar').fill('En rød frukt\teple');
+  await page.getByRole('button', { name: 'Lagre og start øving' }).click();
+  await page.getByRole('button', { name: 'Ordsett' }).click();
+
+  await page.evaluate(() => {
+    localStorage.setItem('puggern.progress', JSON.stringify({
+      version: 1,
+      words: [{ id: 'updated', prompt: 'Oppdatert hint', answer: 'nytt svar' }],
+      session: { queue: ['updated'], correction: false, learned: [], mistakes: {}, settings: {} },
+    }));
+  });
+  await page.getByRole('button', { name: 'Fortsett øvingen' }).click();
+  await expect(page.getByRole('heading', { name: 'Oppdatert hint' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Ordsett' }).click();
+  await page.evaluate(() => localStorage.removeItem('puggern.progress'));
+  await page.getByRole('button', { name: 'Fortsett øvingen' }).click();
+  await expect(page.getByRole('button', { name: 'Fortsett øvingen' })).toBeHidden();
+});
+
 test('opens the cached app shell when offline', async ({ page, context }) => {
   await page.goto('/');
   await page.evaluate(() => navigator.serviceWorker.ready);
@@ -116,4 +140,26 @@ test('highlights malformed entries and supports set editing, duplication, archiv
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('listitem').filter({ hasText: 'Uke 44 (kopi)' }).getByRole('button', { name: 'Slett' }).click();
   await expect(page.getByRole('heading', { name: 'Uke 44 (kopi)' })).toHaveCount(0);
+});
+
+test('keeps malformed rows invalid until repaired and retains preview edits in the source', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Nytt ordsett' }).click();
+  await page.getByLabel('Navn på ordsettet').fill('Uke 45');
+  await page.getByLabel('Hint og svar').fill('to;separator;marks');
+
+  await expect(page.getByText(/Linje 1 må inneholde/)).toBeVisible();
+  await expect(page.locator('.preview-row.invalid')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Lagre ordsett' }).click();
+  await expect(page.getByRole('alert')).toContainText('Rett opp de markerte linjene');
+
+  await page.getByLabel('Svar, linje 1').fill('hound');
+  await expect(page.getByLabel('Hint og svar')).toHaveValue('to\thound');
+  await page.getByLabel('Hint og svar').fill('to\thound\ncat;kitty');
+  await expect(page.getByLabel('Svar, linje 1')).toHaveValue('hound');
+  await expect(page.getByLabel('Svar, linje 2')).toHaveValue('kitty');
+
+  await page.getByRole('button', { name: 'Lagre ordsett' }).click();
+  const set = page.getByRole('listitem').filter({ hasText: 'Uke 45' });
+  await expect(set).toContainText('2 ord');
 });

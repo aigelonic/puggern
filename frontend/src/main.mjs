@@ -208,6 +208,7 @@ function openEditor(set = null) {
 function previewEntryError(entry, index) {
   const promptText = entry.prompt.trim();
   const answerText = entry.answer.trim();
+  if (entry.error?.startsWith('Linje')) return entry.error;
   if (!promptText || !answerText) {
     return entry.error ?? `Linje ${entry.lineNumber} må inneholde både et hint og et svar.`;
   }
@@ -254,6 +255,11 @@ function renderPreview() {
       entry.answer = answerField.value;
       if (canRepair && entry.prompt.trim() && entry.answer.trim() && entry.error?.startsWith('Linje')) {
         entry.error = null;
+      }
+      if (canRepair) {
+        const sourceLines = wordSetInput.value.split(/\r?\n/);
+        sourceLines[entry.lineNumber - 1] = `${entry.prompt}\t${entry.answer}`;
+        wordSetInput.value = sourceLines.join('\n');
       }
       const message = previewEntryError(entry, index);
       row.classList.toggle('invalid', Boolean(message));
@@ -347,7 +353,14 @@ window.addEventListener('offline', updateConnectionStatus);
 updateConnectionStatus();
 renderWordSets();
 resumeButton.hidden = !savedProgress;
-resumeButton.addEventListener('click', () => startSession(savedProgress.words, savedProgress.session));
+resumeButton.addEventListener('click', () => {
+  const progress = loadProgress(window.localStorage);
+  if (!progress) {
+    resumeButton.hidden = true;
+    return;
+  }
+  startSession(progress.words, progress.session);
+});
 
 document.querySelector('#new-set-button').addEventListener('click', () => openEditor());
 document.querySelector('#cancel-edit-button').addEventListener('click', () => {
