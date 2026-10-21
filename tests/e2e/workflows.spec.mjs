@@ -2,8 +2,10 @@ import { expect, test } from '@playwright/test';
 
 test('creates a set and practices a missed word until it is learned', async ({ page }) => {
   await page.goto('/');
-  await page.getByLabel('Ordsettet ditt').fill('En rød frukt\teple');
-  await page.getByRole('button', { name: /Start øvingen/ }).click();
+  await page.getByRole('button', { name: 'Nytt ordsett' }).click();
+  await page.getByLabel('Navn på ordsettet').fill('Frukt');
+  await page.getByLabel('Hint og svar').fill('En rød frukt\teple');
+  await page.getByRole('button', { name: 'Lagre og start øving' }).click();
 
   await expect(page.getByRole('heading', { name: 'En rød frukt' })).toBeVisible();
   await page.getByLabel('Stavingen din').fill('pære');
@@ -25,12 +27,15 @@ test('creates a set and practices a missed word until it is learned', async ({ p
 
 test('reloads and resumes a saved session during its correction step', async ({ page }) => {
   await page.goto('/');
-  await page.getByLabel('Ordsettet ditt').fill('En rød frukt\teple');
-  await page.getByRole('button', { name: /Start øvingen/ }).click();
+  await page.getByRole('button', { name: 'Nytt ordsett' }).click();
+  await page.getByLabel('Navn på ordsettet').fill('Frukt');
+  await page.getByLabel('Hint og svar').fill('En rød frukt\teple');
+  await page.getByRole('button', { name: 'Lagre og start øving' }).click();
   await page.getByLabel('Stavingen din').fill('pære');
   await page.getByRole('button', { name: 'Sjekk svaret' }).click();
 
   await page.reload();
+  await expect(page.getByRole('heading', { name: 'Frukt' })).toBeVisible();
   await page.getByRole('button', { name: 'Fortsett øvingen' }).click();
   await expect(page.getByRole('heading', { name: 'En rød frukt' })).toBeVisible();
   await expect(page.getByLabel('Skriv ordet én gang')).toBeVisible();
@@ -46,5 +51,69 @@ test('opens the cached app shell when offline', async ({ page, context }) => {
   await page.reload();
 
   await expect(page.getByRole('heading', { name: 'Klar, ferdig, stav!' })).toBeVisible();
-  await expect(page.getByLabel('Ordsettet ditt')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Nytt ordsett' })).toBeVisible();
+});
+
+test('creates and practices a saved word set in both directions', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Nytt ordsett' }).click();
+  await page.getByLabel('Navn på ordsettet').fill('Uke 42');
+  await page.getByLabel('Hint og svar').fill('hund;dog');
+  await page.getByLabel('Quizretning').selectOption('both');
+
+  await expect(page.getByLabel('Hint, linje 1')).toHaveValue('hund');
+  await page.getByLabel('Svar, linje 1').fill('hound');
+  await page.getByRole('button', { name: 'Lagre ordsett' }).click();
+
+  const set = page.getByRole('listitem').filter({ hasText: 'Uke 42' });
+  await expect(set).toBeVisible();
+  await set.getByRole('button', { name: 'Start øving' }).click();
+  await expect(page.getByText('0 av 2 lært')).toBeVisible();
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const currentPrompt = await page.locator('#prompt').textContent();
+    await page.getByLabel('Stavingen din').fill(currentPrompt === 'hund' ? 'hound' : 'hund');
+    await page.getByRole('button', { name: 'Sjekk svaret' }).click();
+  }
+  await expect(page.getByRole('heading', { name: 'Godt jobbet!' })).toBeVisible();
+});
+
+test('highlights malformed entries and supports set editing, duplication, archiving, and deletion', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Nytt ordsett' }).click();
+  await page.getByLabel('Navn på ordsettet').fill('Uke 43');
+  await page.getByLabel('Hint og svar').fill('gyldig; svar\nuten skilletegn');
+  await expect(page.getByText(/Linje 2 må inneholde/)).toBeVisible();
+  await expect(page.locator('.preview-row.invalid')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Lagre ordsett' }).click();
+  await expect(page.getByRole('alert')).toContainText('Rett opp de markerte linjene');
+  await expect(page.getByRole('list').filter({ has: page.getByText('Uke 43') })).toHaveCount(0);
+
+  await page.getByLabel('Hint og svar').fill('gyldig; svar');
+  await page.getByRole('button', { name: 'Lagre ordsett' }).click();
+  let set = page.getByRole('listitem').filter({ hasText: 'Uke 43' });
+  await expect(set).toBeVisible();
+  await set.getByRole('button', { name: 'Rediger' }).click();
+  await page.getByLabel('Navn på ordsettet').fill('Uke 44');
+  await page.getByRole('button', { name: 'Lagre ordsett' }).click();
+
+  set = page.getByRole('listitem').filter({ hasText: 'Uke 44' });
+  await set.getByRole('button', { name: 'Kopier' }).click();
+  await expect(page.getByRole('heading', { name: 'Uke 44 (kopi)' })).toBeVisible();
+  set = page.getByRole('listitem').filter({
+    has: page.getByRole('heading', { name: 'Uke 44', exact: true }),
+  });
+  await set.getByRole('button', { name: 'Arkiver' }).click();
+  await page.getByRole('button', { name: 'Vis arkiv' }).click();
+  const archivedSet = page.getByRole('listitem').filter({
+    has: page.getByRole('heading', { name: 'Uke 44', exact: true }),
+  });
+  await expect(archivedSet).toBeVisible();
+  await archivedSet.getByRole('button', { name: 'Gjenopprett' }).click();
+  await page.getByRole('button', { name: 'Vis aktive ordsett' }).click();
+  await expect(page.getByRole('heading', { name: 'Uke 44', exact: true })).toBeVisible();
+
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('listitem').filter({ hasText: 'Uke 44 (kopi)' }).getByRole('button', { name: 'Slett' }).click();
+  await expect(page.getByRole('heading', { name: 'Uke 44 (kopi)' })).toHaveCount(0);
 });

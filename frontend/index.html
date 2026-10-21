@@ -22,21 +22,41 @@
       <section id="setup-view" class="view setup-view">
         <p class="eyebrow">Litt øving gjør susen</p>
         <h1>Klar, ferdig, stav!</h1>
-        <p class="intro">Lag et sett med hint og svar, og øv i ditt eget tempo.</p>
-        <form id="word-set-form">
-          <label for="word-set">Ordsettet ditt</label>
-          <textarea id="word-set" rows="6" required aria-describedby="word-set-help">Det skinner på himmelen om dagen&#9;sol
-Vann i frossen form&#9;is
-Et dyr som ofte er et kjæledyr&#9;hund</textarea>
-          <p id="word-set-help" class="field-help">Skriv ett hint og ett svar per linje, atskilt med tabulatortasten.</p>
+        <p class="intro">Lag et ordsett med hint og svar, og øv i ditt eget tempo.</p>
+        <div class="saved-sets-heading">
+          <h2 id="saved-sets-title">Ordsettene dine</h2>
+          <button id="archive-toggle" class="text-button" type="button">Vis arkiv</button>
+        </div>
+        <p id="setup-error" class="feedback error" role="alert" hidden></p>
+        <ul id="word-set-list" class="word-set-list" aria-labelledby="saved-sets-title"></ul>
+        <p id="empty-sets" class="field-help">Ingen ordsett ennå. Lag ditt første under.</p>
+        <button id="new-set-button" class="button secondary new-set-button" type="button">Nytt ordsett</button>
+        <button id="resume-button" class="button secondary resume-button" type="button" hidden>Fortsett øvingen</button>
+
+        <form id="word-set-form" hidden>
+          <div class="editor-heading">
+            <h2 id="editor-title">Nytt ordsett</h2>
+            <button id="cancel-edit-button" class="text-button" type="button">Avbryt</button>
+          </div>
+          <label for="word-set-name">Navn på ordsettet</label>
+          <input id="word-set-name" type="text" maxlength="80" required autocomplete="off">
+          <label for="word-set">Hint og svar</label>
+          <textarea id="word-set" rows="6" required aria-describedby="word-set-help" placeholder="hund; dog&#10;Et kjæledyr - katt"></textarea>
+          <p id="word-set-help" class="field-help">Én oppføring per linje. Bruk tabulator, semikolon eller « - » mellom hint og svar.</p>
+          <div id="word-preview" class="word-preview" aria-live="polite"></div>
+          <label for="quiz-direction">Quizretning</label>
+          <select id="quiz-direction">
+            <option value="prompt-to-answer">Hint → svar</option>
+            <option value="answer-to-prompt">Svar → hint</option>
+            <option value="both">Begge retninger</option>
+          </select>
           <div class="settings-row">
             <label class="check-option"><input id="case-sensitive" type="checkbox"> Skill mellom store og små bokstaver</label>
             <label class="check-option"><input id="accent-sensitive" type="checkbox"> Ta hensyn til aksenter</label>
           </div>
-          <p id="setup-error" class="feedback error" role="alert" hidden></p>
           <div class="actions">
-            <button class="button primary" type="submit">Start øvingen <span aria-hidden="true">&#8594;</span></button>
-            <button id="resume-button" class="button secondary" type="button" hidden>Fortsett øvingen</button>
+            <button class="button primary" type="submit">Lagre ordsett</button>
+            <button id="save-and-start-button" class="button secondary" type="button">Lagre og start øving</button>
           </div>
         </form>
       </section>
@@ -62,7 +82,7 @@ Et dyr som ofte er et kjæledyr&#9;hund</textarea>
         <p id="completion-message" class="intro"></p>
         <h2>Ord det kan være lurt å øve mer på</h2>
         <ul id="hardest-words"></ul>
-        <button id="new-set-button" class="button primary" type="button">Lag et nytt ordsett <span aria-hidden="true">&#8594;</span></button>
+        <button id="completion-new-set-button" class="button primary" type="button">Lag et nytt ordsett <span aria-hidden="true">&#8594;</span></button>
       </section>
     </main>
     <script type="module" src="./src/main.mjs"></script>
