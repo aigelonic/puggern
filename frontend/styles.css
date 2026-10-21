@@ -170,6 +170,44 @@ select:focus {
   gap: 1rem;
 }
 
+.profile-controls {
+  margin-bottom: 2rem;
+}
+
+.profile-controls h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.4rem;
+}
+
+.profile-controls > label,
+#profile-form > label {
+  display: block;
+  margin: 0 0 0.55rem;
+  font-family: 'Trebuchet MS', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.profile-picker {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.profile-picker select {
+  flex: 1;
+}
+
+#profile-form {
+  margin-top: 1rem;
+}
+
+#profile-form input[type='text'] {
+  min-height: 3rem;
+  margin-bottom: 1rem;
+  padding: 0.55rem 0.75rem;
+  font-size: 1rem;
+}
+
 .saved-sets-heading {
   margin-bottom: 0.75rem;
 }
@@ -228,8 +266,7 @@ select:focus {
   color: #8d3325;
 }
 
-.new-set-button,
-.resume-button {
+.new-set-button {
   margin-top: 0.75rem;
 }
 
@@ -433,6 +470,10 @@ select:focus {
 
   .word-set-item {
     padding: 0.75rem;
+  }
+
+  .profile-picker {
+    flex-direction: column;
   }
 
   .set-actions .button {

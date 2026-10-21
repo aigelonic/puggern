@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#f7f5ef" />
     <meta name="description" content="Et ordtreningsspill som fungerer uten nett." />
     <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles.css?v=4" />
     <title>Puggern</title>
   </head>
   <body>
@@ -20,10 +20,41 @@
       </header>
       <p id="progress-warning" class="feedback error" role="alert" hidden></p>
 
+      <p id="app-error" class="feedback error" role="alert" hidden></p>
+
       <section id="setup-view" class="view setup-view">
         <p class="eyebrow">Litt øving gjør susen</p>
         <h1>Klar, ferdig, stav!</h1>
         <p class="intro">Lag et ordsett med hint og svar, og øv i ditt eget tempo.</p>
+        <section class="profile-controls" aria-labelledby="profile-heading">
+          <h2 id="profile-heading">Hvem øver?</h2>
+          <label for="profile-select">Profil</label>
+          <div class="profile-picker">
+            <select id="profile-select"></select>
+            <button id="new-profile-button" class="button secondary" type="button">
+              Legg til profil
+            </button>
+          </div>
+          <form id="profile-form" hidden>
+            <label for="profile-name">Navn</label>
+            <input id="profile-name" type="text" maxlength="40" required autocomplete="off" />
+            <label for="profile-avatar">Valgfri emoji</label>
+            <input
+              id="profile-avatar"
+              type="text"
+              maxlength="8"
+              autocomplete="off"
+              aria-describedby="profile-help"
+            />
+            <p id="profile-help" class="field-help">Navnet lagres bare i denne nettleseren.</p>
+            <div class="actions">
+              <button class="button primary" type="submit">Lagre profil</button>
+              <button id="cancel-profile-button" class="button secondary" type="button">
+                Avbryt
+              </button>
+            </div>
+          </form>
+        </section>
         <div class="saved-sets-heading">
           <h2 id="saved-sets-title">Ordsettene dine</h2>
           <button id="archive-toggle" class="text-button" type="button">Vis arkiv</button>
@@ -34,10 +65,6 @@
         <button id="new-set-button" class="button secondary new-set-button" type="button">
           Nytt ordsett
         </button>
-        <button id="resume-button" class="button secondary resume-button" type="button" hidden>
-          Fortsett øvingen
-        </button>
-
         <form id="word-set-form" hidden>
           <div class="editor-heading">
             <h2 id="editor-title">Nytt ordsett</h2>
@@ -124,6 +151,6 @@
         </div>
       </section>
     </main>
-    <script type="module" src="./src/main.mjs"></script>
+    <script type="module" src="./src/main.mjs?v=5"></script>
   </body>
 </html>

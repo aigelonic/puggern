@@ -17,11 +17,15 @@ Create named word sets by pasting one clue and spelling per line, separated by
 a tab, semicolon, or `-`. Review and edit the parsed entries before saving.
 Each set supports up to 100 entries, either quiz direction or both directions,
 and its own case/accent matching settings. Sets can be edited, copied, archived,
-restored, and deleted. Word sets and progress are saved in browser storage on
-this device; they are not synced to other devices.
+restored, and deleted. Create a local profile for each child, with an optional
+emoji avatar. Practice progress is kept separately for each profile and word
+set, so an unfinished session can be continued or restarted, including after a
+page reload. Profiles, word sets, and progress are saved in browser storage on
+this device; they are not synced to other devices. Only the profile name and
+optional emoji are stored for a profile.
 
-The current progress and word-set storage formats are version 1; corrupt or
-unsupported saved data is ignored rather than resumed or displayed.
+The current profile, progress, and word-set storage formats are version 1;
+corrupt or unsupported saved data is ignored rather than resumed or displayed.
 
 Finishing practice opens a summary with learned practice entries, first-try
 correct entries, and incorrect-answer counts for entries needing more practice.
@@ -31,10 +35,10 @@ survives reload, and you can practice the same set again or return to word sets.
 If saving progress fails, practice still continues and a warning explains that
 progress may be lost on reload.
 
-Storage currently retains only the latest session. Per-profile/per-set completion
-history depends on [#19](https://github.com/aigelonic/puggern/issues/19), and session
+Storage retains each profile's current session per word set, not a history of
+completed attempts. Session
 rewards and celebration depend on [#18](https://github.com/aigelonic/puggern/issues/18);
-neither model is implemented here.
+that model is not implemented here.
 
 ## Tests
 

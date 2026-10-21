@@ -7,11 +7,15 @@ async function startSet(page, source = 'hund;dog', direction = 'prompt-to-answer
   await page.getByLabel('Hint og svar').fill(source);
   await page.getByLabel('Quizretning').selectOption(direction);
   await page.getByRole('button', { name: 'Lagre og start øving' }).click();
+  await expect(page.getByLabel('Stavingen din')).toBeFocused();
 }
 
 async function answer(page, value) {
   await page.locator('#answer').fill(value);
   await page.locator('#answer').press('Enter');
+  await expect(
+    page.getByRole('button', { name: 'Sjekk svaret', includeHidden: true }),
+  ).toBeEnabled();
 }
 
 async function expectCompletion(page, learned, firstTry) {
@@ -49,7 +53,10 @@ for (const { source, direction, count } of [
     await expect(page.locator('#progress-label')).toHaveText(
       `0 av ${count} lært · ${count} oppgaver igjen`,
     );
-    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('puggern.progress')));
+    const saved = await page.evaluate(() => {
+      const state = JSON.parse(localStorage.getItem('puggern.profile-state'));
+      return Object.values(state.progress[state.activeProfileId])[0];
+    });
     expect(saved.session.learned).toEqual([]);
     expect(saved.session.mistakes).toEqual({});
     await page.reload();
@@ -65,6 +72,7 @@ test('resumes corrections offline and counts independent answers, not correction
   await page.evaluate(() => navigator.serviceWorker.ready);
   await page.reload();
   await page.getByRole('button', { name: 'Fortsett øvingen' }).click();
+  await expect(page.getByLabel('Stavingen din')).toBeFocused();
   const missedPrompt = await page.locator('#prompt').textContent();
   const answers = { hund: 'dog', dog: 'hund' };
   await answer(page, 'wrong');
@@ -101,6 +109,43 @@ test('shows completion even when saving the final answer fails', async ({ page }
   await expect(page.getByRole('alert')).toContainText('Fremgangen kunne ikke lagres');
   await page.getByRole('button', { name: 'Til ordsettene' }).click();
   await expect(page.getByRole('button', { name: 'Fortsett øvingen' })).toBeHidden();
+});
+
+test('restores the latest summary for the active profile after revisiting an older set', async ({
+  page,
+}) => {
+  await startSet(page);
+  await answer(page, 'dog');
+  await expectCompletion(page, 1, 1);
+  await page.getByRole('button', { name: 'Lag et nytt ordsett' }).click();
+  await page.getByLabel('Navn på ordsettet').fill('Flere ord');
+  await page.getByLabel('Hint og svar').fill('katt;cat\nfugl;bird');
+  await page.getByRole('button', { name: 'Lagre og start øving' }).click();
+  await expect(page.getByLabel('Stavingen din')).toBeFocused();
+  const answers = { katt: 'cat', fugl: 'bird' };
+  for (let index = 0; index < 2; index += 1) {
+    await answer(page, answers[await page.locator('#prompt').textContent()]);
+  }
+  await expectCompletion(page, 2, 2);
+  await page.getByRole('button', { name: 'Til ordsettene' }).click();
+  await page
+    .getByRole('listitem')
+    .filter({ hasText: 'Øveord' })
+    .getByRole('button', { name: 'Øv på nytt' })
+    .click();
+  await expect(page.getByLabel('Stavingen din')).toBeFocused();
+  await answer(page, 'dog');
+  await expectCompletion(page, 1, 1);
+  await page.reload();
+  await expectCompletion(page, 1, 1);
+  await page.getByRole('button', { name: 'Til ordsettene' }).click();
+  await page.getByRole('button', { name: 'Legg til profil' }).click();
+  await page.getByLabel('Navn', { exact: true }).fill('Ny profil');
+  await page.getByRole('button', { name: 'Lagre profil' }).click();
+  await expect(page.getByLabel('Profil').locator('option:checked')).toHaveText('Ny profil');
+  await page.reload();
+  await expect(page.locator('#complete-view')).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Start øving' })).toHaveCount(2);
 });
 
 test('restores continue when storage recovers during an unfinished session', async ({ page }) => {
