@@ -34,9 +34,15 @@ more-specific instructions.
    implementer's summary. Identify the base, HEAD, and worktree state reviewed.
 3. Check correctness against the requested behavior, regressions, edge cases,
    authorization and input handling where relevant, tests, and consistency
-   across affected surfaces. For documentation or customization changes, check
-   instruction conflicts, invocation/tool compatibility, and bypasses in the
-   proposed workflow. Prioritize concrete defects over style preferences.
+   across affected surfaces. For user-facing behavior, trace important state
+   transitions as well as the initial render, including focus, visibility, and
+   how dynamic status or error content is exposed to assistive technology.
+   Do not infer that an ARIA role or live-region attribute alone guarantees an
+   announcement; verify the relevant update lifecycle and control association,
+   and distinguish interactive evidence from static inspection. For
+   documentation or customization changes, check instruction conflicts,
+   invocation/tool compatibility, and bypasses in the proposed workflow.
+   Prioritize concrete defects over style preferences.
 4. Report actionable findings with severity (`critical`, `high`, `medium`, or
    `low`), file and line, impact, evidence, and a suggested correction. Separate
    uncertain concerns and missing validation from confirmed defects.

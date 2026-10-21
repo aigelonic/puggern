@@ -394,6 +394,53 @@ select:focus {
   color: #a33f2d;
 }
 
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.correction-feedback {
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid #aeb8a9;
+  border-left: 4px solid #b4533d;
+  border-radius: 5px;
+  background: #fffefa;
+  font-family: 'Trebuchet MS', sans-serif;
+}
+
+.correction-feedback p {
+  margin: 0;
+}
+
+.correction-label {
+  color: #52665d;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.correct-answer {
+  margin-top: 0.2rem !important;
+  color: #263a32;
+  font-size: 1.4rem;
+  font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.correction-instruction {
+  margin-top: 0.25rem !important;
+  color: #52665d;
+  line-height: 1.4;
+}
+
 .practice-view {
   margin-top: clamp(2rem, 8vh, 5rem);
 }

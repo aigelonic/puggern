@@ -1,7 +1,10 @@
 import { expect, test } from '@playwright/test';
 
-test('creates a set and practices a missed word until it is learned', async ({ page }) => {
+test('shows prominent correction feedback and practices a missed word until it is learned', async ({
+  page,
+}) => {
   await page.goto('/');
+  await page.setViewportSize({ width: 375, height: 667 });
   await page.getByRole('button', { name: 'Nytt ordsett' }).click();
   await page.getByLabel('Navn på ordsettet').fill('Frukt');
   await page.getByLabel('Hint og svar').fill('En rød frukt\teple');
@@ -9,10 +12,27 @@ test('creates a set and practices a missed word until it is learned', async ({ p
 
   await expect(page.getByRole('heading', { name: 'En rød frukt' })).toBeVisible();
   await page.getByLabel('Stavingen din').fill('pære');
-  await page.getByRole('button', { name: 'Sjekk svaret' }).click();
-  await expect(
-    page.getByText('Riktig stavemåte er eple. Skriv ordet én gang, så kommer det tilbake senere.'),
-  ).toBeVisible();
+  await page.getByLabel('Stavingen din').press('Enter');
+  const correction = page.locator('#correction-feedback');
+  await expect(correction).toBeVisible();
+  await expect(correction.locator('.correction-label')).toHaveText('Riktig stavemåte');
+  await expect(page.locator('#correct-answer')).toHaveText('eple');
+  await expect(page.locator('#correction-instruction')).toHaveText(
+    'Skriv ordet én gang, så kommer det tilbake senere.',
+  );
+  await expect(page.locator('#correction-announcement')).toHaveText(
+    'Riktig stavemåte er eple. Skriv ordet én gang, så kommer det tilbake senere.',
+  );
+  await expect(page.locator('#correction-announcement')).toHaveAttribute('aria-live', 'polite');
+  await expect(page.locator('#answer')).toHaveAttribute('aria-describedby', 'correction-feedback');
+  await expect(page.locator('#answer')).toHaveAccessibleDescription(
+    'Riktig stavemåte eple Skriv ordet én gang, så kommer det tilbake senere.',
+  );
+  await expect(page.locator('#answer')).toBeFocused();
+  await expect(correction).toBeInViewport();
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
+    .toBe(true);
 
   await page.getByLabel('Skriv ordet én gang').fill('eple');
   await page.getByRole('button', { name: 'Sjekk svaret' }).click();
@@ -30,6 +50,69 @@ test('creates a set and practices a missed word until it is learned', async ({ p
   await expect(page.locator('#completion-first-try-count')).toHaveText('0');
   await expect(page.locator('#completion-extra-practice-count')).toHaveText('1');
   await expect(page.getByText('En rød frukt → eple · 1 feilsvar')).toBeVisible();
+});
+
+test('chooses correction announcement after delayed progress saving', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Nytt ordsett' }).click();
+  await page.getByLabel('Navn på ordsettet').fill('Frukt');
+  await page.getByLabel('Hint og svar').fill('En rød frukt\teple');
+  await page.getByRole('button', { name: 'Lagre og start øving' }).click();
+
+  await page.evaluate(() => {
+    window.profileStateLockAcquired = new Promise((resolve) => {
+      navigator.locks.request('puggern.profile-state', async () => {
+        resolve();
+        await new Promise((release) => {
+          window.releaseProfileStateLock = release;
+        });
+      });
+    });
+  });
+  await page.evaluate(() => window.profileStateLockAcquired);
+
+  await page.getByLabel('Stavingen din').fill('pære');
+  await page.getByLabel('Stavingen din').press('Enter');
+  await expect(page.locator('#answer')).toHaveAttribute('readonly', '');
+  await page.getByRole('button', { name: 'Ordsett' }).click();
+  await page.evaluate(() => window.releaseProfileStateLock());
+
+  await expect(page.locator('#correction-feedback')).toBeVisible();
+  await expect(page.locator('#correction-announcement')).toHaveText(
+    'Rettelsen vises ved svarfeltet.',
+  );
+  await expect(page.locator('#answer')).toHaveAccessibleDescription(
+    'Riktig stavemåte eple Skriv ordet én gang, så kommer det tilbake senere.',
+  );
+  await expect(page.locator('#answer')).toBeFocused();
+});
+
+test('wraps long correction spellings on a mobile viewport', async ({ page }) => {
+  const longAnswer = 'staving'.repeat(12);
+  await page.setViewportSize({ width: 375, height: 667 });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Nytt ordsett' }).click();
+  await page.getByLabel('Navn på ordsettet').fill('Lange ord');
+  await page.getByLabel('Hint og svar').fill(`Et langt ord\t${longAnswer}`);
+  await page.getByRole('button', { name: 'Lagre og start øving' }).click();
+  await page.getByLabel('Stavingen din').fill('feil');
+  await page.getByRole('button', { name: 'Sjekk svaret' }).click();
+
+  const correction = page.locator('#correction-feedback');
+  const spelling = page.locator('#correct-answer');
+  await expect(correction).toBeInViewport();
+  await expect(spelling).toHaveText(longAnswer);
+  const layout = await spelling.evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+    height: element.getBoundingClientRect().height,
+    lineHeight: Number.parseFloat(getComputedStyle(element).lineHeight),
+  }));
+  expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth);
+  expect(layout.height).toBeGreaterThan(layout.lineHeight);
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
+    .toBe(true);
 });
 
 test('completes a single-entry session immediately and supports restart and return to sets', async ({
@@ -66,20 +149,50 @@ test('completes a single-entry session immediately and supports restart and retu
 
 test('reloads and resumes a saved session during its correction step', async ({ page }) => {
   await page.goto('/');
+  await expect(page.locator('#correction-announcement')).toHaveText('');
+  await expect(page.locator('#correction-announcement')).not.toHaveAttribute('hidden');
   await page.getByRole('button', { name: 'Nytt ordsett' }).click();
   await page.getByLabel('Navn på ordsettet').fill('Frukt');
   await page.getByLabel('Hint og svar').fill('En rød frukt\teple');
   await page.getByRole('button', { name: 'Lagre og start øving' }).click();
   await page.getByLabel('Stavingen din').fill('pære');
   await page.getByRole('button', { name: 'Sjekk svaret' }).click();
-  await expect(page.getByText(/Riktig stavemåte er eple/)).toBeVisible();
+  await expect(page.locator('#correct-answer')).toHaveText('eple');
+  await expect(page.locator('#correction-instruction')).toBeVisible();
+  await expect(page.locator('#correction-announcement')).toHaveText(
+    'Rettelsen vises ved svarfeltet.',
+  );
+  await expect(page.locator('#answer')).toBeFocused();
 
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Frukt' })).toBeVisible();
   await page.getByRole('button', { name: 'Fortsett øvingen' }).click();
   await expect(page.getByRole('heading', { name: 'En rød frukt' })).toBeVisible();
   await expect(page.getByLabel('Skriv ordet én gang')).toBeVisible();
-  await expect(page.getByText(/Riktig stavemåte er eple/)).toBeVisible();
+  await expect(page.locator('#correction-feedback')).toBeVisible();
+  await expect(page.locator('#correct-answer')).toHaveText('eple');
+  await expect(page.locator('#correction-instruction')).toHaveText(
+    'Skriv ordet én gang, så kommer det tilbake senere.',
+  );
+  await expect(page.locator('#correction-announcement')).toHaveText(
+    'Rettelsen vises ved svarfeltet.',
+  );
+  await expect(page.locator('#correction-announcement')).toHaveAttribute('aria-live', 'polite');
+  await expect(page.locator('#answer')).toHaveAttribute('aria-describedby', 'correction-feedback');
+  await expect(page.locator('#answer')).toHaveAccessibleDescription(
+    'Riktig stavemåte eple Skriv ordet én gang, så kommer det tilbake senere.',
+  );
+  await expect(page.locator('#answer')).toBeFocused();
+
+  await page.getByRole('button', { name: 'Ordsett' }).click();
+  await expect(page.locator('#correction-announcement')).toHaveText('');
+  await page.getByRole('button', { name: 'Fortsett øvingen' }).click();
+  await expect(page.locator('#correction-announcement')).toHaveText(
+    'Rettelsen vises ved svarfeltet.',
+  );
+  await expect(page.locator('#answer')).toHaveAccessibleDescription(
+    'Riktig stavemåte eple Skriv ordet én gang, så kommer det tilbake senere.',
+  );
 
   await page.getByLabel('Skriv ordet én gang').fill('eple');
   await page.getByRole('button', { name: 'Sjekk svaret' }).click();
@@ -104,7 +217,7 @@ test('refreshes word-set actions after saving progress and returning to the list
   await expect(page.getByRole('heading', { name: 'En rød frukt' })).toBeVisible();
   await page.getByLabel('Stavingen din').fill('pære');
   await page.getByRole('button', { name: 'Sjekk svaret' }).click();
-  await expect(page.getByText(/Riktig stavemåte er eple/)).toBeVisible();
+  await expect(page.locator('#correct-answer')).toHaveText('eple');
   await page.getByRole('button', { name: 'Ordsett' }).click();
 
   const set = page.getByRole('listitem').filter({ hasText: 'Frukt' });
@@ -120,7 +233,7 @@ test('preserves concurrent profile and progress changes across tabs', async ({ p
   await page.getByRole('button', { name: 'Lagre og start øving' }).click();
   await page.getByLabel('Stavingen din').fill('pære');
   await page.getByRole('button', { name: 'Sjekk svaret' }).click();
-  await expect(page.getByText(/Riktig stavemåte er eple/)).toBeVisible();
+  await expect(page.locator('#correct-answer')).toHaveText('eple');
 
   const otherPage = await context.newPage();
   await otherPage.goto('/');
@@ -130,7 +243,7 @@ test('preserves concurrent profile and progress changes across tabs', async ({ p
   await otherPage.getByRole('button', { name: 'Lagre og start øving' }).click();
   await otherPage.getByLabel('Stavingen din').fill('katt');
   await otherPage.getByRole('button', { name: 'Sjekk svaret' }).click();
-  await expect(otherPage.getByText(/Riktig stavemåte er hund/)).toBeVisible();
+  await expect(otherPage.locator('#correct-answer')).toHaveText('hund');
   await otherPage.getByRole('button', { name: 'Ordsett' }).click();
   await otherPage.getByRole('button', { name: 'Legg til profil' }).click();
   await otherPage.getByLabel('Navn', { exact: true }).fill('Ada');
@@ -214,7 +327,7 @@ test('keeps each profile progress separate and offers continue or restart', asyn
   await page.getByRole('button', { name: 'Lagre og start øving' }).click();
   await page.getByLabel('Stavingen din').fill('pære');
   await page.getByRole('button', { name: 'Sjekk svaret' }).click();
-  await expect(page.getByText(/Riktig stavemåte er eple/)).toBeVisible();
+  await expect(page.locator('#correct-answer')).toHaveText('eple');
   await page.getByRole('button', { name: 'Ordsett' }).click();
 
   await page.getByRole('button', { name: 'Legg til profil' }).click();
@@ -244,7 +357,7 @@ test('migrates an older in-progress session into the default profile', async ({ 
   await page.getByRole('button', { name: 'Lagre og start øving' }).click();
   await page.getByLabel('Stavingen din').fill('pære');
   await page.getByRole('button', { name: 'Sjekk svaret' }).click();
-  await expect(page.getByText(/Riktig stavemåte er eple/)).toBeVisible();
+  await expect(page.locator('#correct-answer')).toHaveText('eple');
   await page.getByRole('button', { name: 'Ordsett' }).click();
   await page.evaluate(() => {
     const state = JSON.parse(localStorage.getItem('puggern.profile-state'));
@@ -260,6 +373,8 @@ test('migrates an older in-progress session into the default profile', async ({ 
   const set = page.getByRole('listitem').filter({ hasText: 'Frukt' });
   await set.getByRole('button', { name: 'Fortsett øvingen' }).click();
   await expect(page.getByLabel('Skriv ordet én gang')).toBeVisible();
+  await expect(page.locator('#correction-feedback')).toBeVisible();
+  await expect(page.locator('#correct-answer')).toHaveText('eple');
 });
 
 test('completed practice remains saved and can be restarted', async ({ page }) => {
