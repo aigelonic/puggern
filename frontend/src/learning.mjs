@@ -6,13 +6,20 @@ export function parseWordSet(source) {
     throw new TypeError('Ordsettet må være tekst.');
   }
 
-  const words = source.split(/\r?\n/)
+  const words = source
+    .split(/\r?\n/)
     .map((line, index) => ({ line: line.trim(), lineNumber: index + 1 }))
     .filter(({ line }) => line.length > 0)
     .map(({ line, lineNumber }, index) => {
       const separator = line.indexOf('\t');
-      if (separator < 1 || separator === line.length - 1 || line.indexOf('\t', separator + 1) !== -1) {
-        throw new Error(`Linje ${lineNumber} må inneholde et hint og et svar, atskilt med én tabulator.`);
+      if (
+        separator < 1 ||
+        separator === line.length - 1 ||
+        line.indexOf('\t', separator + 1) !== -1
+      ) {
+        throw new Error(
+          `Linje ${lineNumber} må inneholde et hint og et svar, atskilt med én tabulator.`,
+        );
       }
 
       const prompt = line.slice(0, separator).trim();
@@ -99,14 +106,23 @@ export function loadProgress(storage) {
 
   try {
     const progress = JSON.parse(stored);
-    if (progress.version !== PROGRESS_VERSION || !Array.isArray(progress.words)
-      || progress.words.some((word) => typeof word.id !== 'string'
-        || typeof word.prompt !== 'string' || typeof word.answer !== 'string')
-      || !progress.session || !Array.isArray(progress.session.queue)
-      || progress.session.queue.some((id) => !progress.words.some((word) => word.id === id))
-      || typeof progress.session.correction !== 'boolean'
-      || !Array.isArray(progress.session.learned) || !progress.session.mistakes
-      || typeof progress.session.mistakes !== 'object') {
+    if (
+      progress.version !== PROGRESS_VERSION ||
+      !Array.isArray(progress.words) ||
+      progress.words.some(
+        (word) =>
+          typeof word.id !== 'string' ||
+          typeof word.prompt !== 'string' ||
+          typeof word.answer !== 'string',
+      ) ||
+      !progress.session ||
+      !Array.isArray(progress.session.queue) ||
+      progress.session.queue.some((id) => !progress.words.some((word) => word.id === id)) ||
+      typeof progress.session.correction !== 'boolean' ||
+      !Array.isArray(progress.session.learned) ||
+      !progress.session.mistakes ||
+      typeof progress.session.mistakes !== 'object'
+    ) {
       return null;
     }
     return progress;

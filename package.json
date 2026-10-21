@@ -5,9 +5,15 @@
   "scripts": {
     "test": "npm run test:unit && npm run test:e2e",
     "test:unit": "node --test tests/*.test.mjs",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "lint": "eslint frontend tests playwright.config.mjs eslint.config.js",
+    "format:check": "prettier --check ."
   },
   "devDependencies": {
-    "@playwright/test": "^1.55.0"
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.55.0",
+    "eslint": "^10.13.0",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.10"
   }
 }

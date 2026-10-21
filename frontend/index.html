@@ -1,19 +1,19 @@
 <!doctype html>
 <html lang="nb">
   <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#f7f5ef">
-    <meta name="description" content="Et ordtreningsspill som fungerer uten nett.">
-    <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./styles.css">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f7f5ef" />
+    <meta name="description" content="Et ordtreningsspill som fungerer uten nett." />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="stylesheet" href="./styles.css" />
     <title>Puggern</title>
   </head>
   <body>
     <main class="app-shell">
       <header class="app-header">
         <a class="brand" href="./" aria-label="Puggern home">
-          <img src="./icons/pug-192.png" width="32" height="32" alt="">
+          <img src="./icons/pug-192.png" width="32" height="32" alt="" />
           Puggern<span>.</span>
         </a>
         <p id="connection-status" role="status" aria-live="polite"></p>
@@ -25,18 +25,30 @@
         <p class="intro">Lag et sett med hint og svar, og øv i ditt eget tempo.</p>
         <form id="word-set-form">
           <label for="word-set">Ordsettet ditt</label>
-          <textarea id="word-set" rows="6" required aria-describedby="word-set-help">Det skinner på himmelen om dagen&#9;sol
+          <textarea id="word-set" rows="6" required aria-describedby="word-set-help">
+Det skinner på himmelen om dagen&#9;sol
 Vann i frossen form&#9;is
 Et dyr som ofte er et kjæledyr&#9;hund</textarea>
-          <p id="word-set-help" class="field-help">Skriv ett hint og ett svar per linje, atskilt med tabulatortasten.</p>
+          <p id="word-set-help" class="field-help">
+            Skriv ett hint og ett svar per linje, atskilt med tabulatortasten.
+          </p>
           <div class="settings-row">
-            <label class="check-option"><input id="case-sensitive" type="checkbox"> Skill mellom store og små bokstaver</label>
-            <label class="check-option"><input id="accent-sensitive" type="checkbox"> Ta hensyn til aksenter</label>
+            <label class="check-option"
+              ><input id="case-sensitive" type="checkbox" /> Skill mellom store og små
+              bokstaver</label
+            >
+            <label class="check-option"
+              ><input id="accent-sensitive" type="checkbox" /> Ta hensyn til aksenter</label
+            >
           </div>
           <p id="setup-error" class="feedback error" role="alert" hidden></p>
           <div class="actions">
-            <button class="button primary" type="submit">Start øvingen <span aria-hidden="true">&#8594;</span></button>
-            <button id="resume-button" class="button secondary" type="button" hidden>Fortsett øvingen</button>
+            <button class="button primary" type="submit">
+              Start øvingen <span aria-hidden="true">&#8594;</span>
+            </button>
+            <button id="resume-button" class="button secondary" type="button" hidden>
+              Fortsett øvingen
+            </button>
           </div>
         </form>
       </section>
@@ -50,9 +62,18 @@ Et dyr som ofte er et kjæledyr&#9;hund</textarea>
         <h1 id="prompt"></h1>
         <form id="answer-form">
           <label id="answer-label" for="answer">Stavingen din</label>
-          <input id="answer" name="answer" type="text" autocomplete="off" autocapitalize="off" required>
+          <input
+            id="answer"
+            name="answer"
+            type="text"
+            autocomplete="off"
+            autocapitalize="off"
+            required
+          />
           <p id="feedback" class="feedback" role="status" aria-live="polite"></p>
-          <button class="button primary" type="submit">Sjekk svaret <span aria-hidden="true">&#8594;</span></button>
+          <button class="button primary" type="submit">
+            Sjekk svaret <span aria-hidden="true">&#8594;</span>
+          </button>
         </form>
       </section>
 
@@ -62,7 +83,9 @@ Et dyr som ofte er et kjæledyr&#9;hund</textarea>
         <p id="completion-message" class="intro"></p>
         <h2>Ord det kan være lurt å øve mer på</h2>
         <ul id="hardest-words"></ul>
-        <button id="new-set-button" class="button primary" type="button">Lag et nytt ordsett <span aria-hidden="true">&#8594;</span></button>
+        <button id="new-set-button" class="button primary" type="button">
+          Lag et nytt ordsett <span aria-hidden="true">&#8594;</span>
+        </button>
       </section>
     </main>
     <script type="module" src="./src/main.mjs"></script>

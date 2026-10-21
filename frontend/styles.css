@@ -1,6 +1,6 @@
 :root {
   color-scheme: light;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: Georgia, 'Times New Roman', serif;
   color: #263a32;
   background: #f4f2e9;
   font-synthesis: none;
@@ -63,7 +63,7 @@ textarea {
 .feedback,
 .text-button,
 label {
-  font-family: "Trebuchet MS", sans-serif;
+  font-family: 'Trebuchet MS', sans-serif;
 }
 
 #connection-status {
@@ -79,7 +79,7 @@ label {
 .eyebrow {
   margin: 0 0 0.65rem;
   color: #b4533d;
-  font-family: "Trebuchet MS", sans-serif;
+  font-family: 'Trebuchet MS', sans-serif;
   font-size: 0.8rem;
   font-weight: 700;
   letter-spacing: 0;
@@ -97,7 +97,7 @@ h1 {
   max-width: 38rem;
   margin: 1rem 0 2rem;
   color: #52665d;
-  font-family: "Trebuchet MS", sans-serif;
+  font-family: 'Trebuchet MS', sans-serif;
   font-size: 1.05rem;
   line-height: 1.55;
 }
@@ -111,7 +111,7 @@ form > label,
 }
 
 textarea,
-input[type="text"] {
+input[type='text'] {
   display: block;
   width: 100%;
   border: 1px solid #aeb8a9;
@@ -124,19 +124,19 @@ input[type="text"] {
 textarea {
   min-height: 9rem;
   padding: 0.9rem 1rem;
-  font-family: "Trebuchet MS", sans-serif;
+  font-family: 'Trebuchet MS', sans-serif;
   line-height: 1.65;
   resize: vertical;
 }
 
-input[type="text"] {
+input[type='text'] {
   min-height: 3.6rem;
   padding: 0.7rem 0.9rem;
   font-size: 1.35rem;
 }
 
 textarea:focus,
-input[type="text"]:focus {
+input[type='text']:focus {
   border-color: #347457;
   box-shadow: 0 0 0 3px #3474572b;
 }
@@ -180,7 +180,7 @@ input[type="text"]:focus {
   border: 1px solid transparent;
   border-radius: 4px;
   cursor: pointer;
-  font-family: "Trebuchet MS", sans-serif;
+  font-family: 'Trebuchet MS', sans-serif;
   font-weight: 700;
 }
 
@@ -263,7 +263,7 @@ input[type="text"]:focus {
   margin: 0 0 2rem;
   padding-left: 1.2rem;
   color: #52665d;
-  font-family: "Trebuchet MS", sans-serif;
+  font-family: 'Trebuchet MS', sans-serif;
   line-height: 1.8;
 }
 

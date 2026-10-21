@@ -60,9 +60,11 @@ function renderPractice(message = '') {
   progressLabel.textContent = `${learnedCount} av ${words.length} lært · ${session.queue.length} oppgaver igjen`;
   prompt.textContent = word.prompt;
   answerLabel.textContent = session.correction ? 'Skriv ordet én gang' : 'Stavingen din';
-  feedback.textContent = message || (session.correction
-    ? `Riktig stavemåte er ${word.answer}. Skriv ordet én gang, så kommer det tilbake senere.`
-    : '');
+  feedback.textContent =
+    message ||
+    (session.correction
+      ? `Riktig stavemåte er ${word.answer}. Skriv ordet én gang, så kommer det tilbake senere.`
+      : '');
   feedback.classList.toggle('error', session.correction);
   answerInput.value = '';
   showView(practiceView);
@@ -105,7 +107,9 @@ window.addEventListener('offline', updateConnectionStatus);
 updateConnectionStatus();
 
 resumeButton.hidden = !savedProgress;
-resumeButton.addEventListener('click', () => startSession(savedProgress.words, savedProgress.session));
+resumeButton.addEventListener('click', () =>
+  startSession(savedProgress.words, savedProgress.session),
+);
 
 wordSetForm.addEventListener('submit', (event) => {
   event.preventDefault();
@@ -127,7 +131,9 @@ answerForm.addEventListener('submit', (event) => {
 
   if (outcome.result === 'incorrect') {
     const word = currentWord(session, words);
-    renderPractice(`Riktig stavemåte er ${word.answer}. Skriv ordet én gang, så kommer det tilbake senere.`);
+    renderPractice(
+      `Riktig stavemåte er ${word.answer}. Skriv ordet én gang, så kommer det tilbake senere.`,
+    );
     return;
   }
   if (outcome.result === 'retry-scheduled') {

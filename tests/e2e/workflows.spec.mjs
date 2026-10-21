@@ -8,7 +8,9 @@ test('creates a set and practices a missed word until it is learned', async ({ p
   await expect(page.getByRole('heading', { name: 'En rød frukt' })).toBeVisible();
   await page.getByLabel('Stavingen din').fill('pære');
   await page.getByRole('button', { name: 'Sjekk svaret' }).click();
-  await expect(page.getByText('Riktig stavemåte er eple. Skriv ordet én gang, så kommer det tilbake senere.')).toBeVisible();
+  await expect(
+    page.getByText('Riktig stavemåte er eple. Skriv ordet én gang, så kommer det tilbake senere.'),
+  ).toBeVisible();
 
   await page.getByLabel('Skriv ordet én gang').fill('eple');
   await page.getByRole('button', { name: 'Sjekk svaret' }).click();
