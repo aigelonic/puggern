@@ -111,7 +111,8 @@ form > label,
 }
 
 textarea,
-input[type='text'] {
+input[type='text'],
+select {
   display: block;
   width: 100%;
   border: 1px solid #aeb8a9;
@@ -135,8 +136,15 @@ input[type='text'] {
   font-size: 1.35rem;
 }
 
+select {
+  min-height: 3rem;
+  padding: 0.5rem 0.75rem;
+  font-family: 'Trebuchet MS', sans-serif;
+}
+
 textarea:focus,
-input[type='text']:focus {
+input[type='text']:focus,
+select:focus {
   border-color: #347457;
   box-shadow: 0 0 0 3px #3474572b;
 }
@@ -152,6 +160,131 @@ input[type='text']:focus {
   flex-wrap: wrap;
   gap: 1rem 1.5rem;
   margin: 1.1rem 0 1.4rem;
+}
+
+.saved-sets-heading,
+.editor-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.saved-sets-heading {
+  margin-bottom: 0.75rem;
+}
+
+.saved-sets-heading h2,
+.editor-heading h2 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.word-set-list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.word-set-item {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid #d0d6ca;
+  border-radius: 5px;
+  background: #fffefa;
+}
+
+.word-set-details h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  overflow-wrap: anywhere;
+}
+
+.word-set-details p {
+  margin: 0.3rem 0 0;
+  color: #64766d;
+  font-family: 'Trebuchet MS', sans-serif;
+  font-size: 0.85rem;
+}
+
+.set-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.set-actions .button {
+  min-height: 2.5rem;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.85rem;
+}
+
+.danger {
+  border-color: #d7a79e;
+  background: #fff8f6;
+  color: #8d3325;
+}
+
+.new-set-button,
+.resume-button {
+  margin-top: 0.75rem;
+}
+
+#word-set-form {
+  margin-top: 2.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #d0d6ca;
+}
+
+.editor-heading {
+  margin-bottom: 1.25rem;
+}
+
+#word-set-name {
+  min-height: 3rem;
+  margin-bottom: 1.25rem;
+  padding: 0.55rem 0.75rem;
+  font-size: 1rem;
+}
+
+.word-preview {
+  display: grid;
+  gap: 0.55rem;
+  margin: 1rem 0 1.4rem;
+  font-family: 'Trebuchet MS', sans-serif;
+}
+
+.word-preview h3 {
+  margin: 0 0 0.25rem;
+  color: #52665d;
+  font-size: 0.9rem;
+}
+
+.preview-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.5rem;
+}
+
+.preview-row input[type='text'] {
+  min-height: 2.7rem;
+  padding: 0.5rem 0.65rem;
+  font-family: 'Trebuchet MS', sans-serif;
+  font-size: 0.95rem;
+}
+
+.preview-error {
+  grid-column: 1 / -1;
+  margin: -0.25rem 0 0.15rem;
+  color: #a33f2d;
+  font-size: 0.82rem;
+}
+
+.preview-row.invalid input[type='text'] {
+  border-color: #a33f2d;
 }
 
 .check-option {
@@ -296,6 +429,18 @@ input[type='text']:focus {
 
   .practice-topline {
     margin-bottom: 3rem;
+  }
+
+  .word-set-item {
+    padding: 0.75rem;
+  }
+
+  .set-actions .button {
+    flex: 1 1 auto;
+  }
+
+  .preview-row {
+    grid-template-columns: 1fr;
   }
 }
 

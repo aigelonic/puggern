@@ -8,10 +8,12 @@ import {
   loadProgress,
   normalizeAnswer,
   parseWordSet,
+  previewWordSet,
   PROGRESS_KEY,
   PROGRESS_VERSION,
   saveProgress,
   submitAnswer,
+  wordsForDirection,
 } from '../frontend/src/learning.mjs';
 
 test('parses non-empty prompt and answer pairs and reports malformed lines', () => {
@@ -21,6 +23,30 @@ test('parses non-empty prompt and answer pairs and reports malformed lines', () 
   ]);
   assert.throws(() => parseWordSet('A prompt without an answer'), /Linje 1/);
   assert.throws(() => parseWordSet(' \n '), /minst ett/);
+});
+
+test('accepts paste separators, previews malformed rows, and enforces set limits', () => {
+  assert.deepEqual(parseWordSet('hund;dog\nVann - water\nkatt\tcat'), [
+    { id: '0', prompt: 'hund', answer: 'dog' },
+    { id: '1', prompt: 'Vann', answer: 'water' },
+    { id: '2', prompt: 'katt', answer: 'cat' },
+  ]);
+  assert.match(previewWordSet('Ugyldig linje')[0].error, /Linje 1/);
+  assert.match(previewWordSet('to;separator;marks')[0].error, /Linje 1/);
+  assert.throws(() => parseWordSet(`${'a\tb\n'.repeat(100)}c\td`), /maksimalt 100/);
+  assert.throws(() => parseWordSet(`${'x'.repeat(201)}\ty`), /200 tegn/);
+});
+
+test('creates practice entries in the selected direction', () => {
+  const words = parseWordSet('hund\tdog');
+  assert.deepEqual(wordsForDirection(words, 'answer-to-prompt'), [
+    { id: '0', prompt: 'dog', answer: 'hund' },
+  ]);
+  assert.deepEqual(wordsForDirection(words, 'both'), [
+    { id: '0:forward', prompt: 'hund', answer: 'dog' },
+    { id: '0:reverse', prompt: 'dog', answer: 'hund' },
+  ]);
+  assert.throws(() => wordsForDirection(words, 'unknown'), /quizretning/);
 });
 
 test('normalizes whitespace, case, and accents according to set settings', () => {

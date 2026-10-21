@@ -1,41 +1,76 @@
 export const PROGRESS_VERSION = 1;
 export const PROGRESS_KEY = 'puggern.progress';
+export const MAX_WORDS_PER_SET = 100;
+export const MAX_WORD_LENGTH = 200;
 
-export function parseWordSet(source) {
+export function previewWordSet(source) {
   if (typeof source !== 'string') {
     throw new TypeError('Ordsettet må være tekst.');
   }
 
-  const words = source
-    .split(/\r?\n/)
-    .map((line, index) => ({ line: line.trim(), lineNumber: index + 1 }))
-    .filter(({ line }) => line.length > 0)
-    .map(({ line, lineNumber }, index) => {
-      const separator = line.indexOf('\t');
-      if (
-        separator < 1 ||
-        separator === line.length - 1 ||
-        line.indexOf('\t', separator + 1) !== -1
-      ) {
-        throw new Error(
-          `Linje ${lineNumber} må inneholde et hint og et svar, atskilt med én tabulator.`,
-        );
-      }
+  const lines = source.split(/\r?\n/);
+  const entries = [];
+  lines.forEach((rawLine, index) => {
+    const line = rawLine.trim();
+    if (!line) return;
 
-      const prompt = line.slice(0, separator).trim();
-      const answer = line.slice(separator + 1).trim();
-      if (!prompt || !answer) {
-        throw new Error(`Linje ${lineNumber} må inneholde både et hint og et svar.`);
-      }
+    let separator = '\t';
+    if (!line.includes(separator)) {
+      separator = line.includes(';') ? ';' : ' - ';
+    }
+    const separatorIndex = line.indexOf(separator);
+    const prompt = separatorIndex < 1 ? '' : line.slice(0, separatorIndex).trim();
+    const answer = separatorIndex < 1 ? '' : line.slice(separatorIndex + separator.length).trim();
+    let error = null;
 
-      return { id: String(index), prompt, answer };
+    if (
+      separatorIndex < 1 ||
+      !prompt ||
+      !answer ||
+      line.indexOf(separator, separatorIndex + separator.length) !== -1
+    ) {
+      error = `Linje ${index + 1} må inneholde et hint og et svar, atskilt med tab, semikolon eller « - ».`;
+    } else if (entries.length >= MAX_WORDS_PER_SET) {
+      error = `Et ordsett kan inneholde maksimalt ${MAX_WORDS_PER_SET} ord.`;
+    } else if (prompt.length > MAX_WORD_LENGTH || answer.length > MAX_WORD_LENGTH) {
+      error = `Hint og svar kan ikke være lengre enn ${MAX_WORD_LENGTH} tegn.`;
+    }
+
+    entries.push({
+      id: String(entries.length),
+      lineNumber: index + 1,
+      prompt,
+      answer,
+      error,
     });
+  });
+  return entries;
+}
 
-  if (words.length === 0) {
+export function parseWordSet(source) {
+  const entries = previewWordSet(source);
+  if (entries.length === 0) {
     throw new Error('Legg til minst ett hint og ett svar.');
   }
+  const invalidEntry = entries.find(({ error }) => error);
+  if (invalidEntry) throw new Error(invalidEntry.error);
+  return entries.map(({ id, prompt, answer }) => ({ id, prompt, answer }));
+}
 
-  return words;
+export function wordsForDirection(words, direction = 'prompt-to-answer') {
+  if (direction === 'prompt-to-answer') {
+    return words.map((word) => ({ ...word }));
+  }
+  if (direction === 'answer-to-prompt') {
+    return words.map(({ id, prompt, answer }) => ({ id, prompt: answer, answer: prompt }));
+  }
+  if (direction === 'both') {
+    return words.flatMap(({ id, prompt, answer }) => [
+      { id: `${id}:forward`, prompt, answer },
+      { id: `${id}:reverse`, prompt: answer, answer: prompt },
+    ]);
+  }
+  throw new TypeError('Velg en gyldig quizretning.');
 }
 
 export function normalizeAnswer(answer, { caseSensitive = false, accentSensitive = false } = {}) {
