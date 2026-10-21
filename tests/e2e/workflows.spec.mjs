@@ -29,7 +29,7 @@ test('creates a set and practices a missed word until it is learned', async ({ p
   await expect(page.locator('#completion-practiced-count')).toHaveText('1');
   await expect(page.locator('#completion-first-try-count')).toHaveText('0');
   await expect(page.locator('#completion-extra-practice-count')).toHaveText('1');
-  await expect(page.getByText('En rød frukt → eple')).toBeVisible();
+  await expect(page.getByText('En rød frukt → eple · 1 feilsvar')).toBeVisible();
 });
 
 test('completes a single-entry session immediately and supports restart and return to sets', async ({
@@ -54,12 +54,12 @@ test('completes a single-entry session immediately and supports restart and retu
     .toBe('completion-heading');
   await expect(page.getByText('Ingen ord trengte ekstra øving denne gangen.')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Øv på nytt' }).click();
+  await page.getByRole('button', { name: 'Øv på samme sett igjen' }).click();
   await expect(page.getByRole('heading', { name: 'En rød frukt' })).toBeVisible();
   await expect(page.getByText('0 av 1 lært')).toBeVisible();
   await page.getByLabel('Stavingen din').fill('eple');
   await page.getByRole('button', { name: 'Sjekk svaret' }).click();
-  await page.locator('#completion-back-button').click();
+  await page.locator('#completion-sets-button').click();
   await expect(page.getByRole('heading', { name: 'Ordsettene dine' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Frukt' })).toBeVisible();
 });
@@ -170,6 +170,7 @@ test('loads the latest saved progress when resuming and hides a stale continue a
   await page.getByRole('button', { name: 'Lagre og start øving' }).click();
   await expect(page.getByRole('heading', { name: 'En rød frukt' })).toBeVisible();
   await page.getByRole('button', { name: 'Ordsett' }).click();
+  await page.reload();
 
   await page.evaluate(() => {
     const state = JSON.parse(localStorage.getItem('puggern.profile-state'));

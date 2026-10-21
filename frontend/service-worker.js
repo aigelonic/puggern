@@ -1,4 +1,4 @@
-const CACHE_NAME = 'puggern-app-shell-v4';
+const CACHE_NAME = 'puggern-app-shell-v5';
 const APP_SHELL = [
   './',
   './index.html',
@@ -6,7 +6,7 @@ const APP_SHELL = [
   './manifest.webmanifest',
   './icons/pug-192.png',
   './icons/pug-512.png',
-  './src/main.mjs?v=4',
+  './src/main.mjs?v=5',
   './src/learning.mjs?v=4',
   './src/profiles.mjs?v=4',
   './src/word-sets.mjs?v=4',

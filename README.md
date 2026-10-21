@@ -27,6 +27,19 @@ optional emoji are stored for a profile.
 The current profile, progress, and word-set storage formats are version 1;
 corrupt or unsupported saved data is ignored rather than resumed or displayed.
 
+Finishing practice opens a summary with learned practice entries, first-try
+correct entries, and incorrect-answer counts for entries needing more practice.
+Practicing both directions counts each direction as a separate entry; copying a
+correction does not count as learning an entry. The latest completed summary
+survives reload, and you can practice the same set again or return to word sets.
+If saving progress fails, practice still continues and a warning explains that
+progress may be lost on reload.
+
+Storage retains each profile's current session per word set, not a history of
+completed attempts. Session
+rewards and celebration depend on [#18](https://github.com/aigelonic/puggern/issues/18);
+that model is not implemented here.
+
 ## Tests
 
 Use Node.js 24 and npm. Install the development dependency and Chromium once,

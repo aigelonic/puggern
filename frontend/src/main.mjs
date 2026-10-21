@@ -55,6 +55,7 @@ let words = [];
 let session = null;
 let currentSetId = null;
 let currentProfileId = null;
+let unsavedProgress = false;
 
 function setAppError(message) {
   appError.textContent = message;
@@ -168,22 +169,39 @@ async function persistProgress() {
       progress: {
         ...state.progress,
         [currentProfileId]: {
-          ...(state.progress[currentProfileId] ?? {}),
+          ...Object.fromEntries(
+            Object.entries(state.progress[currentProfileId] ?? {}).filter(
+              ([setId]) => setId !== currentSetId,
+            ),
+          ),
           [currentSetId]: progress,
         },
       },
     }),
     'lagre øvingsfremgangen',
   );
-  if (saved) renderWordSets();
+  unsavedProgress = !saved;
+  const warning = document.querySelector('#progress-warning');
+  warning.hidden = saved;
+  if (!saved) {
+    setAppError('');
+    warning.textContent =
+      'Fremgangen kunne ikke lagres på denne enheten. Du kan fortsette å øve, men fremgangen kan gå tapt når du laster siden på nytt.';
+  }
+  renderWordSets();
   return saved;
 }
 
-async function startSession(nextWords, nextSession, setId) {
+async function startSession(
+  nextWords,
+  nextSession,
+  setId,
+  profileId = profileState.activeProfileId,
+) {
   words = nextWords;
   session = nextSession;
   currentSetId = setId;
-  currentProfileId = profileState.activeProfileId;
+  currentProfileId = profileId;
   await persistProgress();
   renderPractice();
 }
@@ -198,9 +216,20 @@ async function startWordSet(set) {
 }
 
 async function continueWordSet(set) {
-  const progress = activeProfileProgress()[set.id];
+  const progress = wordSetProgress(set.id);
   if (!progress) return;
   await startSession(progress.words, progress.session, set.id);
+}
+
+function wordSetProgress(setId) {
+  if (
+    unsavedProgress &&
+    currentProfileId === profileState.activeProfileId &&
+    currentSetId === setId
+  ) {
+    return { words, session };
+  }
+  return activeProfileProgress()[setId];
 }
 
 function renderPractice(message = '') {
@@ -226,29 +255,28 @@ function renderPractice(message = '') {
 }
 
 function finishSession() {
+  const firstTryCount = session.learned.filter((id) => !session.mistakes[id]).length;
   document.querySelector('#completion-message').textContent =
-    `Du fullførte alle ${session.learned.length} øvingsoppgavene.`;
+    `Du lærte ${session.learned.length} øveoppføringer. ${firstTryCount} riktige på første forsøk.`;
   document.querySelector('#completion-practiced-count').textContent = String(
     session.learned.length,
   );
-  document.querySelector('#completion-first-try-count').textContent = String(
-    session.learned.filter((id) => !session.mistakes[id]).length,
-  );
+  document.querySelector('#completion-first-try-count').textContent = String(firstTryCount);
 
   const hardestWords = document.querySelector('#hardest-words');
   const wordsNeedingPractice = Object.entries(session.mistakes)
     .filter(([, count]) => count > 0)
     .sort((left, right) => right[1] - left[1])
-    .map(([id]) => words.find((item) => item.id === id))
-    .filter(Boolean);
+    .map(([id, count]) => ({ word: words.find((item) => item.id === id), count }))
+    .filter(({ word }) => word);
   document.querySelector('#completion-extra-practice-count').textContent = String(
     wordsNeedingPractice.length,
   );
   hardestWords.replaceChildren();
   if (wordsNeedingPractice.length > 0) {
-    wordsNeedingPractice.forEach((word) => {
+    wordsNeedingPractice.forEach(({ word, count }) => {
       const item = document.createElement('li');
-      item.textContent = `${word.prompt} → ${word.answer}`;
+      item.textContent = `${word.prompt} → ${word.answer} · ${count} feilsvar`;
       hardestWords.append(item);
     });
   } else {
@@ -301,7 +329,7 @@ function renderWordSets() {
     const name = document.createElement('h3');
     name.textContent = set.name;
     const summary = document.createElement('p');
-    const progress = activeProfileProgress()[set.id];
+    const progress = wordSetProgress(set.id);
     const progressSummary = !progress
       ? ''
       : progress.session.queue.length === 0
@@ -541,6 +569,15 @@ window.addEventListener('offline', updateConnectionStatus);
 updateConnectionStatus();
 renderProfiles();
 renderWordSets();
+const latestProgress = Object.entries(activeProfileProgress()).at(-1);
+const [savedSetId, savedProgress] = latestProgress ?? [];
+if (savedProgress?.session.queue.length === 0 && wordSets.some((set) => set.id === savedSetId)) {
+  words = savedProgress.words;
+  session = savedProgress.session;
+  currentSetId = savedSetId;
+  currentProfileId = profileState.activeProfileId;
+  finishSession();
+}
 profileSelect.addEventListener('change', async () => {
   const activeProfileId = profileSelect.value;
   if (await persistProfileState((state) => ({ ...state, activeProfileId }), 'bytte profil'))
@@ -644,11 +681,17 @@ document.querySelector('#back-button').addEventListener('click', () => {
   renderWordSets();
 });
 document.querySelector('#completion-restart-button').addEventListener('click', () => {
-  startSession(words, createSession(words, Math.random, session.settings), currentSetId);
+  startSession(
+    words,
+    createSession(words, Math.random, session.settings),
+    currentSetId,
+    currentProfileId,
+  );
 });
-document.querySelector('#completion-back-button').addEventListener('click', () => {
+document.querySelector('#completion-sets-button').addEventListener('click', () => {
   showView(setupView);
-  document.querySelector('#saved-sets-title').focus();
+  document.querySelector('#new-set-button').focus();
+  renderWordSets();
 });
 document.querySelector('#completion-new-set-button').addEventListener('click', () => {
   showView(setupView);

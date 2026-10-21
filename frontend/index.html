@@ -18,6 +18,7 @@
         </a>
         <p id="connection-status" role="status" aria-live="polite"></p>
       </header>
+      <p id="progress-warning" class="feedback error" role="alert" hidden></p>
 
       <p id="app-error" class="feedback error" role="alert" hidden></p>
 
@@ -153,9 +154,9 @@
         <ul id="hardest-words"></ul>
         <div class="actions">
           <button id="completion-restart-button" class="button primary" type="button">
-            Øv på nytt
+            Øv på samme sett igjen
           </button>
-          <button id="completion-back-button" class="button secondary" type="button">
+          <button id="completion-sets-button" class="button secondary" type="button">
             Til ordsettene
           </button>
           <button id="completion-new-set-button" class="button secondary" type="button">
@@ -164,6 +165,6 @@
         </div>
       </section>
     </main>
-    <script type="module" src="./src/main.mjs?v=4"></script>
+    <script type="module" src="./src/main.mjs?v=5"></script>
   </body>
 </html>
