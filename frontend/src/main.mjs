@@ -41,6 +41,7 @@ const answerForm = document.querySelector('#answer-form');
 const answerButton = answerForm.querySelector('button[type="submit"]');
 const answerInput = document.querySelector('#answer');
 const feedback = document.querySelector('#feedback');
+const correctionAnnouncement = document.querySelector('#correction-announcement');
 const correctionFeedback = document.querySelector('#correction-feedback');
 const correctAnswer = document.querySelector('#correct-answer');
 const correctionInstruction = document.querySelector('#correction-instruction');
@@ -150,6 +151,7 @@ function showView(view) {
   setupView.hidden = view !== setupView;
   practiceView.hidden = view !== practiceView;
   completeView.hidden = view !== completeView;
+  if (view !== practiceView) correctionAnnouncement.textContent = '';
 }
 
 function showSetupError(message) {
@@ -235,7 +237,7 @@ function wordSetProgress(setId) {
   return activeProfileProgress()[setId];
 }
 
-function renderPractice(message = '') {
+function renderPractice(message = '', { announceCorrection = false } = {}) {
   const word = currentWord(session, words);
   if (!word) {
     finishSession();
@@ -254,8 +256,18 @@ function renderPractice(message = '') {
     : '';
   feedback.textContent = isCorrection ? '' : message;
   feedback.classList.toggle('error', false);
+  if (isCorrection) {
+    answerInput.setAttribute('aria-describedby', 'correction-feedback');
+  } else {
+    answerInput.removeAttribute('aria-describedby');
+  }
   answerInput.value = '';
   showView(practiceView);
+  correctionAnnouncement.textContent = isCorrection
+    ? announceCorrection
+      ? `Riktig stavemåte er ${word.answer}. Skriv ordet én gang, så kommer det tilbake senere.`
+      : 'Rettelsen vises ved svarfeltet.'
+    : '';
   answerInput.focus();
 }
 
@@ -660,7 +672,9 @@ answerForm.addEventListener('submit', async (event) => {
     await persistProgress();
 
     if (outcome.result === 'incorrect') {
-      renderPractice();
+      renderPractice('', {
+        announceCorrection: document.activeElement === answerInput,
+      });
       return;
     }
     if (outcome.result === 'retry-scheduled') {

@@ -12,13 +12,21 @@ test('shows prominent correction feedback and practices a missed word until it i
 
   await expect(page.getByRole('heading', { name: 'En rød frukt' })).toBeVisible();
   await page.getByLabel('Stavingen din').fill('pære');
-  await page.getByRole('button', { name: 'Sjekk svaret' }).click();
+  await page.getByLabel('Stavingen din').press('Enter');
   const correction = page.locator('#correction-feedback');
   await expect(correction).toBeVisible();
   await expect(correction.locator('.correction-label')).toHaveText('Riktig stavemåte');
   await expect(page.locator('#correct-answer')).toHaveText('eple');
   await expect(page.locator('#correction-instruction')).toHaveText(
     'Skriv ordet én gang, så kommer det tilbake senere.',
+  );
+  await expect(page.locator('#correction-announcement')).toHaveText(
+    'Riktig stavemåte er eple. Skriv ordet én gang, så kommer det tilbake senere.',
+  );
+  await expect(page.locator('#correction-announcement')).toHaveAttribute('aria-live', 'polite');
+  await expect(page.locator('#answer')).toHaveAttribute('aria-describedby', 'correction-feedback');
+  await expect(page.locator('#answer')).toHaveAccessibleDescription(
+    'Riktig stavemåte eple Skriv ordet én gang, så kommer det tilbake senere.',
   );
   await expect(page.locator('#answer')).toBeFocused();
   await expect(correction).toBeInViewport();
@@ -42,6 +50,41 @@ test('shows prominent correction feedback and practices a missed word until it i
   await expect(page.locator('#completion-first-try-count')).toHaveText('0');
   await expect(page.locator('#completion-extra-practice-count')).toHaveText('1');
   await expect(page.getByText('En rød frukt → eple · 1 feilsvar')).toBeVisible();
+});
+
+test('chooses correction announcement after delayed progress saving', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Nytt ordsett' }).click();
+  await page.getByLabel('Navn på ordsettet').fill('Frukt');
+  await page.getByLabel('Hint og svar').fill('En rød frukt\teple');
+  await page.getByRole('button', { name: 'Lagre og start øving' }).click();
+
+  await page.evaluate(() => {
+    window.profileStateLockAcquired = new Promise((resolve) => {
+      navigator.locks.request('puggern.profile-state', async () => {
+        resolve();
+        await new Promise((release) => {
+          window.releaseProfileStateLock = release;
+        });
+      });
+    });
+  });
+  await page.evaluate(() => window.profileStateLockAcquired);
+
+  await page.getByLabel('Stavingen din').fill('pære');
+  await page.getByLabel('Stavingen din').press('Enter');
+  await expect(page.locator('#answer')).toHaveAttribute('readonly', '');
+  await page.getByRole('button', { name: 'Ordsett' }).click();
+  await page.evaluate(() => window.releaseProfileStateLock());
+
+  await expect(page.locator('#correction-feedback')).toBeVisible();
+  await expect(page.locator('#correction-announcement')).toHaveText(
+    'Rettelsen vises ved svarfeltet.',
+  );
+  await expect(page.locator('#answer')).toHaveAccessibleDescription(
+    'Riktig stavemåte eple Skriv ordet én gang, så kommer det tilbake senere.',
+  );
+  await expect(page.locator('#answer')).toBeFocused();
 });
 
 test('wraps long correction spellings on a mobile viewport', async ({ page }) => {
@@ -106,6 +149,8 @@ test('completes a single-entry session immediately and supports restart and retu
 
 test('reloads and resumes a saved session during its correction step', async ({ page }) => {
   await page.goto('/');
+  await expect(page.locator('#correction-announcement')).toHaveText('');
+  await expect(page.locator('#correction-announcement')).not.toHaveAttribute('hidden');
   await page.getByRole('button', { name: 'Nytt ordsett' }).click();
   await page.getByLabel('Navn på ordsettet').fill('Frukt');
   await page.getByLabel('Hint og svar').fill('En rød frukt\teple');
@@ -114,6 +159,9 @@ test('reloads and resumes a saved session during its correction step', async ({ 
   await page.getByRole('button', { name: 'Sjekk svaret' }).click();
   await expect(page.locator('#correct-answer')).toHaveText('eple');
   await expect(page.locator('#correction-instruction')).toBeVisible();
+  await expect(page.locator('#correction-announcement')).toHaveText(
+    'Rettelsen vises ved svarfeltet.',
+  );
   await expect(page.locator('#answer')).toBeFocused();
 
   await page.reload();
@@ -126,7 +174,25 @@ test('reloads and resumes a saved session during its correction step', async ({ 
   await expect(page.locator('#correction-instruction')).toHaveText(
     'Skriv ordet én gang, så kommer det tilbake senere.',
   );
+  await expect(page.locator('#correction-announcement')).toHaveText(
+    'Rettelsen vises ved svarfeltet.',
+  );
+  await expect(page.locator('#correction-announcement')).toHaveAttribute('aria-live', 'polite');
+  await expect(page.locator('#answer')).toHaveAttribute('aria-describedby', 'correction-feedback');
+  await expect(page.locator('#answer')).toHaveAccessibleDescription(
+    'Riktig stavemåte eple Skriv ordet én gang, så kommer det tilbake senere.',
+  );
   await expect(page.locator('#answer')).toBeFocused();
+
+  await page.getByRole('button', { name: 'Ordsett' }).click();
+  await expect(page.locator('#correction-announcement')).toHaveText('');
+  await page.getByRole('button', { name: 'Fortsett øvingen' }).click();
+  await expect(page.locator('#correction-announcement')).toHaveText(
+    'Rettelsen vises ved svarfeltet.',
+  );
+  await expect(page.locator('#answer')).toHaveAccessibleDescription(
+    'Riktig stavemåte eple Skriv ordet én gang, så kommer det tilbake senere.',
+  );
 
   await page.getByLabel('Skriv ordet én gang').fill('eple');
   await page.getByRole('button', { name: 'Sjekk svaret' }).click();
