@@ -38,8 +38,28 @@
 - Run relevant existing checks after changes, starting with targeted tests.
 - Add focused regression tests for changed behavior when practical.
 - Self-review the full diff before requesting human review.
+- Before creating any PR (including drafts), complete the independent local review below; self-review and post-PR review do not satisfy this gate.
 - Do not self-approve or auto-merge as the implementing agent.
 - Record any meaningful test failures, skipped checks, or unresolved blockers in the PR description.
+
+### Verification and specialist reviews
+
+- For behavior changes, bug fixes, and final executable validation, use the [Verification agent](.github/agents/verification.agent.md) to run relevant existing checks and verify acceptance criteria. Documentation-only changes need only applicable documentation/format checks.
+- Use the [Security Review agent](.github/agents/security-review.agent.md) for security-sensitive changes, such as authorization, untrusted input, sensitive data, or dependency changes.
+- Use the [UI / Accessibility Review agent](.github/agents/ui-accessibility-review.agent.md) for user-facing UI changes, including keyboard, focus, responsive layout, and reduced-motion behavior.
+- Give each agent the task, acceptance criteria, intended PR base, complete change scope, and relevant check results. Run only applicable specialists; do not add unrelated handoffs.
+- These agents report evidence and findings without fixing the implementation. The implementing agent owns fixes and reruns affected validation/reviews. They must not recursively invoke this workflow.
+- If a custom agent cannot be invoked, use an available separate agent with the same instructions. If required verification or an applicable review cannot be completed, report the blocker and stop before PR creation.
+- Complete applicable verification and specialist reviews before the independent local review. Pass their results, limitations, and finding resolutions to the local reviewer; they do not replace its final pass.
+
+### Independent local review gate
+
+- After implementation and relevant checks, invoke the [Local Review agent](.github/agents/local-review.agent.md) in a separate agent context. Prefer a different model when available; a separate reviewer agent is required even when only the same model is available.
+- If the runtime cannot invoke that custom agent, use an available independent review agent with the same review instructions. If no independent reviewer is available, stop before PR creation and report the blocker; never substitute the implementing agent's own review.
+- Give the reviewer the task and acceptance criteria, intended PR base branch, full diff against the merge base (including committed, staged, unstaged, and intended untracked files), and check commands/results. Include relevant context and known limitations, not just a summary of the edits.
+- Fix actionable findings and rerun affected checks. Have the independent reviewer recheck fixes and the final diff; any subsequent change invalidates the prior pass until reviewed.
+- Do not create the PR until the reviewer explicitly reports `PASS` for the final state. Unresolved critical/high-severity findings block a pass. Other actionable findings must be fixed or explicitly accepted by the user with the rationale recorded.
+- This gate applies to all PR changes, including documentation and agent instructions. A local pass is not a GitHub approval and does not replace CI or human review.
 
 ## Commits and pull requests
 
@@ -51,6 +71,8 @@
   - non-goals,
   - relevant risks or migrations,
   - test commands and results, or reasons checks were not run,
+  - applicable verification and specialist review results, including limitations and finding resolutions,
+  - independent local review evidence: reviewer agent/model (if known), reviewed base and final commit/worktree state, verdict, findings and resolutions or user-accepted risks, and recheck results,
   - links to related issues only when they exist.
 - Use closing keywords only when the linked issue is actually resolved; otherwise mark it as related work.
 
