@@ -45,6 +45,7 @@
 
 - Use Conventional Commits for commit messages and PR titles: `type(scope): description`.
 - Keep each PR to one coherent, independently reviewable purpose.
+- Preserve PR descriptions as literal Markdown: use `##` headings and `-` list markers, and verify the submitted body rather than relying on rendered formatting. When providing a description for copy/paste in chat, wrap the complete body in a `markdown` code fence.
 - In PR descriptions, include:
   - a brief summary of scope,
   - non-goals,
