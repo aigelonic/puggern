@@ -89,7 +89,11 @@ test('persists supported progress and ignores corrupt or unknown versions', () =
   const session = createSession(words, () => 0.999);
 
   saveProgress(storage, session, words);
-  assert.deepEqual(loadProgress(storage), { version: PROGRESS_VERSION, session, words });
+  assert.deepEqual(loadProgress(storage), {
+    version: PROGRESS_VERSION,
+    session,
+    words,
+  });
 
   values.set(PROGRESS_KEY, '{');
   assert.equal(loadProgress(storage), null);

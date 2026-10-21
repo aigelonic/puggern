@@ -10,7 +10,9 @@ test('creates a set and practices a missed word until it is learned', async ({ p
   await expect(page.getByRole('heading', { name: 'En rød frukt' })).toBeVisible();
   await page.getByLabel('Stavingen din').fill('pære');
   await page.getByRole('button', { name: 'Sjekk svaret' }).click();
-  await expect(page.getByText('Riktig stavemåte er eple. Skriv ordet én gang, så kommer det tilbake senere.')).toBeVisible();
+  await expect(
+    page.getByText('Riktig stavemåte er eple. Skriv ordet én gang, så kommer det tilbake senere.'),
+  ).toBeVisible();
 
   await page.getByLabel('Skriv ordet én gang').fill('eple');
   await page.getByRole('button', { name: 'Sjekk svaret' }).click();
@@ -42,7 +44,9 @@ test('reloads and resumes a saved session during its correction step', async ({ 
   await expect(page.getByText(/Riktig stavemåte er eple/)).toBeVisible();
 });
 
-test('loads the latest saved progress when resuming and hides a stale resume button', async ({ page }) => {
+test('loads the latest saved progress when resuming and hides a stale resume button', async ({
+  page,
+}) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Nytt ordsett' }).click();
   await page.getByLabel('Navn på ordsettet').fill('Frukt');
@@ -51,11 +55,14 @@ test('loads the latest saved progress when resuming and hides a stale resume but
   await page.getByRole('button', { name: 'Ordsett' }).click();
 
   await page.evaluate(() => {
-    localStorage.setItem('puggern.progress', JSON.stringify({
-      version: 1,
-      words: [{ id: 'updated', prompt: 'Oppdatert hint', answer: 'nytt svar' }],
-      session: { queue: ['updated'], correction: false, learned: [], mistakes: {}, settings: {} },
-    }));
+    localStorage.setItem(
+      'puggern.progress',
+      JSON.stringify({
+        version: 1,
+        words: [{ id: 'updated', prompt: 'Oppdatert hint', answer: 'nytt svar' }],
+        session: { queue: ['updated'], correction: false, learned: [], mistakes: {}, settings: {} },
+      }),
+    );
   });
   await page.getByRole('button', { name: 'Fortsett øvingen' }).click();
   await expect(page.getByRole('heading', { name: 'Oppdatert hint' })).toBeVisible();
@@ -102,7 +109,9 @@ test('creates and practices a saved word set in both directions', async ({ page 
   await expect(page.getByRole('heading', { name: 'Godt jobbet!' })).toBeVisible();
 });
 
-test('highlights malformed entries and supports set editing, duplication, archiving, and deletion', async ({ page }) => {
+test('highlights malformed entries and supports set editing, duplication, archiving, and deletion', async ({
+  page,
+}) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Nytt ordsett' }).click();
   await page.getByLabel('Navn på ordsettet').fill('Uke 43');
@@ -138,11 +147,17 @@ test('highlights malformed entries and supports set editing, duplication, archiv
   await expect(page.getByRole('heading', { name: 'Uke 44', exact: true })).toBeVisible();
 
   page.once('dialog', (dialog) => dialog.accept());
-  await page.getByRole('listitem').filter({ hasText: 'Uke 44 (kopi)' }).getByRole('button', { name: 'Slett' }).click();
+  await page
+    .getByRole('listitem')
+    .filter({ hasText: 'Uke 44 (kopi)' })
+    .getByRole('button', { name: 'Slett' })
+    .click();
   await expect(page.getByRole('heading', { name: 'Uke 44 (kopi)' })).toHaveCount(0);
 });
 
-test('keeps malformed rows invalid until repaired and retains preview edits in the source', async ({ page }) => {
+test('keeps malformed rows invalid until repaired and retains preview edits in the source', async ({
+  page,
+}) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Nytt ordsett' }).click();
   await page.getByLabel('Navn på ordsettet').fill('Uke 45');

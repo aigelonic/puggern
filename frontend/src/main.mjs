@@ -92,9 +92,11 @@ function renderPractice(message = '') {
   progressLabel.textContent = `${learnedCount} av ${words.length} lært · ${session.queue.length} oppgaver igjen`;
   prompt.textContent = word.prompt;
   answerLabel.textContent = session.correction ? 'Skriv ordet én gang' : 'Stavingen din';
-  feedback.textContent = message || (session.correction
-    ? `Riktig stavemåte er ${word.answer}. Skriv ordet én gang, så kommer det tilbake senere.`
-    : '');
+  feedback.textContent =
+    message ||
+    (session.correction
+      ? `Riktig stavemåte er ${word.answer}. Skriv ordet én gang, så kommer det tilbake senere.`
+      : '');
   feedback.classList.toggle('error', session.correction);
   answerInput.value = '';
   showView(practiceView);
@@ -167,11 +169,13 @@ function renderWordSets() {
     const name = document.createElement('h3');
     name.textContent = set.name;
     const summary = document.createElement('p');
-    summary.textContent = `${set.words.length} ord · ${{
-      'prompt-to-answer': 'hint til svar',
-      'answer-to-prompt': 'svar til hint',
-      both: 'begge retninger',
-    }[set.direction]}`;
+    summary.textContent = `${set.words.length} ord · ${
+      {
+        'prompt-to-answer': 'hint til svar',
+        'answer-to-prompt': 'svar til hint',
+        both: 'begge retninger',
+      }[set.direction]
+    }`;
     details.append(name, summary);
 
     const actions = document.createElement('div');
@@ -195,7 +199,8 @@ function openEditor(set = null) {
   editorSetId = set?.id ?? null;
   editorTitle.textContent = set ? 'Rediger ordsett' : 'Nytt ordsett';
   wordSetNameInput.value = set?.name ?? '';
-  wordSetInput.value = set?.words.map(({ prompt: clue, answer }) => `${clue}\t${answer}`).join('\n') ?? '';
+  wordSetInput.value =
+    set?.words.map(({ prompt: clue, answer }) => `${clue}\t${answer}`).join('\n') ?? '';
   document.querySelector('#quiz-direction').value = set?.direction ?? 'prompt-to-answer';
   document.querySelector('#case-sensitive').checked = set?.settings.caseSensitive ?? false;
   document.querySelector('#accent-sensitive').checked = set?.settings.accentSensitive ?? false;
@@ -212,7 +217,8 @@ function previewEntryError(entry, index) {
   if (!promptText || !answerText) {
     return entry.error ?? `Linje ${entry.lineNumber} må inneholde både et hint og et svar.`;
   }
-  if (index >= MAX_WORDS_PER_SET) return `Et ordsett kan inneholde maksimalt ${MAX_WORDS_PER_SET} ord.`;
+  if (index >= MAX_WORDS_PER_SET)
+    return `Et ordsett kan inneholde maksimalt ${MAX_WORDS_PER_SET} ord.`;
   if (promptText.length > MAX_WORD_LENGTH || answerText.length > MAX_WORD_LENGTH) {
     return `Hint og svar kan ikke være lengre enn ${MAX_WORD_LENGTH} tegn.`;
   }
@@ -253,7 +259,12 @@ function renderPreview() {
     const updateRow = (canRepair = false) => {
       entry.prompt = promptField.value;
       entry.answer = answerField.value;
-      if (canRepair && entry.prompt.trim() && entry.answer.trim() && entry.error?.startsWith('Linje')) {
+      if (
+        canRepair &&
+        entry.prompt.trim() &&
+        entry.answer.trim() &&
+        entry.error?.startsWith('Linje')
+      ) {
         entry.error = null;
       }
       if (canRepair) {
@@ -313,7 +324,7 @@ function saveEditor(startAfterSave = false) {
     updatedAt: now,
   };
   const nextWordSets = previous
-    ? wordSets.map((item) => item.id === set.id ? set : item)
+    ? wordSets.map((item) => (item.id === set.id ? set : item))
     : [set, ...wordSets];
   if (!updateWordSets(nextWordSets, 'lagre')) return;
   if (!previous) showArchived = false;
@@ -325,7 +336,9 @@ function saveEditor(startAfterSave = false) {
 
 function changeArchived(set, archived) {
   const now = new Date().toISOString();
-  const nextWordSets = wordSets.map((item) => item.id === set.id ? { ...item, archived, updatedAt: now } : item);
+  const nextWordSets = wordSets.map((item) =>
+    item.id === set.id ? { ...item, archived, updatedAt: now } : item,
+  );
   updateWordSets(nextWordSets, archived ? 'arkivere' : 'gjenopprette');
 }
 
@@ -345,7 +358,10 @@ function duplicateWordSet(set) {
 
 function deleteWordSet(set) {
   if (!window.confirm(`Slette ordsettet «${set.name}»?`)) return;
-  updateWordSets(wordSets.filter((item) => item.id !== set.id), 'slette');
+  updateWordSets(
+    wordSets.filter((item) => item.id !== set.id),
+    'slette',
+  );
 }
 
 window.addEventListener('online', updateConnectionStatus);
@@ -386,7 +402,9 @@ answerForm.addEventListener('submit', (event) => {
 
   if (outcome.result === 'incorrect') {
     const word = currentWord(session, words);
-    renderPractice(`Riktig stavemåte er ${word.answer}. Skriv ordet én gang, så kommer det tilbake senere.`);
+    renderPractice(
+      `Riktig stavemåte er ${word.answer}. Skriv ordet én gang, så kommer det tilbake senere.`,
+    );
     return;
   }
   if (outcome.result === 'retry-scheduled') {

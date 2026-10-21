@@ -1,6 +1,6 @@
 :root {
   color-scheme: light;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: Georgia, 'Times New Roman', serif;
   color: #263a32;
   background: #f4f2e9;
   font-synthesis: none;
@@ -63,7 +63,7 @@ textarea {
 .feedback,
 .text-button,
 label {
-  font-family: "Trebuchet MS", sans-serif;
+  font-family: 'Trebuchet MS', sans-serif;
 }
 
 #connection-status {
@@ -79,7 +79,7 @@ label {
 .eyebrow {
   margin: 0 0 0.65rem;
   color: #b4533d;
-  font-family: "Trebuchet MS", sans-serif;
+  font-family: 'Trebuchet MS', sans-serif;
   font-size: 0.8rem;
   font-weight: 700;
   letter-spacing: 0;
@@ -97,7 +97,7 @@ h1 {
   max-width: 38rem;
   margin: 1rem 0 2rem;
   color: #52665d;
-  font-family: "Trebuchet MS", sans-serif;
+  font-family: 'Trebuchet MS', sans-serif;
   font-size: 1.05rem;
   line-height: 1.55;
 }
@@ -111,7 +111,7 @@ form > label,
 }
 
 textarea,
-input[type="text"],
+input[type='text'],
 select {
   display: block;
   width: 100%;
@@ -125,12 +125,12 @@ select {
 textarea {
   min-height: 9rem;
   padding: 0.9rem 1rem;
-  font-family: "Trebuchet MS", sans-serif;
+  font-family: 'Trebuchet MS', sans-serif;
   line-height: 1.65;
   resize: vertical;
 }
 
-input[type="text"] {
+input[type='text'] {
   min-height: 3.6rem;
   padding: 0.7rem 0.9rem;
   font-size: 1.35rem;
@@ -139,11 +139,11 @@ input[type="text"] {
 select {
   min-height: 3rem;
   padding: 0.5rem 0.75rem;
-  font-family: "Trebuchet MS", sans-serif;
+  font-family: 'Trebuchet MS', sans-serif;
 }
 
 textarea:focus,
-input[type="text"]:focus,
+input[type='text']:focus,
 select:focus {
   border-color: #347457;
   box-shadow: 0 0 0 3px #3474572b;
@@ -206,7 +206,7 @@ select:focus {
 .word-set-details p {
   margin: 0.3rem 0 0;
   color: #64766d;
-  font-family: "Trebuchet MS", sans-serif;
+  font-family: 'Trebuchet MS', sans-serif;
   font-size: 0.85rem;
 }
 
@@ -254,7 +254,7 @@ select:focus {
   display: grid;
   gap: 0.55rem;
   margin: 1rem 0 1.4rem;
-  font-family: "Trebuchet MS", sans-serif;
+  font-family: 'Trebuchet MS', sans-serif;
 }
 
 .word-preview h3 {
@@ -269,10 +269,10 @@ select:focus {
   gap: 0.5rem;
 }
 
-.preview-row input[type="text"] {
+.preview-row input[type='text'] {
   min-height: 2.7rem;
   padding: 0.5rem 0.65rem;
-  font-family: "Trebuchet MS", sans-serif;
+  font-family: 'Trebuchet MS', sans-serif;
   font-size: 0.95rem;
 }
 
@@ -283,7 +283,7 @@ select:focus {
   font-size: 0.82rem;
 }
 
-.preview-row.invalid input[type="text"] {
+.preview-row.invalid input[type='text'] {
   border-color: #a33f2d;
 }
 
@@ -313,7 +313,7 @@ select:focus {
   border: 1px solid transparent;
   border-radius: 4px;
   cursor: pointer;
-  font-family: "Trebuchet MS", sans-serif;
+  font-family: 'Trebuchet MS', sans-serif;
   font-weight: 700;
 }
 
@@ -396,7 +396,7 @@ select:focus {
   margin: 0 0 2rem;
   padding-left: 1.2rem;
   color: #52665d;
-  font-family: "Trebuchet MS", sans-serif;
+  font-family: 'Trebuchet MS', sans-serif;
   line-height: 1.8;
 }
 

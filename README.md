@@ -14,7 +14,7 @@ Then open <http://localhost:8000>. Service workers require HTTPS in production;
 `localhost` is treated as a secure context for development.
 
 Create named word sets by pasting one clue and spelling per line, separated by
-a tab, semicolon, or ` - `. Review and edit the parsed entries before saving.
+a tab, semicolon, or `-`. Review and edit the parsed entries before saving.
 Each set supports up to 100 entries, either quiz direction or both directions,
 and its own case/accent matching settings. Sets can be edited, copied, archived,
 restored, and deleted. Word sets and progress are saved in browser storage on
@@ -37,6 +37,21 @@ npm test
 `npm run test:unit` runs the no-dependency core tests. `npm run test:e2e` runs
 the browser workflows against a temporary static server. GitHub Actions runs
 both suites for pull requests and pushes to `main`.
+
+## Pull Request Checks
+
+GitHub Actions runs separate `Quality`, `Tests`, and `Dependency security`
+checks on pull requests and pushes to `main`. Quality runs ESLint and checks
+formatting with Prettier. Dependency security runs `npm audit` and reviews
+dependency changes in pull requests; moderate and higher severity
+vulnerabilities fail the check. Dependabot checks npm packages and GitHub
+Actions weekly.
+
+Repository administrators must enable Dependabot alerts and security updates
+in the repository's **Settings → Code security and analysis** page, then
+require the `Quality`, `Tests`, and `Dependency security` checks in branch
+protection or rulesets for `main`. These repository settings cannot be
+configured from the workflow files.
 
 ## Server Deployment
 

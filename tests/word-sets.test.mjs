@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { loadWordSets, saveWordSets, WORD_SETS_KEY, WORD_SETS_VERSION } from '../frontend/src/word-sets.mjs';
+import {
+  loadWordSets,
+  saveWordSets,
+  WORD_SETS_KEY,
+  WORD_SETS_VERSION,
+} from '../frontend/src/word-sets.mjs';
 
 function makeStorage() {
   const values = new Map();
@@ -34,13 +39,22 @@ test('ignores corrupt, unsupported, or invalid word-set storage', () => {
   const storage = makeStorage();
   storage.values.set(WORD_SETS_KEY, '{');
   assert.deepEqual(loadWordSets(storage), []);
-  storage.values.set(WORD_SETS_KEY, JSON.stringify({ version: WORD_SETS_VERSION + 1, sets: [validSet] }));
+  storage.values.set(
+    WORD_SETS_KEY,
+    JSON.stringify({ version: WORD_SETS_VERSION + 1, sets: [validSet] }),
+  );
   assert.deepEqual(loadWordSets(storage), []);
-  storage.values.set(WORD_SETS_KEY, JSON.stringify({ version: WORD_SETS_VERSION, sets: [{ ...validSet, words: [] }] }));
+  storage.values.set(
+    WORD_SETS_KEY,
+    JSON.stringify({ version: WORD_SETS_VERSION, sets: [{ ...validSet, words: [] }] }),
+  );
   assert.deepEqual(loadWordSets(storage), []);
-  storage.values.set(WORD_SETS_KEY, JSON.stringify({
-    version: WORD_SETS_VERSION,
-    sets: [validSet, { ...validSet, name: 'Duplicate ID' }],
-  }));
+  storage.values.set(
+    WORD_SETS_KEY,
+    JSON.stringify({
+      version: WORD_SETS_VERSION,
+      sets: [validSet, { ...validSet, name: 'Duplicate ID' }],
+    }),
+  );
   assert.deepEqual(loadWordSets(storage), []);
 });

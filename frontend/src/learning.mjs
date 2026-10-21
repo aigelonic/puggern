@@ -23,7 +23,12 @@ export function previewWordSet(source) {
     const answer = separatorIndex < 1 ? '' : line.slice(separatorIndex + separator.length).trim();
     let error = null;
 
-    if (separatorIndex < 1 || !prompt || !answer || line.indexOf(separator, separatorIndex + separator.length) !== -1) {
+    if (
+      separatorIndex < 1 ||
+      !prompt ||
+      !answer ||
+      line.indexOf(separator, separatorIndex + separator.length) !== -1
+    ) {
       error = `Linje ${index + 1} må inneholde et hint og et svar, atskilt med tab, semikolon eller « - ».`;
     } else if (entries.length >= MAX_WORDS_PER_SET) {
       error = `Et ordsett kan inneholde maksimalt ${MAX_WORDS_PER_SET} ord.`;
@@ -136,14 +141,23 @@ export function loadProgress(storage) {
 
   try {
     const progress = JSON.parse(stored);
-    if (progress.version !== PROGRESS_VERSION || !Array.isArray(progress.words)
-      || progress.words.some((word) => typeof word.id !== 'string'
-        || typeof word.prompt !== 'string' || typeof word.answer !== 'string')
-      || !progress.session || !Array.isArray(progress.session.queue)
-      || progress.session.queue.some((id) => !progress.words.some((word) => word.id === id))
-      || typeof progress.session.correction !== 'boolean'
-      || !Array.isArray(progress.session.learned) || !progress.session.mistakes
-      || typeof progress.session.mistakes !== 'object') {
+    if (
+      progress.version !== PROGRESS_VERSION ||
+      !Array.isArray(progress.words) ||
+      progress.words.some(
+        (word) =>
+          typeof word.id !== 'string' ||
+          typeof word.prompt !== 'string' ||
+          typeof word.answer !== 'string',
+      ) ||
+      !progress.session ||
+      !Array.isArray(progress.session.queue) ||
+      progress.session.queue.some((id) => !progress.words.some((word) => word.id === id)) ||
+      typeof progress.session.correction !== 'boolean' ||
+      !Array.isArray(progress.session.learned) ||
+      !progress.session.mistakes ||
+      typeof progress.session.mistakes !== 'object'
+    ) {
       return null;
     }
     return progress;
