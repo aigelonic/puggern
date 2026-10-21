@@ -192,11 +192,16 @@ async function persistProgress() {
   return saved;
 }
 
-async function startSession(nextWords, nextSession, setId) {
+async function startSession(
+  nextWords,
+  nextSession,
+  setId,
+  profileId = profileState.activeProfileId,
+) {
   words = nextWords;
   session = nextSession;
   currentSetId = setId;
-  currentProfileId = profileState.activeProfileId;
+  currentProfileId = profileId;
   await persistProgress();
   renderPractice();
 }
@@ -668,7 +673,12 @@ document.querySelector('#back-button').addEventListener('click', () => {
   renderWordSets();
 });
 document.querySelector('#completion-restart-button').addEventListener('click', () => {
-  startSession(words, createSession(words, Math.random, session.settings), currentSetId);
+  startSession(
+    words,
+    createSession(words, Math.random, session.settings),
+    currentSetId,
+    currentProfileId,
+  );
 });
 document.querySelector('#completion-sets-button').addEventListener('click', () => {
   showView(setupView);

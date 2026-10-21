@@ -173,6 +173,37 @@ test('restores continue when storage recovers during an unfinished session', asy
   await expectCompletion(page, 1, 0);
 });
 
+test('restarts a summary for its original profile after another tab switches profiles', async ({
+  page,
+  context,
+}) => {
+  await startSet(page);
+  await answer(page, 'dog');
+  await expectCompletion(page, 1, 1);
+  const otherPage = await context.newPage();
+  await otherPage.goto('/');
+  await otherPage.getByRole('button', { name: 'Til ordsettene' }).click();
+  await otherPage.getByRole('button', { name: 'Legg til profil' }).click();
+  await otherPage.getByLabel('Navn', { exact: true }).fill('Ny profil');
+  await otherPage.getByRole('button', { name: 'Lagre profil' }).click();
+  await expect(otherPage.getByLabel('Profil').locator('option:checked')).toHaveText('Ny profil');
+  await otherPage.getByRole('button', { name: 'Start øving' }).click();
+  await expect(otherPage.getByLabel('Stavingen din')).toBeFocused();
+  await answer(otherPage, 'wrong');
+  await expect(otherPage.getByLabel('Skriv ordet én gang')).toBeFocused();
+  await expect(page.getByLabel('Profil').locator('option:checked')).toHaveText('Ny profil');
+  await page.getByRole('button', { name: 'Øv på samme sett igjen' }).click();
+  await expect(page.getByLabel('Stavingen din')).toBeFocused();
+  const progress = await page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem('puggern.profile-state'));
+    return state.profiles.map((profile) => Object.values(state.progress[profile.id])[0].session);
+  });
+  expect(progress[0].queue).toHaveLength(1);
+  expect(progress[0].learned).toEqual([]);
+  expect(progress[1].correction).toBe(true);
+  expect(Object.values(progress[1].mistakes)).toEqual([1]);
+});
+
 test('resumes an unfinished in-memory session after saving fails', async ({ page }) => {
   await startSet(page);
   await page.evaluate(() => {
