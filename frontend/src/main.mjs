@@ -5,14 +5,22 @@ import {
   MAX_WORD_LENGTH,
   MAX_WORDS_PER_SET,
   previewWordSet,
-  PROGRESS_KEY,
-  saveProgress,
+  PROGRESS_VERSION,
   submitAnswer,
   wordsForDirection,
 } from './learning.mjs';
+import {
+  createProfileState,
+  loadProfileState,
+  MAX_PROFILE_AVATAR_LENGTH,
+  MAX_PROFILE_NAME_LENGTH,
+  MAX_PROFILES,
+  saveProfileState,
+} from './profiles.mjs';
 import { loadWordSets, saveWordSets, MAX_WORD_SET_NAME_LENGTH } from './word-sets.mjs';
 
 const status = document.querySelector('#connection-status');
+const appError = document.querySelector('#app-error');
 const setupView = document.querySelector('#setup-view');
 const practiceView = document.querySelector('#practice-view');
 const completeView = document.querySelector('#complete-view');
@@ -23,7 +31,11 @@ const wordPreview = document.querySelector('#word-preview');
 const setupError = document.querySelector('#setup-error');
 const wordSetList = document.querySelector('#word-set-list');
 const emptySets = document.querySelector('#empty-sets');
-const resumeButton = document.querySelector('#resume-button');
+const profileSelect = document.querySelector('#profile-select');
+const profileForm = document.querySelector('#profile-form');
+const profileNameInput = document.querySelector('#profile-name');
+const profileAvatarInput = document.querySelector('#profile-avatar');
+const newProfileButton = document.querySelector('#new-profile-button');
 const answerForm = document.querySelector('#answer-form');
 const answerInput = document.querySelector('#answer');
 const feedback = document.querySelector('#feedback');
@@ -32,13 +44,71 @@ const prompt = document.querySelector('#prompt');
 const answerLabel = document.querySelector('#answer-label');
 const editorTitle = document.querySelector('#editor-title');
 const archiveToggle = document.querySelector('#archive-toggle');
-const savedProgress = loadProgress(window.localStorage);
 let wordSets = loadWordSets(window.localStorage);
+let profileState = loadProfileState(window.localStorage);
 let showArchived = false;
 let editorSetId = null;
 let editorRows = [];
 let words = [];
 let session = null;
+let currentSetId = null;
+
+function setAppError(message) {
+  appError.textContent = message;
+  appError.hidden = !message;
+}
+
+if (!profileState) {
+  profileState = createProfileState();
+  const legacyProgress = loadProgress(window.localStorage);
+  const matchingSet = legacyProgress
+    ? wordSets.find(
+        (set) =>
+          JSON.stringify(wordsForDirection(set.words, set.direction)) ===
+          JSON.stringify(legacyProgress.words),
+      )
+    : null;
+  if (matchingSet) {
+    profileState.progress[profileState.activeProfileId][matchingSet.id] = legacyProgress;
+  }
+  try {
+    saveProfileState(window.localStorage, profileState);
+    if (matchingSet) window.localStorage.removeItem('puggern.progress');
+  } catch (error) {
+    setAppError(`Kunne ikke lagre profiler og øving: ${error.message}`);
+  }
+}
+
+function persistProfileState(nextState, action) {
+  try {
+    saveProfileState(window.localStorage, nextState);
+    profileState = nextState;
+    setAppError('');
+    return true;
+  } catch (error) {
+    setAppError(`Kunne ikke ${action}: ${error.message}`);
+    return false;
+  }
+}
+
+function activeProfileProgress() {
+  return profileState.progress[profileState.activeProfileId] ?? {};
+}
+
+function renderProfiles() {
+  profileSelect.replaceChildren();
+  profileState.profiles.forEach((profile) => {
+    const option = document.createElement('option');
+    option.value = profile.id;
+    option.textContent = profile.avatar ? `${profile.avatar} ${profile.name}` : profile.name;
+    option.selected = profile.id === profileState.activeProfileId;
+    profileSelect.append(option);
+  });
+  newProfileButton.disabled = profileState.profiles.length >= MAX_PROFILES;
+  newProfileButton.title = newProfileButton.disabled
+    ? `Du kan ha maksimalt ${MAX_PROFILES} profiler.`
+    : '';
+}
 
 function updateConnectionStatus() {
   status.textContent = navigator.onLine
@@ -65,20 +135,37 @@ function settingsFromForm() {
 }
 
 function persistProgress() {
-  saveProgress(window.localStorage, session, words);
+  const progressBySet = activeProfileProgress();
+  const nextState = {
+    ...profileState,
+    progress: {
+      ...profileState.progress,
+      [profileState.activeProfileId]: {
+        ...progressBySet,
+        [currentSetId]: { version: PROGRESS_VERSION, session, words },
+      },
+    },
+  };
+  persistProfileState(nextState, 'lagre øvingsfremgangen');
 }
 
-function startSession(nextWords, nextSession) {
+function startSession(nextWords, nextSession, setId) {
   words = nextWords;
   session = nextSession;
+  currentSetId = setId;
   persistProgress();
-  resumeButton.hidden = false;
   renderPractice();
 }
 
 function startWordSet(set) {
   const practiceWords = wordsForDirection(set.words, set.direction);
-  startSession(practiceWords, createSession(practiceWords, Math.random, set.settings));
+  startSession(practiceWords, createSession(practiceWords, Math.random, set.settings), set.id);
+}
+
+function continueWordSet(set) {
+  const progress = activeProfileProgress()[set.id];
+  if (!progress) return;
+  startSession(progress.words, progress.session, set.id);
 }
 
 function renderPractice(message = '') {
@@ -104,8 +191,6 @@ function renderPractice(message = '') {
 }
 
 function finishSession() {
-  window.localStorage.removeItem(PROGRESS_KEY);
-  resumeButton.hidden = true;
   document.querySelector('#completion-message').textContent = `Du øvde på ${words.length} ord.`;
 
   const hardestWords = document.querySelector('#hardest-words');
@@ -169,19 +254,34 @@ function renderWordSets() {
     const name = document.createElement('h3');
     name.textContent = set.name;
     const summary = document.createElement('p');
+    const progress = activeProfileProgress()[set.id];
+    const progressSummary = !progress
+      ? ''
+      : progress.session.queue.length === 0
+        ? ' · Fullført'
+        : ` · ${progress.session.learned.length} lært`;
     summary.textContent = `${set.words.length} ord · ${
       {
         'prompt-to-answer': 'hint til svar',
         'answer-to-prompt': 'svar til hint',
         both: 'begge retninger',
       }[set.direction]
-    }`;
+    }${progressSummary}`;
     details.append(name, summary);
 
     const actions = document.createElement('div');
     actions.className = 'set-actions';
     if (!set.archived) {
-      actions.append(makeButton('Start øving', () => startWordSet(set), 'button primary'));
+      if (progress && progress.session.queue.length > 0) {
+        actions.append(
+          makeButton('Fortsett øvingen', () => continueWordSet(set), 'button primary'),
+        );
+        actions.append(makeButton('Start på nytt', () => startWordSet(set)));
+      } else if (progress) {
+        actions.append(makeButton('Øv på nytt', () => startWordSet(set), 'button primary'));
+      } else {
+        actions.append(makeButton('Start øving', () => startWordSet(set), 'button primary'));
+      }
       actions.append(makeButton('Rediger', () => openEditor(set)));
       actions.append(makeButton('Kopier', () => duplicateWordSet(set)));
       actions.append(makeButton('Arkiver', () => changeArchived(set, true)));
@@ -358,24 +458,73 @@ function duplicateWordSet(set) {
 
 function deleteWordSet(set) {
   if (!window.confirm(`Slette ordsettet «${set.name}»?`)) return;
-  updateWordSets(
-    wordSets.filter((item) => item.id !== set.id),
-    'slette',
+  if (
+    !updateWordSets(
+      wordSets.filter((item) => item.id !== set.id),
+      'slette',
+    )
+  )
+    return;
+  const progress = Object.fromEntries(
+    Object.entries(profileState.progress).map(([profileId, sets]) => {
+      const remaining = { ...sets };
+      delete remaining[set.id];
+      return [profileId, remaining];
+    }),
   );
+  persistProfileState({ ...profileState, progress }, 'fjerne øvingsfremgangen');
 }
 
 window.addEventListener('online', updateConnectionStatus);
 window.addEventListener('offline', updateConnectionStatus);
 updateConnectionStatus();
+renderProfiles();
 renderWordSets();
-resumeButton.hidden = !savedProgress;
-resumeButton.addEventListener('click', () => {
-  const progress = loadProgress(window.localStorage);
-  if (!progress) {
-    resumeButton.hidden = true;
+profileSelect.addEventListener('change', () => {
+  const nextState = { ...profileState, activeProfileId: profileSelect.value };
+  if (persistProfileState(nextState, 'bytte profil')) renderWordSets();
+  else renderProfiles();
+});
+newProfileButton.addEventListener('click', () => {
+  profileForm.hidden = false;
+  profileNameInput.focus();
+});
+document.querySelector('#cancel-profile-button').addEventListener('click', () => {
+  profileForm.hidden = true;
+  profileNameInput.value = '';
+  profileAvatarInput.value = '';
+});
+profileForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const name = profileNameInput.value.trim();
+  const avatar = profileAvatarInput.value.trim();
+  if (!name) {
+    setAppError('Skriv inn et profilnavn.');
+    profileNameInput.focus();
     return;
   }
-  startSession(progress.words, progress.session);
+  if (name.length > MAX_PROFILE_NAME_LENGTH || avatar.length > MAX_PROFILE_AVATAR_LENGTH) {
+    setAppError('Profilnavnet eller emojien er for lang.');
+    return;
+  }
+  if (profileState.profiles.length >= MAX_PROFILES) {
+    setAppError(`Du kan ha maksimalt ${MAX_PROFILES} profiler.`);
+    return;
+  }
+  const profile = { id: crypto.randomUUID(), name, avatar };
+  const nextState = {
+    ...profileState,
+    activeProfileId: profile.id,
+    profiles: [...profileState.profiles, profile],
+    progress: { ...profileState.progress, [profile.id]: {} },
+  };
+  if (persistProfileState(nextState, 'lagre profilen')) {
+    renderProfiles();
+    renderWordSets();
+    profileForm.hidden = true;
+    profileNameInput.value = '';
+    profileAvatarInput.value = '';
+  }
 });
 
 document.querySelector('#new-set-button').addEventListener('click', () => openEditor());
@@ -419,6 +568,10 @@ answerForm.addEventListener('submit', (event) => {
 });
 
 document.querySelector('#back-button').addEventListener('click', () => showView(setupView));
+document.querySelector('#completion-back-button').addEventListener('click', () => {
+  showView(setupView);
+  renderWordSets();
+});
 document.querySelector('#completion-new-set-button').addEventListener('click', () => {
   showView(setupView);
   openEditor();
