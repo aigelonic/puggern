@@ -41,6 +41,9 @@ const answerForm = document.querySelector('#answer-form');
 const answerButton = answerForm.querySelector('button[type="submit"]');
 const answerInput = document.querySelector('#answer');
 const feedback = document.querySelector('#feedback');
+const correctionFeedback = document.querySelector('#correction-feedback');
+const correctAnswer = document.querySelector('#correct-answer');
+const correctionInstruction = document.querySelector('#correction-instruction');
 const progressLabel = document.querySelector('#progress-label');
 const prompt = document.querySelector('#prompt');
 const answerLabel = document.querySelector('#answer-label');
@@ -240,15 +243,17 @@ function renderPractice(message = '') {
   }
 
   const learnedCount = session.learned.length;
+  const isCorrection = session.correction;
   progressLabel.textContent = `${learnedCount} av ${words.length} lært · ${session.queue.length} oppgaver igjen`;
   prompt.textContent = word.prompt;
-  answerLabel.textContent = session.correction ? 'Skriv ordet én gang' : 'Stavingen din';
-  feedback.textContent =
-    message ||
-    (session.correction
-      ? `Riktig stavemåte er ${word.answer}. Skriv ordet én gang, så kommer det tilbake senere.`
-      : '');
-  feedback.classList.toggle('error', session.correction);
+  answerLabel.textContent = isCorrection ? 'Skriv ordet én gang' : 'Stavingen din';
+  correctionFeedback.hidden = !isCorrection;
+  correctAnswer.textContent = isCorrection ? word.answer : '';
+  correctionInstruction.textContent = isCorrection
+    ? 'Skriv ordet én gang, så kommer det tilbake senere.'
+    : '';
+  feedback.textContent = isCorrection ? '' : message;
+  feedback.classList.toggle('error', false);
   answerInput.value = '';
   showView(practiceView);
   answerInput.focus();
@@ -655,10 +660,7 @@ answerForm.addEventListener('submit', async (event) => {
     await persistProgress();
 
     if (outcome.result === 'incorrect') {
-      const word = currentWord(session, words);
-      renderPractice(
-        `Riktig stavemåte er ${word.answer}. Skriv ordet én gang, så kommer det tilbake senere.`,
-      );
+      renderPractice();
       return;
     }
     if (outcome.result === 'retry-scheduled') {

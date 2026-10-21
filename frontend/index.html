@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#f7f5ef" />
     <meta name="description" content="Et ordtreningsspill som fungerer uten nett." />
     <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="stylesheet" href="./styles.css?v=4" />
+    <link rel="stylesheet" href="./styles.css?v=5" />
     <title>Puggern</title>
   </head>
   <body>
@@ -117,6 +117,18 @@
         <h1 id="prompt"></h1>
         <form id="answer-form">
           <label id="answer-label" for="answer">Stavingen din</label>
+          <div
+            id="correction-feedback"
+            class="correction-feedback"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            hidden
+          >
+            <p class="correction-label">Riktig stavemåte</p>
+            <p id="correct-answer" class="correct-answer"></p>
+            <p id="correction-instruction" class="correction-instruction"></p>
+          </div>
           <input
             id="answer"
             name="answer"
@@ -165,6 +177,6 @@
         </div>
       </section>
     </main>
-    <script type="module" src="./src/main.mjs?v=5"></script>
+    <script type="module" src="./src/main.mjs?v=6"></script>
   </body>
 </html>
