@@ -24,7 +24,7 @@ test('creates a set and practices a missed word until it is learned', async ({ p
   }
 
   await expect(page.getByRole('heading', { name: 'Godt jobbet!' })).toBeVisible();
-  await expect(page.getByText('eple · 1 forsøk')).toBeVisible();
+  await expect(page.getByText('En rød frukt → eple · 1 feilsvar')).toBeVisible();
 });
 
 test('reloads and resumes a saved session during its correction step', async ({ page }) => {

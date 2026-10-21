@@ -5,7 +5,6 @@ import {
   MAX_WORD_LENGTH,
   MAX_WORDS_PER_SET,
   previewWordSet,
-  PROGRESS_KEY,
   saveProgress,
   submitAnswer,
   wordsForDirection,
@@ -65,14 +64,24 @@ function settingsFromForm() {
 }
 
 function persistProgress() {
-  saveProgress(window.localStorage, session, words);
+  const warning = document.querySelector('#progress-warning');
+  try {
+    saveProgress(window.localStorage, session, words);
+    warning.hidden = true;
+    return true;
+  } catch {
+    warning.textContent =
+      'Fremgangen kunne ikke lagres på denne enheten. Du kan fortsette å øve, men fremgangen kan gå tapt når du laster siden på nytt.';
+    warning.hidden = false;
+    resumeButton.hidden = true;
+    return false;
+  }
 }
 
 function startSession(nextWords, nextSession) {
   words = nextWords;
   session = nextSession;
-  persistProgress();
-  resumeButton.hidden = false;
+  resumeButton.hidden = !persistProgress() || session.queue.length === 0;
   renderPractice();
 }
 
@@ -104,9 +113,10 @@ function renderPractice(message = '') {
 }
 
 function finishSession() {
-  window.localStorage.removeItem(PROGRESS_KEY);
   resumeButton.hidden = true;
-  document.querySelector('#completion-message').textContent = `Du øvde på ${words.length} ord.`;
+  const firstTryCount = session.learned.filter((id) => !session.mistakes[id]).length;
+  document.querySelector('#completion-message').textContent =
+    `Du lærte ${session.learned.length} øveoppføringer. ${firstTryCount} riktige på første forsøk.`;
 
   const hardestWords = document.querySelector('#hardest-words');
   hardestWords.replaceChildren();
@@ -117,7 +127,7 @@ function finishSession() {
       const word = words.find((item) => item.id === id);
       if (!word) return;
       const item = document.createElement('li');
-      item.textContent = `${word.answer} · ${count} forsøk`;
+      item.textContent = `${word.prompt} → ${word.answer} · ${count} feilsvar`;
       hardestWords.append(item);
     });
   if (hardestWords.childElementCount === 0) {
@@ -126,6 +136,7 @@ function finishSession() {
     hardestWords.append(item);
   }
   showView(completeView);
+  document.querySelector('#completion-heading').focus();
 }
 
 function makeButton(label, action, className = 'button secondary') {
@@ -368,7 +379,12 @@ window.addEventListener('online', updateConnectionStatus);
 window.addEventListener('offline', updateConnectionStatus);
 updateConnectionStatus();
 renderWordSets();
-resumeButton.hidden = !savedProgress;
+resumeButton.hidden = !savedProgress || savedProgress.session.queue.length === 0;
+if (savedProgress?.session.queue.length === 0) {
+  words = savedProgress.words;
+  session = savedProgress.session;
+  finishSession();
+}
 resumeButton.addEventListener('click', () => {
   const progress = loadProgress(window.localStorage);
   if (!progress) {
@@ -419,6 +435,13 @@ answerForm.addEventListener('submit', (event) => {
 });
 
 document.querySelector('#back-button').addEventListener('click', () => showView(setupView));
+document.querySelector('#completion-restart-button').addEventListener('click', () => {
+  startSession(words, createSession(words, Math.random, session.settings));
+});
+document.querySelector('#completion-sets-button').addEventListener('click', () => {
+  showView(setupView);
+  document.querySelector('#new-set-button').focus();
+});
 document.querySelector('#completion-new-set-button').addEventListener('click', () => {
   showView(setupView);
   openEditor();

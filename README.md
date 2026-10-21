@@ -23,6 +23,19 @@ this device; they are not synced to other devices.
 The current progress and word-set storage formats are version 1; corrupt or
 unsupported saved data is ignored rather than resumed or displayed.
 
+Finishing practice opens a summary with learned practice entries, first-try
+correct entries, and incorrect-answer counts for entries needing more practice.
+Practicing both directions counts each direction as a separate entry; copying a
+correction does not count as learning an entry. The latest completed summary
+survives reload, and you can practice the same set again or return to word sets.
+If saving progress fails, practice still continues and a warning explains that
+progress may be lost on reload.
+
+Storage currently retains only the latest session. Per-profile/per-set completion
+history depends on [#19](https://github.com/aigelonic/puggern/issues/19), and session
+rewards and celebration depend on [#18](https://github.com/aigelonic/puggern/issues/18);
+neither model is implemented here.
+
 ## Tests
 
 Use Node.js 24 and npm. Install the development dependency and Chromium once,
