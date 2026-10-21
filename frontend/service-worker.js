@@ -1,4 +1,4 @@
-const CACHE_NAME = 'puggern-app-shell-v1';
+const CACHE_NAME = 'puggern-app-shell-v2';
 const APP_SHELL = [
   './',
   './index.html',
@@ -8,6 +8,7 @@ const APP_SHELL = [
   './icons/pug-512.png',
   './src/main.mjs',
   './src/learning.mjs',
+  './src/word-sets.mjs',
 ];
 
 self.addEventListener('install', (event) => {

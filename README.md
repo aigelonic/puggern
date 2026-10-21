@@ -13,9 +13,15 @@ python3 -m http.server 8000 --directory frontend
 Then open <http://localhost:8000>. Service workers require HTTPS in production;
 `localhost` is treated as a secure context for development.
 
-Word sets use one clue and spelling per line, separated by a tab. Progress is
-saved in browser storage on this device. The current progress format is version
-1; corrupt or unsupported versions are ignored rather than resumed.
+Create named word sets by pasting one clue and spelling per line, separated by
+a tab, semicolon, or ` - `. Review and edit the parsed entries before saving.
+Each set supports up to 100 entries, either quiz direction or both directions,
+and its own case/accent matching settings. Sets can be edited, copied, archived,
+restored, and deleted. Word sets and progress are saved in browser storage on
+this device; they are not synced to other devices.
+
+The current progress and word-set storage formats are version 1; corrupt or
+unsupported saved data is ignored rather than resumed or displayed.
 
 ## Tests
 
