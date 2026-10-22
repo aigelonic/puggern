@@ -1,4 +1,4 @@
-import { isValidProgress } from './learning.mjs?v=4';
+import { isValidProgress } from './learning.mjs?v=5';
 
 export const PROFILE_STATE_KEY = 'puggern.profile-state';
 export const PROFILE_STATE_VERSION = 1;
@@ -6,8 +6,20 @@ export const MAX_PROFILES = 10;
 export const MAX_PROFILE_NAME_LENGTH = 40;
 export const MAX_PROFILE_AVATAR_LENGTH = 8;
 
+export function createRewards() {
+  return { points: 0, bestStreak: 0, completedSets: 0 };
+}
+
+export function addRewards(rewards = createRewards(), earned) {
+  return {
+    points: Math.min(Number.MAX_SAFE_INTEGER, rewards.points + earned.points),
+    bestStreak: Math.max(rewards.bestStreak, earned.bestStreak),
+    completedSets: Math.min(Number.MAX_SAFE_INTEGER, rewards.completedSets + earned.completedSets),
+  };
+}
+
 export function createProfileState(id = crypto.randomUUID()) {
-  const profile = { id, name: 'Min profil', avatar: '' };
+  const profile = { id, name: 'Min profil', avatar: '', rewards: createRewards() };
   return {
     version: PROFILE_STATE_VERSION,
     activeProfileId: id,
@@ -32,7 +44,12 @@ function isValidProfileState(state) {
         profile.name.trim().length > 0 &&
         profile.name.length <= MAX_PROFILE_NAME_LENGTH &&
         typeof profile.avatar === 'string' &&
-        profile.avatar.length <= MAX_PROFILE_AVATAR_LENGTH,
+        profile.avatar.length <= MAX_PROFILE_AVATAR_LENGTH &&
+        (profile.rewards === undefined ||
+          (profile.rewards &&
+            ['points', 'bestStreak', 'completedSets'].every(
+              (key) => Number.isSafeInteger(profile.rewards[key]) && profile.rewards[key] >= 0,
+            ))),
     ) ||
     !state.profiles.some((profile) => profile.id === state.activeProfileId) ||
     !state.progress ||

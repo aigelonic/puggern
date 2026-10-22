@@ -8,17 +8,19 @@ import {
   PROGRESS_VERSION,
   submitAnswer,
   wordsForDirection,
-} from './learning.mjs?v=4';
+} from './learning.mjs?v=5';
 import {
+  addRewards,
   createProfileState,
+  createRewards,
   loadProfileState,
   MAX_PROFILE_AVATAR_LENGTH,
   MAX_PROFILE_NAME_LENGTH,
   MAX_PROFILES,
   PROFILE_STATE_KEY,
   saveProfileState,
-} from './profiles.mjs?v=4';
-import { loadWordSets, saveWordSets, MAX_WORD_SET_NAME_LENGTH } from './word-sets.mjs?v=4';
+} from './profiles.mjs?v=5';
+import { loadWordSets, saveWordSets, MAX_WORD_SET_NAME_LENGTH } from './word-sets.mjs?v=5';
 
 const status = document.querySelector('#connection-status');
 const appError = document.querySelector('#app-error');
@@ -60,6 +62,7 @@ let session = null;
 let currentSetId = null;
 let currentProfileId = null;
 let unsavedProgress = false;
+const pendingRewards = new Map();
 
 function setAppError(message) {
   appError.textContent = message;
@@ -109,9 +112,17 @@ async function persistProfileState(updateState, action) {
   try {
     await withProfileStateLock(() => {
       const latestState = loadProfileState(window.localStorage) ?? profileState;
-      const nextState = updateState(latestState);
+      const updatedState = updateState(latestState);
+      const nextState = {
+        ...updatedState,
+        profiles: updatedState.profiles.map((profile) => {
+          const earned = pendingRewards.get(profile.id);
+          return earned ? { ...profile, rewards: addRewards(profile.rewards, earned) } : profile;
+        }),
+      };
       saveProfileState(window.localStorage, nextState);
       profileState = nextState;
+      pendingRewards.clear();
     });
     setAppError('');
     renderProfiles();
@@ -139,6 +150,10 @@ function renderProfiles() {
   newProfileButton.title = newProfileButton.disabled
     ? `Du kan ha maksimalt ${MAX_PROFILES} profiler.`
     : '';
+  const profile = profileState.profiles.find(({ id }) => id === profileState.activeProfileId);
+  const rewards = profile.rewards ?? createRewards();
+  document.querySelector('#profile-rewards').textContent =
+    `${rewards.points} poeng totalt · Beste rekke: ${rewards.bestStreak} · ${rewards.completedSets} sett fullført`;
 }
 
 function updateConnectionStatus() {
@@ -247,6 +262,11 @@ function renderPractice(message = '', { announceCorrection = false } = {}) {
   const learnedCount = session.learned.length;
   const isCorrection = session.correction;
   progressLabel.textContent = `${learnedCount} av ${words.length} lært · ${session.queue.length} oppgaver igjen`;
+  const progressBar = document.querySelector('#practice-progress');
+  progressBar.max = words.length;
+  progressBar.value = learnedCount;
+  document.querySelector('#practice-rewards').textContent =
+    `${session.points ?? 0} poeng · ${session.streak ?? 0} riktige på rad`;
   prompt.textContent = word.prompt;
   answerLabel.textContent = isCorrection ? 'Skriv ordet én gang' : 'Stavingen din';
   correctionFeedback.hidden = !isCorrection;
@@ -272,6 +292,8 @@ function renderPractice(message = '', { announceCorrection = false } = {}) {
 }
 
 function finishSession() {
+  document.querySelector('#completion-rewards').textContent =
+    `${session.points ?? 0} poeng · Beste rekke: ${session.bestStreak ?? 0} riktige på rad`;
   const firstTryCount = session.learned.filter((id) => !session.mistakes[id]).length;
   document.querySelector('#completion-message').textContent =
     `Du lærte ${session.learned.length} øveoppføringer. ${firstTryCount} riktige på første forsøk.`;
@@ -623,7 +645,7 @@ profileForm.addEventListener('submit', async (event) => {
     setAppError('Profilnavnet eller emojien er for lang.');
     return;
   }
-  const profile = { id: crypto.randomUUID(), name, avatar };
+  const profile = { id: crypto.randomUUID(), name, avatar, rewards: createRewards() };
   if (
     await persistProfileState((state) => {
       if (state.profiles.length >= MAX_PROFILES) {
@@ -668,6 +690,12 @@ answerForm.addEventListener('submit', async (event) => {
   answerInput.readOnly = true;
   try {
     const outcome = submitAnswer(session, answerInput.value, words, session.settings);
+    const earned = {
+      points: (outcome.session.points ?? 0) - (session.points ?? 0),
+      bestStreak: outcome.session.bestStreak ?? 0,
+      completedSets: outcome.result === 'complete' && session.queue.length > 0 ? 1 : 0,
+    };
+    pendingRewards.set(currentProfileId, addRewards(pendingRewards.get(currentProfileId), earned));
     session = outcome.session;
     await persistProgress();
 
@@ -685,7 +713,7 @@ answerForm.addEventListener('submit', async (event) => {
       finishSession();
       return;
     }
-    renderPractice('Riktig! Fortsett slik.');
+    renderPractice('Riktig! +10 poeng. Fortsett slik.');
   } finally {
     answerButton.disabled = false;
     answerInput.readOnly = false;
