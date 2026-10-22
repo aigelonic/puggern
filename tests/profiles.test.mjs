@@ -3,7 +3,9 @@ import test from 'node:test';
 
 import { createSession, parseWordSet, PROGRESS_VERSION } from '../frontend/src/learning.mjs';
 import {
+  addRewards,
   createProfileState,
+  createRewards,
   loadProfileState,
   MAX_PROFILES,
   PROFILE_STATE_KEY,
@@ -75,4 +77,46 @@ test('ignores corrupt, unsupported, or invalid profile state', () => {
   state.activeProfileId = state.profiles[0].id;
   storage.values.set(PROFILE_STATE_KEY, JSON.stringify(state));
   assert.equal(loadProfileState(storage), null);
+});
+
+test('persists accumulated profile rewards independently of replaced practice progress', () => {
+  const storage = makeStorage();
+  const state = createProfileState('profile-1');
+  const profile = state.profiles[0];
+  profile.rewards = addRewards(profile.rewards, {
+    points: 20,
+    bestStreak: 2,
+    completedSets: 1,
+  });
+  profile.rewards = addRewards(profile.rewards, {
+    points: 10,
+    bestStreak: 1,
+    completedSets: 1,
+  });
+  state.profiles.push({ id: 'profile-2', name: 'Ada', avatar: '', rewards: createRewards() });
+  saveProfileState(storage, state);
+  assert.deepEqual(
+    loadProfileState(storage).profiles.map(({ rewards }) => rewards),
+    [
+      { points: 30, bestStreak: 2, completedSets: 2 },
+      { points: 0, bestStreak: 0, completedSets: 0 },
+    ],
+  );
+});
+
+test('accepts profiles without rewards and rejects invalid reward counters', () => {
+  const storage = makeStorage();
+  const state = createProfileState('legacy');
+  delete state.profiles[0].rewards;
+  saveProfileState(storage, state);
+  assert.deepEqual(loadProfileState(storage), state);
+  assert.deepEqual(addRewards(undefined, createRewards()), createRewards());
+
+  for (const key of ['points', 'bestStreak', 'completedSets']) {
+    for (const value of [-1, 0.5, '10', null, Number.MAX_SAFE_INTEGER + 1]) {
+      state.profiles[0].rewards = { ...createRewards(), [key]: value };
+      saveProfileState(storage, state);
+      assert.equal(loadProfileState(storage), null);
+    }
+  }
 });
