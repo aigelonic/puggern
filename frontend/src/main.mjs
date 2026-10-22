@@ -713,7 +713,7 @@ answerForm.addEventListener('submit', async (event) => {
       finishSession();
       return;
     }
-    renderPractice('Riktig! +10 poeng. Fortsett slik.');
+    renderPractice('Riktig! Fortsett slik.');
   } finally {
     answerButton.disabled = false;
     answerInput.readOnly = false;
