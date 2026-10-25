@@ -70,6 +70,40 @@ test('restores focus when the exercise setup dialog is canceled', async ({ page 
   await expect(startButton).toBeFocused();
 });
 
+test('restores focus to the saved-set heading when setup is canceled at the set limit', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Nytt ordsett' }).click();
+  await page.getByLabel('Navn på ordsettet').fill('Øveord');
+  await page.getByLabel('Hint og svar').fill('hund;dog');
+  await saveAfterMinimumTime(page, 'Lagre ordsett');
+  await expect(page.locator('#word-set-form')).toBeHidden();
+
+  await page.evaluate(() => {
+    const storage = JSON.parse(localStorage.getItem('puggern.word-sets'));
+    const [set] = storage.sets;
+    storage.sets = [
+      set,
+      ...Array.from({ length: 48 }, (_, index) => ({
+        ...set,
+        id: `extra-${index}`,
+        name: `Ekstra ${index}`,
+      })),
+    ];
+    localStorage.setItem('puggern.word-sets', JSON.stringify(storage));
+  });
+  await page.reload();
+  await page.locator('#new-set-button').click();
+  await page.getByLabel('Navn på ordsettet').fill('Siste sett');
+  await page.getByLabel('Hint og svar').fill('katt;cat');
+  await page.waitForTimeout(300);
+  await page.getByRole('button', { name: 'Lagre og start øving' }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.getByRole('dialog').getByRole('button', { name: 'Avbryt' }).click();
+  await expect(page.locator('#saved-sets-title')).toBeFocused();
+});
+
 test('uses one randomized direction per card for a set configured in both directions', async ({
   page,
 }) => {
@@ -170,6 +204,69 @@ for (const { source, direction, count } of [
     await expect(page.getByRole('button', { name: 'Fortsett øvingen' })).toBeVisible();
   });
 }
+
+test('regenerates mixed directions from source words when restarting', async ({ page }) => {
+  await page.addInitScript(() => {
+    let call = 0;
+    Math.random = () => (call++ < 2 ? 0 : 0.99);
+  });
+  await startSet(page, 'hund;dog\nkatt;cat', 'prompt-to-answer', {
+    directionMode: 'mixed',
+    orderMode: 'original',
+  });
+  await expect(page.locator('#prompt')).toHaveText('hund');
+  await answer(page, 'dog');
+  await expect(page.locator('#prompt')).toHaveText('cat');
+  await answer(page, 'katt');
+  await expect(page.getByRole('heading', { name: 'Godt jobbet!' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Øv på samme sett igjen' }).click();
+
+  await expect(page.locator('#prompt')).toHaveText('dog');
+  const saved = await page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem('puggern.profile-state'));
+    return Object.values(state.progress[state.activeProfileId])[0];
+  });
+  expect(saved.words.map(({ prompt }) => prompt)).toEqual(['dog', 'katt']);
+  expect(saved.session.exerciseConfig.directionMode).toBe('mixed');
+});
+
+test('rebuilds legacy both-direction progress as one mixed question per source word', async ({
+  page,
+}) => {
+  await startSet(page, 'hund;dog\nkatt;cat', 'both', {
+    directionMode: 'mixed',
+    orderMode: 'original',
+  });
+  const answers = { hund: 'dog', dog: 'hund', katt: 'cat', cat: 'katt' };
+  for (let index = 0; index < 2; index += 1) {
+    await answer(page, answers[await page.locator('#prompt').textContent()]);
+  }
+  await expect(page.getByRole('heading', { name: 'Godt jobbet!' })).toBeVisible();
+  await page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem('puggern.profile-state'));
+    const progress = Object.values(state.progress[state.activeProfileId])[0];
+    const set = JSON.parse(localStorage.getItem('puggern.word-sets')).sets[0];
+    progress.words = set.words.flatMap(({ id, prompt, answer }) => [
+      { id: `${id}:forward`, prompt, answer },
+      { id: `${id}:reverse`, prompt: answer, answer: prompt },
+    ]);
+    progress.session.learned = progress.words.map(({ id }) => id);
+    delete progress.session.exerciseConfig;
+    localStorage.setItem('puggern.profile-state', JSON.stringify(state));
+  });
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Godt jobbet!' })).toBeVisible();
+  await page.getByRole('button', { name: 'Øv på samme sett igjen' }).click();
+
+  await expect(page.locator('#progress-label')).toHaveText('0 av 2 lært · 2 oppgaver igjen');
+  const saved = await page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem('puggern.profile-state'));
+    return Object.values(state.progress[state.activeProfileId])[0];
+  });
+  expect(saved.words).toHaveLength(2);
+  expect(saved.session.exerciseConfig.directionMode).toBe('mixed');
+});
 
 test('focuses the saved-set heading when returning to a full set list', async ({ page }) => {
   await startSet(page);
@@ -337,6 +434,50 @@ test('restarts a summary for its original profile after another tab switches pro
   expect(progress[0].learned).toEqual([]);
   expect(progress[1].correction).toBe(true);
   expect(Object.values(progress[1].mistakes)).toEqual([1]);
+});
+
+test('starts pending setup for the profile that opened it after another tab switches profiles', async ({
+  page,
+  context,
+}) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Nytt ordsett' }).click();
+  await page.getByLabel('Navn på ordsettet').fill('Øveord');
+  await page.getByLabel('Hint og svar').fill('hund;dog');
+  await saveAfterMinimumTime(page, 'Lagre ordsett');
+  await expect(page.locator('#word-set-form')).toBeHidden();
+  await page
+    .getByRole('listitem')
+    .filter({ hasText: 'Øveord' })
+    .getByRole('button', { name: 'Start øving' })
+    .click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+
+  const otherPage = await context.newPage();
+  await otherPage.goto('/');
+  await otherPage.getByRole('button', { name: 'Legg til profil' }).click();
+  await otherPage.getByLabel('Navn', { exact: true }).fill('Ny profil');
+  await saveAfterMinimumTime(otherPage, 'Lagre profil');
+  await otherPage.getByRole('button', { name: 'Start øving' }).click();
+  await otherPage.getByRole('dialog').getByRole('button', { name: 'Start øving' }).click();
+  await answer(otherPage, 'wrong');
+  await expect(otherPage.locator('#correction-feedback')).toBeVisible();
+  await expect(page.locator('#profile-select option:checked')).toHaveText('Ny profil');
+
+  await page.getByRole('dialog').getByRole('button', { name: 'Start øving' }).click();
+  await expect(page.getByLabel('Stavingen din')).toBeFocused();
+  const sessions = await page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem('puggern.profile-state'));
+    return Object.fromEntries(
+      state.profiles.map((profile) => [
+        profile.name,
+        Object.values(state.progress[profile.id])[0]?.session,
+      ]),
+    );
+  });
+  expect(sessions['Min profil'].correction).toBe(false);
+  expect(sessions['Min profil'].queue).toHaveLength(1);
+  expect(sessions['Ny profil'].correction).toBe(true);
 });
 
 test('resumes an unfinished in-memory session after saving fails', async ({ page }) => {

@@ -2,13 +2,19 @@ import { createServer } from 'node:http';
 import { expect, test } from '@playwright/test';
 import { createProfileState } from '../../frontend/src/profiles.mjs';
 
-test('replaces an installed v8 shell with bad module MIME types and works offline', async ({
+test('replaces an installed v11 shell with bad module MIME types and works offline', async ({
   page,
   context,
   baseURL,
 }) => {
   let legacy = true;
   const baseOrigin = new URL(baseURL).origin;
+  const legacyModuleVersions = {
+    '/src/main.mjs': '10',
+    '/src/learning.mjs': '6',
+    '/src/profiles.mjs': '6',
+    '/src/word-sets.mjs': '7',
+  };
   const server = createServer(async (request, response) => {
     try {
       const upstreamUrl = new URL(request.url, baseOrigin);
@@ -26,17 +32,17 @@ test('replaces an installed v8 shell with bad module MIME types and works offlin
         pathname === '/styles.css' ||
         pathname === '/service-worker.js' ||
         pathname.endsWith('.mjs');
-      if (legacy && textAsset) {
+      const legacyModule = legacyModuleVersions[pathname] === upstreamUrl.searchParams.get('v');
+      if (legacy && textAsset && (!pathname.endsWith('.mjs') || legacyModule)) {
         body = Buffer.from(
           body
             .toString()
-            .replaceAll('puggern-app-shell-v12', 'puggern-app-shell-v8')
-            .replaceAll('styles.css?v=10', 'styles.css?v=7')
-            .replaceAll('main.mjs?v=11', 'main.mjs?v=8')
-            .replaceAll('word-sets.mjs?v=7', 'word-sets.mjs?v=5')
-            .replaceAll('creation-guard.mjs?v=3', 'creation-guard.mjs?v=2')
-            .replaceAll('.mjs?v=7', '.mjs?v=5')
-            .replaceAll('.mjs?v=6', '.mjs?v=5')
+            .replaceAll('puggern-app-shell-v13', 'puggern-app-shell-v11')
+            .replaceAll('styles.css?v=10', 'styles.css?v=9')
+            .replaceAll('main.mjs?v=12', 'main.mjs?v=10')
+            .replaceAll('profiles.mjs?v=7', 'profiles.mjs?v=6')
+            .replaceAll('word-sets.mjs?v=8', 'word-sets.mjs?v=7')
+            .replaceAll('learning.mjs?v=7', 'learning.mjs?v=6')
             .replaceAll('#46574e', '#64766d'),
         );
       }
@@ -47,7 +53,7 @@ test('replaces an installed v8 shell with bad module MIME types and works offlin
           response.setHeader(name, value);
         }
       }
-      if (legacy && pathname.endsWith('.mjs') && pathname !== '/src/main.mjs') {
+      if (legacy && legacyModule && pathname !== '/src/main.mjs') {
         response.setHeader('content-type', 'application/octet-stream');
         response.setHeader('cache-control', 'max-age=3600');
       } else if (legacy && pathname === '/styles.css') {
@@ -84,16 +90,29 @@ test('replaces an installed v8 shell with bad module MIME types and works offlin
     }, createProfileState('existing-profile'));
     expect(
       await page.evaluate(async () => {
-        const cache = await caches.open('puggern-app-shell-v8');
-        return (await cache.match('./src/profiles.mjs?v=5')).headers.get('content-type');
+        const cache = await caches.open('puggern-app-shell-v11');
+        return (await cache.match('./src/profiles.mjs?v=6')).headers.get('content-type');
       }),
     ).toBe('application/octet-stream');
     expect(
       await page.evaluate(async () => {
-        const cache = await caches.open('puggern-app-shell-v8');
-        return (await cache.match('./styles.css?v=7')).text();
+        const cache = await caches.open('puggern-app-shell-v11');
+        return (await cache.match('./styles.css?v=9')).text();
       }),
     ).toContain('#64766d');
+    expect(
+      await page.evaluate(async () => {
+        const cache = await caches.open('puggern-app-shell-v11');
+        return Promise.all(
+          ['./src/profiles.mjs?v=6', './src/word-sets.mjs?v=7'].map(async (url) =>
+            (await cache.match(url)).text(),
+          ),
+        );
+      }),
+    ).toEqual([
+      expect.stringContaining('./learning.mjs?v=6'),
+      expect.stringContaining('./learning.mjs?v=6'),
+    ]);
 
     legacy = false;
     const consoleErrors = [];
@@ -108,9 +127,9 @@ test('replaces an installed v8 shell with bad module MIME types and works offlin
       await registration.update();
       await changed;
     });
-    await expect.poll(() => page.evaluate(() => caches.keys())).toEqual(['puggern-app-shell-v12']);
+    await expect.poll(() => page.evaluate(() => caches.keys())).toEqual(['puggern-app-shell-v13']);
     const cachedModules = await page.evaluate(async () => {
-      const cache = await caches.open('puggern-app-shell-v12');
+      const cache = await caches.open('puggern-app-shell-v13');
       const requests = (await cache.keys()).filter((request) =>
         new URL(request.url).pathname.endsWith('.mjs'),
       );
@@ -122,13 +141,27 @@ test('replaces an installed v8 shell with bad module MIME types and works offlin
     for (const type of cachedModules) expect(type).toMatch(/^(?:application|text)\/javascript\b/);
     expect(
       await page.evaluate(async () => {
-        const cache = await caches.open('puggern-app-shell-v12');
-        return (await cache.match('./index.html')).text();
+        const cache = await caches.open('puggern-app-shell-v13');
+        return Promise.all(
+          [
+            './src/main.mjs?v=12',
+            './src/learning.mjs?v=7',
+            './src/profiles.mjs?v=7',
+            './src/word-sets.mjs?v=8',
+            './src/creation-guard.mjs?v=3',
+          ].map(async (url) => Boolean(await cache.match(url))),
+        );
       }),
-    ).toContain('./src/main.mjs?v=11');
+    ).toEqual([true, true, true, true, true]);
     expect(
       await page.evaluate(async () => {
-        const cache = await caches.open('puggern-app-shell-v12');
+        const cache = await caches.open('puggern-app-shell-v13');
+        return (await cache.match('./index.html')).text();
+      }),
+    ).toContain('./src/main.mjs?v=12');
+    expect(
+      await page.evaluate(async () => {
+        const cache = await caches.open('puggern-app-shell-v13');
         return (await cache.match('./styles.css?v=10')).text();
       }),
     ).toContain('#46574e');

@@ -20,13 +20,13 @@ import {
   MAX_PROFILES,
   PROFILE_STATE_KEY,
   saveProfileState,
-} from './profiles.mjs?v=6';
+} from './profiles.mjs?v=7';
 import {
   loadWordSets,
   saveWordSets,
   MAX_WORD_SET_NAME_LENGTH,
   MAX_WORD_SETS,
-} from './word-sets.mjs?v=7';
+} from './word-sets.mjs?v=8';
 import { recordCreationAttempt, MIN_CREATION_FORM_TIME_MS } from './creation-guard.mjs?v=3';
 
 const status = document.querySelector('#connection-status');
@@ -73,6 +73,7 @@ let session = null;
 let currentSetId = null;
 let currentProfileId = null;
 let pendingExerciseSet = null;
+let pendingExerciseProfileId = null;
 let exerciseConfigTrigger = null;
 let unsavedProgress = false;
 const pendingRewards = new Map();
@@ -224,6 +225,16 @@ function settingsFromForm() {
   };
 }
 
+function directionModeForSet(set) {
+  return (
+    {
+      'prompt-to-answer': 'forward',
+      'answer-to-prompt': 'reverse',
+      both: 'mixed',
+    }[set.direction] ?? 'forward'
+  );
+}
+
 async function persistProgress() {
   const progress = { version: PROGRESS_VERSION, session, words };
   const saved = await persistProfileState(
@@ -271,27 +282,23 @@ async function startSession(
 
 function openExerciseSetup(set) {
   const savedConfig = wordSetProgress(set.id)?.session.exerciseConfig;
-  const directionMode =
-    savedConfig?.directionMode ??
-    {
-      'prompt-to-answer': 'forward',
-      'answer-to-prompt': 'reverse',
-      both: 'mixed',
-    }[set.direction];
+  const directionMode = savedConfig?.directionMode ?? directionModeForSet(set);
   document.querySelector('#exercise-direction').value = directionMode;
   document.querySelector('#exercise-order').value = savedConfig?.orderMode ?? 'shuffled';
   document.querySelector('#exercise-config-title').textContent = `Start øving: ${set.name}`;
   exerciseConfigTrigger = document.activeElement;
   pendingExerciseSet = set;
+  pendingExerciseProfileId = profileState.activeProfileId;
   exerciseConfigDialog.showModal();
 }
 
-async function startWordSet(set, exerciseConfig) {
+async function startWordSet(set, exerciseConfig, profileId) {
   const practiceWords = wordsForExercise(set.words, exerciseConfig.directionMode);
   await startSession(
     practiceWords,
     createSession(practiceWords, Math.random, set.settings, exerciseConfig),
     set.id,
+    profileId,
   );
 }
 
@@ -869,8 +876,11 @@ function cancelExerciseSetup() {
   const focusTarget =
     exerciseConfigTrigger?.isConnected && !exerciseConfigTrigger.closest('[hidden]')
       ? exerciseConfigTrigger
-      : newSetButton;
+      : newSetButton.disabled
+        ? document.querySelector('#saved-sets-title')
+        : newSetButton;
   pendingExerciseSet = null;
+  pendingExerciseProfileId = null;
   exerciseConfigTrigger = null;
   exerciseConfigDialog.close();
   focusTarget.focus();
@@ -884,19 +894,27 @@ exerciseConfigDialog.addEventListener('cancel', (event) => {
 exerciseConfigForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const set = pendingExerciseSet;
+  const profileId = pendingExerciseProfileId;
   const exerciseConfig = {
     directionMode: document.querySelector('#exercise-direction').value,
     orderMode: document.querySelector('#exercise-order').value,
   };
   pendingExerciseSet = null;
+  pendingExerciseProfileId = null;
   exerciseConfigTrigger = null;
   exerciseConfigDialog.close();
-  if (set) await startWordSet(set, exerciseConfig);
+  if (set) await startWordSet(set, exerciseConfig, profileId);
 });
 document.querySelector('#completion-restart-button').addEventListener('click', () => {
+  const set = wordSets.find(({ id }) => id === currentSetId);
+  const exerciseConfig = session.exerciseConfig ?? {
+    directionMode: set ? directionModeForSet(set) : 'forward',
+    orderMode: 'shuffled',
+  };
+  const restartWords = wordsForExercise(set?.words ?? words, exerciseConfig.directionMode);
   startSession(
-    words,
-    createSession(words, Math.random, session.settings, session.exerciseConfig),
+    restartWords,
+    createSession(restartWords, Math.random, session.settings, exerciseConfig),
     currentSetId,
     currentProfileId,
   );
