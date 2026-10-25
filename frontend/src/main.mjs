@@ -7,8 +7,9 @@ import {
   previewWordSet,
   PROGRESS_VERSION,
   submitAnswer,
+  wordsForExercise,
   wordsForDirection,
-} from './learning.mjs?v=6';
+} from './learning.mjs?v=7';
 import {
   addRewards,
   createProfileState,
@@ -60,6 +61,8 @@ const editorTitle = document.querySelector('#editor-title');
 const archiveToggle = document.querySelector('#archive-toggle');
 const newSetButton = document.querySelector('#new-set-button');
 const setLimitHelp = document.querySelector('#set-limit-help');
+const exerciseConfigDialog = document.querySelector('#exercise-config-dialog');
+const exerciseConfigForm = document.querySelector('#exercise-config-form');
 let wordSets = loadWordSets(window.localStorage);
 let profileState = loadProfileState(window.localStorage);
 let showArchived = false;
@@ -69,6 +72,8 @@ let words = [];
 let session = null;
 let currentSetId = null;
 let currentProfileId = null;
+let pendingExerciseSet = null;
+let exerciseConfigTrigger = null;
 let unsavedProgress = false;
 const pendingRewards = new Map();
 
@@ -264,11 +269,28 @@ async function startSession(
   renderPractice();
 }
 
-async function startWordSet(set) {
-  const practiceWords = wordsForDirection(set.words, set.direction);
+function openExerciseSetup(set) {
+  const savedConfig = wordSetProgress(set.id)?.session.exerciseConfig;
+  const directionMode =
+    savedConfig?.directionMode ??
+    {
+      'prompt-to-answer': 'forward',
+      'answer-to-prompt': 'reverse',
+      both: 'mixed',
+    }[set.direction];
+  document.querySelector('#exercise-direction').value = directionMode;
+  document.querySelector('#exercise-order').value = savedConfig?.orderMode ?? 'shuffled';
+  document.querySelector('#exercise-config-title').textContent = `Start øving: ${set.name}`;
+  exerciseConfigTrigger = document.activeElement;
+  pendingExerciseSet = set;
+  exerciseConfigDialog.showModal();
+}
+
+async function startWordSet(set, exerciseConfig) {
+  const practiceWords = wordsForExercise(set.words, exerciseConfig.directionMode);
   await startSession(
     practiceWords,
-    createSession(practiceWords, Math.random, set.settings),
+    createSession(practiceWords, Math.random, set.settings, exerciseConfig),
     set.id,
   );
 }
@@ -438,11 +460,11 @@ function renderWordSets() {
         actions.append(
           makeButton('Fortsett øvingen', () => continueWordSet(set), 'button primary'),
         );
-        actions.append(makeButton('Start på nytt', () => startWordSet(set)));
+        actions.append(makeButton('Start på nytt', () => openExerciseSetup(set)));
       } else if (progress) {
-        actions.append(makeButton('Øv på nytt', () => startWordSet(set), 'button primary'));
+        actions.append(makeButton('Øv på nytt', () => openExerciseSetup(set), 'button primary'));
       } else {
-        actions.append(makeButton('Start øving', () => startWordSet(set), 'button primary'));
+        actions.append(makeButton('Start øving', () => openExerciseSetup(set), 'button primary'));
       }
       actions.append(makeButton('Rediger', () => openEditor(set)));
       actions.append(makeButton('Kopier', () => duplicateWordSet(set)));
@@ -619,7 +641,7 @@ async function saveEditor(startAfterSave = false) {
   wordSetForm.hidden = true;
   showSetupError('');
   showCreationError(wordSetForm, '');
-  if (startAfterSave) startWordSet(set);
+  if (startAfterSave) openExerciseSetup(set);
 }
 
 function changeArchived(set, archived) {
@@ -843,10 +865,38 @@ document.querySelector('#back-button').addEventListener('click', () => {
   showView(setupView);
   renderWordSets();
 });
+function cancelExerciseSetup() {
+  const focusTarget =
+    exerciseConfigTrigger?.isConnected && !exerciseConfigTrigger.closest('[hidden]')
+      ? exerciseConfigTrigger
+      : newSetButton;
+  pendingExerciseSet = null;
+  exerciseConfigTrigger = null;
+  exerciseConfigDialog.close();
+  focusTarget.focus();
+}
+
+document.querySelector('#cancel-exercise-setup').addEventListener('click', cancelExerciseSetup);
+exerciseConfigDialog.addEventListener('cancel', (event) => {
+  event.preventDefault();
+  cancelExerciseSetup();
+});
+exerciseConfigForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const set = pendingExerciseSet;
+  const exerciseConfig = {
+    directionMode: document.querySelector('#exercise-direction').value,
+    orderMode: document.querySelector('#exercise-order').value,
+  };
+  pendingExerciseSet = null;
+  exerciseConfigTrigger = null;
+  exerciseConfigDialog.close();
+  if (set) await startWordSet(set, exerciseConfig);
+});
 document.querySelector('#completion-restart-button').addEventListener('click', () => {
   startSession(
     words,
-    createSession(words, Math.random, session.settings),
+    createSession(words, Math.random, session.settings, session.exerciseConfig),
     currentSetId,
     currentProfileId,
   );

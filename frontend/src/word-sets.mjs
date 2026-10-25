@@ -1,4 +1,4 @@
-import { MAX_WORDS_PER_SET, MAX_WORD_LENGTH } from './learning.mjs?v=6';
+import { MAX_WORDS_PER_SET, MAX_WORD_LENGTH } from './learning.mjs?v=7';
 
 export const WORD_SETS_KEY = 'puggern.word-sets';
 export const WORD_SETS_VERSION = 1;

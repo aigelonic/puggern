@@ -1,19 +1,119 @@
 import { expect, test } from '@playwright/test';
 
-async function saveAfterMinimumTime(page, name) {
+async function saveAfterMinimumTime(page, name, exerciseConfig = {}) {
   await page.waitForTimeout(300);
   await page.getByRole('button', { name }).click();
+  const dialog = page.locator('#exercise-config-dialog');
+  if (name === 'Lagre og start øving') {
+    await expect(dialog).toBeVisible();
+    if (exerciseConfig.directionMode) {
+      await dialog.locator('#exercise-direction').selectOption(exerciseConfig.directionMode);
+    }
+    if (exerciseConfig.orderMode) {
+      await dialog.locator('#exercise-order').selectOption(exerciseConfig.orderMode);
+    }
+    await dialog.getByRole('button', { name: 'Start øving' }).click();
+  }
 }
 
-async function startSet(page, source = 'hund;dog', direction = 'prompt-to-answer') {
+async function startSet(
+  page,
+  source = 'hund;dog',
+  direction = 'prompt-to-answer',
+  exerciseConfig = {},
+) {
   await page.goto('/');
   await page.getByRole('button', { name: 'Nytt ordsett' }).click();
   await page.getByLabel('Navn på ordsettet').fill('Øveord');
   await page.getByLabel('Hint og svar').fill(source);
   await page.getByLabel('Quizretning').selectOption(direction);
-  await saveAfterMinimumTime(page, 'Lagre og start øving');
+  await saveAfterMinimumTime(page, 'Lagre og start øving', exerciseConfig);
   await expect(page.getByLabel('Stavingen din')).toBeFocused();
 }
+
+test('applies reverse direction and original order to the active session', async ({ page }) => {
+  await startSet(page, 'hund;dog\nkatt;cat', 'prompt-to-answer', {
+    directionMode: 'reverse',
+    orderMode: 'original',
+  });
+
+  await expect(page.locator('#prompt')).toHaveText('dog');
+  const saved = await page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem('puggern.profile-state'));
+    return Object.values(state.progress[state.activeProfileId])[0];
+  });
+  expect(saved.session.exerciseConfig).toEqual({
+    directionMode: 'reverse',
+    orderMode: 'original',
+  });
+  expect(saved.session.queue).toEqual(['0', '1']);
+  await answer(page, 'hund');
+  await expect(page.locator('#prompt')).toHaveText('cat');
+});
+
+test('restores focus when the exercise setup dialog is canceled', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Nytt ordsett' }).click();
+  await page.getByLabel('Navn på ordsettet').fill('Øveord');
+  await page.getByLabel('Hint og svar').fill('hund;dog');
+  await page.waitForTimeout(300);
+  await page.getByRole('button', { name: 'Lagre og start øving' }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Nytt ordsett' })).toBeFocused();
+
+  const set = page.getByRole('listitem').filter({ hasText: 'Øveord' });
+  const startButton = set.getByRole('button', { name: 'Start øving' });
+  await startButton.click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Avbryt' }).click();
+  await expect(startButton).toBeFocused();
+});
+
+test('uses one randomized direction per card for a set configured in both directions', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Math.random = () => 0;
+  });
+  await startSet(page, 'hund;dog', 'both', {
+    directionMode: 'mixed',
+    orderMode: 'original',
+  });
+  await expect(page.locator('#progress-label')).toHaveText('0 av 1 lært · 1 oppgaver igjen');
+  await expect(page.locator('#prompt')).toHaveText('hund');
+  await answer(page, 'dog');
+  await expect(page.getByRole('heading', { name: 'Godt jobbet!' })).toBeVisible();
+  await expect(page.locator('#completion-practiced-count')).toHaveText('1');
+});
+
+test('uses both directions and a shuffled order in mixed sessions', async ({ page }) => {
+  await page.addInitScript(() => {
+    Math.random = () => 0;
+  });
+  await startSet(page, 'hund;dog\nkatt;cat\nfugl;bird', 'prompt-to-answer', {
+    directionMode: 'mixed',
+    orderMode: 'shuffled',
+  });
+
+  await expect(page.locator('#prompt')).toHaveText('katt');
+  const prompts = [];
+  const answers = {
+    hund: 'dog',
+    dog: 'hund',
+    katt: 'cat',
+    cat: 'katt',
+    fugl: 'bird',
+    bird: 'fugl',
+  };
+  for (let index = 0; index < 3; index += 1) {
+    const currentPrompt = await page.locator('#prompt').textContent();
+    prompts.push(currentPrompt);
+    await answer(page, answers[currentPrompt]);
+  }
+  expect(new Set(prompts)).toEqual(new Set(['hund', 'katt', 'bird']));
+  await expect(page.getByRole('heading', { name: 'Godt jobbet!' })).toBeVisible();
+});
 
 async function answer(page, value) {
   await page.locator('#answer').fill(value);
@@ -39,7 +139,7 @@ async function expectCompletion(page, learned, firstTry) {
 for (const { source, direction, count } of [
   { source: 'hund;dog', direction: 'prompt-to-answer', count: 1 },
   { source: 'hund;dog\nkatt;cat', direction: 'prompt-to-answer', count: 2 },
-  { source: 'hund;dog', direction: 'both', count: 2 },
+  { source: 'hund;dog', direction: 'both', count: 1 },
 ]) {
   test(`completes ${count} entries in ${direction} on the final answer and restarts cleanly`, async ({
     page,
@@ -114,17 +214,17 @@ test('resumes corrections offline and counts independent answers, not correction
   await page.getByRole('button', { name: 'Fortsett øvingen' }).click();
   await expect(page.getByLabel('Skriv ordet én gang')).toBeFocused();
   await answer(page, answers[missedPrompt]);
-  await expect(page.locator('#progress-label')).toHaveText('0 av 2 lært · 3 oppgaver igjen');
+  await expect(page.locator('#progress-label')).toHaveText('0 av 1 lært · 2 oppgaver igjen');
   await expect(page.locator('#complete-view')).toBeHidden();
-  for (let index = 0; index < 3; index += 1) {
+  for (let index = 0; index < 2; index += 1) {
     await answer(page, answers[await page.locator('#prompt').textContent()]);
   }
-  await expectCompletion(page, 2, 1);
+  await expectCompletion(page, 1, 0);
   await expect(page.locator('#hardest-words')).toHaveText(
     `${missedPrompt} → ${answers[missedPrompt]} · 1 feilsvar`,
   );
   await page.reload();
-  await expectCompletion(page, 2, 1);
+  await expectCompletion(page, 1, 0);
   await page.getByRole('button', { name: 'Til ordsettene' }).click();
   await expect(page.getByRole('heading', { name: 'Øveord' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Fortsett øvingen' })).toBeHidden();
@@ -166,6 +266,7 @@ test('restores the latest summary for the active profile after revisiting an old
     .filter({ hasText: 'Øveord' })
     .getByRole('button', { name: 'Øv på nytt' })
     .click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Start øving' }).click();
   await expect(page.getByLabel('Stavingen din')).toBeFocused();
   await answer(page, 'dog');
   await expectCompletion(page, 1, 1);
@@ -221,6 +322,7 @@ test('restarts a summary for its original profile after another tab switches pro
   await saveAfterMinimumTime(otherPage, 'Lagre profil');
   await expect(otherPage.getByLabel('Profil').locator('option:checked')).toHaveText('Ny profil');
   await otherPage.getByRole('button', { name: 'Start øving' }).click();
+  await otherPage.getByRole('dialog').getByRole('button', { name: 'Start øving' }).click();
   await expect(otherPage.getByLabel('Stavingen din')).toBeFocused();
   await answer(otherPage, 'wrong');
   await expect(otherPage.getByLabel('Skriv ordet én gang')).toBeFocused();

@@ -30,11 +30,12 @@ test('replaces an installed v8 shell with bad module MIME types and works offlin
         body = Buffer.from(
           body
             .toString()
-            .replaceAll('puggern-app-shell-v11', 'puggern-app-shell-v8')
-            .replaceAll('styles.css?v=9', 'styles.css?v=7')
-            .replaceAll('main.mjs?v=10', 'main.mjs?v=8')
+            .replaceAll('puggern-app-shell-v12', 'puggern-app-shell-v8')
+            .replaceAll('styles.css?v=10', 'styles.css?v=7')
+            .replaceAll('main.mjs?v=11', 'main.mjs?v=8')
             .replaceAll('word-sets.mjs?v=7', 'word-sets.mjs?v=5')
             .replaceAll('creation-guard.mjs?v=3', 'creation-guard.mjs?v=2')
+            .replaceAll('.mjs?v=7', '.mjs?v=5')
             .replaceAll('.mjs?v=6', '.mjs?v=5')
             .replaceAll('#46574e', '#64766d'),
         );
@@ -107,9 +108,9 @@ test('replaces an installed v8 shell with bad module MIME types and works offlin
       await registration.update();
       await changed;
     });
-    await expect.poll(() => page.evaluate(() => caches.keys())).toEqual(['puggern-app-shell-v11']);
+    await expect.poll(() => page.evaluate(() => caches.keys())).toEqual(['puggern-app-shell-v12']);
     const cachedModules = await page.evaluate(async () => {
-      const cache = await caches.open('puggern-app-shell-v11');
+      const cache = await caches.open('puggern-app-shell-v12');
       const requests = (await cache.keys()).filter((request) =>
         new URL(request.url).pathname.endsWith('.mjs'),
       );
@@ -121,14 +122,14 @@ test('replaces an installed v8 shell with bad module MIME types and works offlin
     for (const type of cachedModules) expect(type).toMatch(/^(?:application|text)\/javascript\b/);
     expect(
       await page.evaluate(async () => {
-        const cache = await caches.open('puggern-app-shell-v11');
+        const cache = await caches.open('puggern-app-shell-v12');
         return (await cache.match('./index.html')).text();
       }),
-    ).toContain('./src/main.mjs?v=10');
+    ).toContain('./src/main.mjs?v=11');
     expect(
       await page.evaluate(async () => {
-        const cache = await caches.open('puggern-app-shell-v11');
-        return (await cache.match('./styles.css?v=9')).text();
+        const cache = await caches.open('puggern-app-shell-v12');
+        return (await cache.match('./styles.css?v=10')).text();
       }),
     ).toContain('#46574e');
 
