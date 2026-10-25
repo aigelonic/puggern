@@ -63,6 +63,7 @@ test('chooses correction announcement after delayed progress saving', async ({ p
   await page.getByLabel('Navn på ordsettet').fill('Frukt');
   await page.getByLabel('Hint og svar').fill('En rød frukt\teple');
   await saveAfterMinimumTime(page, 'Lagre og start øving');
+  await expect(page.getByLabel('Stavingen din')).toBeVisible();
 
   await page.evaluate(() => {
     window.profileStateLockAcquired = new Promise((resolve) => {
@@ -90,6 +91,48 @@ test('chooses correction announcement after delayed progress saving', async ({ p
     'Riktig stavemåte eple Skriv ordet én gang, så kommer det tilbake senere.',
   );
   await expect(page.locator('#answer')).toBeFocused();
+});
+
+test('does not exceed the set limit when copies are requested concurrently', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => {
+    const timestamp = new Date().toISOString();
+    const sets = Array.from({ length: 49 }, (_, index) => ({
+      id: `set-${index}`,
+      name: `Set ${index}`,
+      words: [{ id: '0', prompt: 'A clue', answer: 'An answer' }],
+      direction: 'prompt-to-answer',
+      settings: { caseSensitive: false, accentSensitive: false },
+      archived: false,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    }));
+    localStorage.setItem('puggern.word-sets', JSON.stringify({ version: 1, sets }));
+  });
+  await page.reload();
+
+  await page.evaluate(() => {
+    window.creationLockAcquired = new Promise((resolve) => {
+      navigator.locks.request('puggern.creation-attempts', async () => {
+        resolve();
+        await new Promise((release) => {
+          window.releaseCreationLock = release;
+        });
+      });
+    });
+  });
+  await page.evaluate(() => window.creationLockAcquired);
+
+  const copyButton = page.getByRole('button', { name: 'Kopier' }).first();
+  await copyButton.click();
+  await copyButton.click();
+  await page.evaluate(() => window.releaseCreationLock());
+
+  await expect(page.locator('#word-set-list > li')).toHaveCount(50);
+  await expect(page.locator('#setup-error')).toContainText('maksimalt 50');
+  expect(
+    await page.evaluate(() => JSON.parse(localStorage.getItem('puggern.word-sets')).sets.length),
+  ).toBe(50);
 });
 
 test('wraps long correction spellings on a mobile viewport', async ({ page }) => {

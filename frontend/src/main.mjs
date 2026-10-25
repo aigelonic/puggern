@@ -374,6 +374,10 @@ function makeButton(label, action, className = 'button secondary') {
 }
 
 function updateWordSets(nextWordSets, action) {
+  if (nextWordSets.length > wordSets.length && nextWordSets.length > MAX_WORD_SETS) {
+    showSetupError(`Du kan ha maksimalt ${MAX_WORD_SETS} ordsett på denne enheten.`);
+    return false;
+  }
   try {
     saveWordSets(window.localStorage, nextWordSets);
   } catch (error) {
@@ -585,6 +589,10 @@ async function saveEditor(startAfterSave = false) {
       );
       return;
     }
+    if (wordSets.length >= MAX_WORD_SETS) {
+      showSetupError(`Du kan ha maksimalt ${MAX_WORD_SETS} ordsett på denne enheten.`);
+      return;
+    }
   }
   const now = new Date().toISOString();
   const set = {
@@ -634,6 +642,10 @@ async function duplicateWordSet(set) {
     }
   } catch (error) {
     showSetupError(`Kunne ikke kontrollere opprettingsbegrensningen: ${error.message}`);
+    return;
+  }
+  if (wordSets.length >= MAX_WORD_SETS) {
+    showSetupError(`Du kan ha maksimalt ${MAX_WORD_SETS} ordsett på denne enheten.`);
     return;
   }
   const now = new Date().toISOString();
