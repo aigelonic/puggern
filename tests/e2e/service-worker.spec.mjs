@@ -8,11 +8,18 @@ test('replaces an installed v8 shell with bad module MIME types and works offlin
   baseURL,
 }) => {
   let legacy = true;
+  const baseOrigin = new URL(baseURL).origin;
   const server = createServer(async (request, response) => {
     try {
-      const upstream = await fetch(new URL(request.url, baseURL));
+      const upstreamUrl = new URL(request.url, baseOrigin);
+      if (upstreamUrl.origin !== baseOrigin) {
+        response.writeHead(400);
+        response.end();
+        return;
+      }
+      const upstream = await fetch(upstreamUrl);
       let body = Buffer.from(await upstream.arrayBuffer());
-      const pathname = new URL(request.url, baseURL).pathname;
+      const pathname = upstreamUrl.pathname;
       const textAsset =
         pathname === '/' ||
         pathname === '/index.html' ||
