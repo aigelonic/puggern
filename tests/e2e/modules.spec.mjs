@@ -16,6 +16,7 @@ test('serves the complete startup module graph as JavaScript', async ({ page, re
     '/src/learning.mjs',
     '/src/main.mjs',
     '/src/profiles.mjs',
+    '/src/share-word-set.mjs',
     '/src/word-sets.mjs',
   ]);
   for (const url of modules) {

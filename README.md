@@ -34,8 +34,9 @@ not show a challenge or use this creation limit.
 
 These are client-side safeguards, not server-enforced abuse controls: browser
 storage and JavaScript can be changed by the device owner. The app has no
-account, shared-set endpoint, or server-side user data to expire; all user
-content stays local and is not publicly listed. The app is marked `noindex`
+account, shared-set endpoint, or server-side user data to expire; user content is
+not automatically uploaded or publicly listed. Explicit sharing links contain the
+selected set's text (see below). The app is marked `noindex`
 and disallowed in `robots.txt`. NGINX logs requests, but spike alerting and
 per-IP write throttling require a backend/hosting layer and are not available
 for localStorage writes. No third-party challenge is used because the static
@@ -61,6 +62,30 @@ combo, and the number of completed sets are saved in the profile and retained wh
 starting a new session or deleting a set. Existing profiles and sessions without
 rewards start their reward counters at zero. Daily streaks, stars, badges,
 unlockables, sounds, and leaderboards are not part of this MVP.
+
+## Sharing between devices
+
+Choose **Del** beside an active or archived word set to share a link using the
+device's share sheet. If unavailable, Puggern copies the link or shows a selectable
+link for manual copying. **Anyone with the link can view the set contents**; avoid
+including identifying or sensitive text. Only the set name, hint/answer pairs,
+direction, and case/accent settings are transferred—not profiles, progress, rewards,
+or local IDs and timestamps. There is no account, backend storage, sync, or revocation.
+
+Open the link on another device, review the preview, and choose **Lagre ordsett**.
+It creates a new active set with fresh local metadata; duplicate names are allowed.
+Existing set and creation limits still apply. In an installed PWA, especially on
+iOS, the operating system may open links in the browser rather than the installed
+app. Open Puggern yourself, choose **Importer lenke**, paste the link, and choose
+**Forhåndsvis** instead. This manual path works offline once the app shell is cached.
+
+The stable `share` query parameter contains version-1 `word-set-share` JSON encoded
+as UTF-8 and unpadded Base64URL. Links over 8,000 characters are blocked on export
+and import; reduce the number of entries or text length. Import parsing is entirely
+client-side and never fetches a pasted link. As with any query URL, opening a link
+online can expose its contents to browser history, the hosting server/request logs,
+and the chosen sharing service. Puggern removes `share` from the current address
+after reading it, but cannot erase copies elsewhere. No file export is included.
 
 ## Tests
 
@@ -130,5 +155,6 @@ all Linux capabilities dropped. The NGINX base image is digest-pinned in
 `Dockerfile`; review and update that digest regularly for security fixes.
 
 The app is a static site with no build step, backend, or runtime dependencies.
-Progress and word sets are intended to stay in the browser on the current
-device. See [ADR 0001](docs/adr/0001-tech-stack.md) for the architecture decision.
+Progress stays in the browser on the current device; word sets can be explicitly
+transferred by link. See [ADR 0001](docs/adr/0001-tech-stack.md) for the architecture
+decision.
