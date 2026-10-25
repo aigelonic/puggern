@@ -21,8 +21,8 @@ restored, and deleted. Create a local profile for each child, with an optional
 emoji avatar. Practice progress is kept separately for each profile and word
 set, so an unfinished session can be continued or restarted, including after a
 page reload. Profiles, word sets, and progress are saved in browser storage on
-this device; they are not synced to other devices. Only the profile name and
-optional emoji are stored for a profile.
+this device; they are not synced to other devices. Profiles store a name,
+optional emoji, and practice rewards.
 
 The current profile, progress, and word-set storage formats are version 1;
 corrupt or unsupported saved data is ignored rather than resumed or displayed.
@@ -35,10 +35,18 @@ survives reload, and you can practice the same set again or return to word sets.
 If saving progress fails, practice still continues and a warning explains that
 progress may be lost on reload.
 
+Each independent correct answer earns 10 points, including scheduled repetitions.
+Copying a correction earns no points. The combo counts consecutive correct answers
+within a session and resets on an incorrect answer; there is no time limit or
+speed bonus. A labeled progress bar shows learned entries, and completing a set
+shows a brief celebration (static when reduced motion is requested).
+
 Storage retains each profile's current session per word set, not a history of
-completed attempts. Session
-rewards and celebration depend on [#18](https://github.com/aigelonic/puggern/issues/18);
-that model is not implemented here.
+completed attempts. Session points and combos survive reloads. Total points, best
+combo, and the number of completed sets are saved in the profile and retained when
+starting a new session or deleting a set. Existing profiles and sessions without
+rewards start their reward counters at zero. Daily streaks, stars, badges,
+unlockables, sounds, and leaderboards are not part of this MVP.
 
 ## Tests
 

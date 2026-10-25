@@ -7,7 +7,7 @@
     <meta name="description" content="Et ordtreningsspill som fungerer uten nett." />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" type="image/png" sizes="192x192" href="./icons/pug-192.png" />
-    <link rel="stylesheet" href="./styles.css?v=6" />
+    <link rel="stylesheet" href="./styles.css?v=7" />
     <title>Puggern</title>
   </head>
   <body>
@@ -43,6 +43,7 @@
               Legg til profil
             </button>
           </div>
+          <p id="profile-rewards" class="field-help"></p>
           <form id="profile-form" hidden>
             <label for="profile-name">Navn</label>
             <input id="profile-name" type="text" maxlength="40" required autocomplete="off" />
@@ -121,6 +122,13 @@
           <button id="back-button" class="text-button" type="button">&#8592; Ordsett</button>
           <p id="progress-label" class="eyebrow"></p>
         </div>
+        <progress
+          id="practice-progress"
+          value="0"
+          max="1"
+          aria-labelledby="progress-label"
+        ></progress>
+        <p id="practice-rewards" class="reward-summary" role="status" aria-live="polite"></p>
         <p class="eyebrow">Stav svaret</p>
         <h1 id="prompt"></h1>
         <form id="answer-form">
@@ -146,8 +154,10 @@
       </section>
 
       <section id="complete-view" class="view complete-view" hidden>
+        <div class="celebration" aria-hidden="true">🎉 ⭐ 🎉</div>
         <p class="eyebrow">Øving fullført</p>
         <h1 id="completion-heading" tabindex="-1">Godt jobbet!</h1>
+        <p id="completion-rewards" class="reward-summary"></p>
         <p id="completion-message" class="intro"></p>
         <dl class="completion-stats">
           <div>
@@ -178,6 +188,6 @@
         </div>
       </section>
     </main>
-    <script type="module" src="./src/main.mjs?v=7"></script>
+    <script type="module" src="./src/main.mjs?v=8"></script>
   </body>
 </html>

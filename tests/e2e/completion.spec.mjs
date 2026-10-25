@@ -220,3 +220,97 @@ test('resumes an unfinished in-memory session after saving fails', async ({ page
   await expect(page.getByLabel('Skriv ordet én gang')).toBeFocused();
   await expect(page.locator('#progress-label')).toHaveText('0 av 1 lært · 1 oppgaver igjen');
 });
+
+test('saves points and combos across reloads, rewards repeats but not correction copies', async ({
+  page,
+}) => {
+  await startSet(page, 'hund;dog\nkatt;cat\nfugl;bird');
+  const answers = { hund: 'dog', katt: 'cat', fugl: 'bird' };
+  const progress = page.getByRole('progressbar');
+  await expect(progress).toHaveAttribute('value', '0');
+  await expect(progress).toHaveAttribute('max', '3');
+  await answer(page, answers[await page.locator('#prompt').textContent()]);
+  await expect(page.locator('#practice-rewards')).toHaveText('10 poeng · 1 riktige på rad');
+  await expect(progress).toHaveAttribute('value', '1');
+  await page.reload();
+  await page.getByRole('button', { name: 'Fortsett øvingen' }).click();
+  await expect(page.locator('#practice-rewards')).toHaveText('10 poeng · 1 riktige på rad');
+  await answer(page, 'wrong');
+  await expect(page.locator('#practice-rewards')).toHaveText('10 poeng · 0 riktige på rad');
+  await answer(page, answers[await page.locator('#prompt').textContent()]);
+  await expect(page.locator('#practice-rewards')).toHaveText('10 poeng · 0 riktige på rad');
+  for (let index = 0; index < 3; index += 1) {
+    await answer(page, answers[await page.locator('#prompt').textContent()]);
+  }
+  await expectCompletion(page, 3, 2);
+  await expect(page.locator('#completion-rewards')).toHaveText(
+    '40 poeng · Beste rekke: 3 riktige på rad',
+  );
+  await expect(page.locator('.celebration')).toBeVisible();
+  await page.reload();
+  await expectCompletion(page, 3, 2);
+  await page.getByRole('button', { name: 'Øv på samme sett igjen' }).click();
+  await expect(page.locator('#practice-rewards')).toHaveText('0 poeng · 0 riktige på rad');
+  for (let index = 0; index < 3; index += 1) {
+    await answer(page, answers[await page.locator('#prompt').textContent()]);
+  }
+  await page.getByRole('button', { name: 'Til ordsettene' }).click();
+  await expect(page.locator('#profile-rewards')).toHaveText(
+    '70 poeng totalt · Beste rekke: 3 · 2 sett fullført',
+  );
+  await page.getByRole('button', { name: 'Legg til profil' }).click();
+  await page.getByLabel('Navn', { exact: true }).fill('Ny profil');
+  await page.getByRole('button', { name: 'Lagre profil' }).click();
+  await expect(page.locator('#profile-rewards')).toHaveText(
+    '0 poeng totalt · Beste rekke: 0 · 0 sett fullført',
+  );
+  await page.getByLabel('Profil', { exact: true }).selectOption({ label: 'Min profil' });
+  await expect(page.locator('#profile-rewards')).toHaveText(
+    '70 poeng totalt · Beste rekke: 3 · 2 sett fullført',
+  );
+});
+
+test('keeps pending rewards on save failure and credits them once when storage recovers', async ({
+  page,
+}) => {
+  await startSet(page, 'hund;dog\nkatt;cat');
+  await page.evaluate(() => {
+    const setItem = Storage.prototype.setItem;
+    let failOnce = true;
+    Storage.prototype.setItem = function (...args) {
+      if (failOnce) {
+        failOnce = false;
+        throw new DOMException('Storage full', 'QuotaExceededError');
+      }
+      return setItem.apply(this, args);
+    };
+  });
+  const answers = { hund: 'dog', katt: 'cat' };
+  await answer(page, answers[await page.locator('#prompt').textContent()]);
+  await expect(page.locator('#progress-warning')).toBeVisible();
+  await answer(page, answers[await page.locator('#prompt').textContent()]);
+  await expectCompletion(page, 2, 2);
+  await expect(page.locator('#progress-warning')).toBeHidden();
+  await page.reload();
+  await expectCompletion(page, 2, 2);
+  await page.getByRole('button', { name: 'Til ordsettene' }).click();
+  await expect(page.locator('#profile-rewards')).toHaveText(
+    '20 poeng totalt · Beste rekke: 2 · 1 sett fullført',
+  );
+});
+
+test('shows a static celebration with reduced motion and fits a narrow viewport', async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.setViewportSize({ width: 320, height: 700 });
+  await startSet(page);
+  await answer(page, 'dog');
+  await expectCompletion(page, 1, 1);
+  await expect(page.locator('.celebration')).toHaveCSS('animation-name', 'none');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'Øv på samme sett igjen' })).toBeFocused();
+});
