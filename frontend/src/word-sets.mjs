@@ -3,6 +3,7 @@ import { MAX_WORDS_PER_SET, MAX_WORD_LENGTH } from './learning.mjs?v=5';
 export const WORD_SETS_KEY = 'puggern.word-sets';
 export const WORD_SETS_VERSION = 1;
 export const MAX_WORD_SET_NAME_LENGTH = 80;
+export const MAX_WORD_SETS = 50;
 
 function isValidWordSet(set) {
   return (
