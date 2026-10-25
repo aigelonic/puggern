@@ -1,4 +1,4 @@
-import { isValidProgress } from './learning.mjs?v=5';
+import { isValidProgress } from './learning.mjs?v=6';
 
 export const PROFILE_STATE_KEY = 'puggern.profile-state';
 export const PROFILE_STATE_VERSION = 1;

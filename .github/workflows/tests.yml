@@ -37,6 +37,14 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm test
+      - name: Test production NGINX module loading and offline profiles
+        run: |
+          docker build -t puggern:test .
+          docker run -d --name puggern-test -p 127.0.0.1:8080:8080 puggern:test
+          curl --fail --retry 10 --retry-connrefused --retry-delay 1 http://127.0.0.1:8080/healthz
+          PLAYWRIGHT_BASE_URL=http://127.0.0.1:8080 npm run test:e2e -- tests/e2e/modules.spec.mjs tests/e2e/profiles.spec.mjs tests/e2e/service-worker.spec.mjs
+      - if: always()
+        run: docker rm -f puggern-test || true
   dependency-security:
     name: Dependency security
     runs-on: ubuntu-latest
