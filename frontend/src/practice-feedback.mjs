@@ -35,6 +35,9 @@ export function createPracticeEffects({
     for (const element of [feedback, correction, progress, celebration]) {
       delete element.dataset.effect;
     }
+    for (const element of [feedback, correction, progress, celebration]) {
+      element.getBoundingClientRect();
+    }
     celebration.querySelector('.confetti')?.remove();
   }
 

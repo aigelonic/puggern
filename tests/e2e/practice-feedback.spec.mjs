@@ -119,8 +119,16 @@ test('rapid submissions replace effects; repeated mistakes and navigation leave 
 }) => {
   await start(page);
   await answer(page, 'wrong');
+  const firstAnimationStart = await page
+    .locator('#correction-feedback')
+    .evaluate((element) => element.getAnimations()[0]?.startTime);
+  expect(firstAnimationStart).not.toBeUndefined();
   await answer(page, 'dog');
   await answer(page, 'wrong');
+  const nextAnimationStart = await page
+    .locator('#correction-feedback')
+    .evaluate((element) => element.getAnimations()[0]?.startTime);
+  expect(nextAnimationStart).not.toBe(firstAnimationStart);
   await expect(page.locator('[data-effect="incorrect"]')).toHaveCount(1);
   await expect(page.locator('[data-effect="retry-scheduled"]')).toHaveCount(0);
   await answer(page, 'cat');
