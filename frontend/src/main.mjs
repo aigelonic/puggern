@@ -755,6 +755,19 @@ profileForm.addEventListener('submit', async (event) => {
     );
     return;
   }
+  try {
+    const guardError = await checkCreationForm(profileForm);
+    if (guardError) {
+      showCreationError(profileForm, guardError);
+      return;
+    }
+  } catch (error) {
+    showCreationError(
+      profileForm,
+      `Kunne ikke kontrollere opprettingsbegrensningen: ${error.message}`,
+    );
+    return;
+  }
   const profile = { id: crypto.randomUUID(), name, avatar, rewards: createRewards() };
   if (
     await persistProfileState(
@@ -778,7 +791,6 @@ profileForm.addEventListener('submit', async (event) => {
     profileForm.hidden = true;
     profileNameInput.value = '';
     profileAvatarInput.value = '';
-    profileSelect.focus();
     showCreationError(profileForm, '');
   }
 });
