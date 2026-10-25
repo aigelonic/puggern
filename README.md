@@ -77,6 +77,19 @@ npm test
 the browser workflows against a temporary static server. GitHub Actions runs
 both suites for pull requests and pushes to `main`.
 
+To check the production NGINX MIME types, headers, profile workflow, and
+service-worker upgrade/offline behavior, start the deployment container described
+below and run:
+
+```sh
+PLAYWRIGHT_BASE_URL=http://127.0.0.1:8080 npm run test:e2e
+```
+
+This uses the running server instead of the development server. All `.mjs`
+modules must be served as JavaScript, not `application/octet-stream`. When
+changing module URLs, update their imports and the service-worker shell together
+and bump the shell cache version so existing installations replace stale assets.
+
 ## Pull Request Checks
 
 GitHub Actions runs separate `Quality`, `Tests`, and `Dependency security`

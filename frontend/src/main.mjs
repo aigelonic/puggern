@@ -8,7 +8,7 @@ import {
   PROGRESS_VERSION,
   submitAnswer,
   wordsForDirection,
-} from './learning.mjs?v=5';
+} from './learning.mjs?v=6';
 import {
   addRewards,
   createProfileState,
@@ -19,14 +19,14 @@ import {
   MAX_PROFILES,
   PROFILE_STATE_KEY,
   saveProfileState,
-} from './profiles.mjs?v=5';
+} from './profiles.mjs?v=6';
 import {
   loadWordSets,
   saveWordSets,
   MAX_WORD_SET_NAME_LENGTH,
   MAX_WORD_SETS,
-} from './word-sets.mjs?v=6';
-import { recordCreationAttempt, MIN_CREATION_FORM_TIME_MS } from './creation-guard.mjs?v=2';
+} from './word-sets.mjs?v=7';
+import { recordCreationAttempt, MIN_CREATION_FORM_TIME_MS } from './creation-guard.mjs?v=3';
 
 const status = document.querySelector('#connection-status');
 const appError = document.querySelector('#app-error');
@@ -72,9 +72,10 @@ let currentProfileId = null;
 let unsavedProgress = false;
 const pendingRewards = new Map();
 
-function setAppError(message) {
+function setAppError(message, source = 'app') {
   appError.textContent = message;
   appError.hidden = !message;
+  appError.dataset.source = source;
 }
 
 async function withProfileStateLock(operation) {
@@ -116,7 +117,7 @@ async function initializeProfileState() {
 
 await initializeProfileState();
 
-async function persistProfileState(updateState, action) {
+async function persistProfileState(updateState, action, errorSource = 'app') {
   try {
     await withProfileStateLock(() => {
       const latestState = loadProfileState(window.localStorage) ?? profileState;
@@ -136,7 +137,7 @@ async function persistProfileState(updateState, action) {
     renderProfiles();
     return true;
   } catch (error) {
-    setAppError(`Kunne ikke ${action}: ${error.message}`);
+    setAppError(`Kunne ikke ${action}: ${error.message}`, errorSource);
     return false;
   }
 }
@@ -725,18 +726,20 @@ document.querySelector('#cancel-profile-button').addEventListener('click', () =>
   profileForm.hidden = true;
   profileNameInput.value = '';
   profileAvatarInput.value = '';
+  if (appError.dataset.source === 'profile') setAppError('');
+  newProfileButton.focus();
 });
 profileForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const name = profileNameInput.value.trim();
   const avatar = profileAvatarInput.value.trim();
   if (!name) {
-    setAppError('Skriv inn et profilnavn.');
+    setAppError('Skriv inn et profilnavn.', 'profile');
     profileNameInput.focus();
     return;
   }
   if (name.length > MAX_PROFILE_NAME_LENGTH || avatar.length > MAX_PROFILE_AVATAR_LENGTH) {
-    setAppError('Profilnavnet eller emojien er for lang.');
+    setAppError('Profilnavnet eller emojien er for lang.', 'profile');
     return;
   }
   try {
@@ -754,23 +757,28 @@ profileForm.addEventListener('submit', async (event) => {
   }
   const profile = { id: crypto.randomUUID(), name, avatar, rewards: createRewards() };
   if (
-    await persistProfileState((state) => {
-      if (state.profiles.length >= MAX_PROFILES) {
-        throw new Error(`Du kan ha maksimalt ${MAX_PROFILES} profiler.`);
-      }
-      return {
-        ...state,
-        activeProfileId: profile.id,
-        profiles: [...state.profiles, profile],
-        progress: { ...state.progress, [profile.id]: {} },
-      };
-    }, 'lagre profilen')
+    await persistProfileState(
+      (state) => {
+        if (state.profiles.length >= MAX_PROFILES) {
+          throw new Error(`Du kan ha maksimalt ${MAX_PROFILES} profiler.`);
+        }
+        return {
+          ...state,
+          activeProfileId: profile.id,
+          profiles: [...state.profiles, profile],
+          progress: { ...state.progress, [profile.id]: {} },
+        };
+      },
+      'lagre profilen',
+      'profile',
+    )
   ) {
     renderProfiles();
     renderWordSets();
     profileForm.hidden = true;
     profileNameInput.value = '';
     profileAvatarInput.value = '';
+    profileSelect.focus();
     showCreationError(profileForm, '');
   }
 });
