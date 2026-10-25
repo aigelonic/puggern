@@ -5,9 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#f7f5ef" />
     <meta name="description" content="Et ordtreningsspill som fungerer uten nett." />
+    <meta name="robots" content="noindex, nofollow, noarchive" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" type="image/png" sizes="192x192" href="./icons/pug-192.png" />
-    <link rel="stylesheet" href="./styles.css?v=7" />
+    <link rel="stylesheet" href="./styles.css?v=8" />
     <title>Puggern</title>
   </head>
   <body>
@@ -45,6 +46,16 @@
           </div>
           <p id="profile-rewards" class="field-help"></p>
           <form id="profile-form" hidden>
+            <div class="anti-bot-field" aria-hidden="true">
+              <label for="profile-website">Nettside</label>
+              <input
+                id="profile-website"
+                name="website"
+                type="text"
+                tabindex="-1"
+                autocomplete="off"
+              />
+            </div>
             <label for="profile-name">Navn</label>
             <input id="profile-name" type="text" maxlength="40" required autocomplete="off" />
             <label for="profile-avatar">Valgfri emoji</label>
@@ -56,6 +67,12 @@
               aria-describedby="profile-help"
             />
             <p id="profile-help" class="field-help">Navnet lagres bare i denne nettleseren.</p>
+            <p
+              id="profile-creation-error"
+              class="feedback error creation-error"
+              role="alert"
+              hidden
+            ></p>
             <div class="actions">
               <button class="button primary" type="submit">Lagre profil</button>
               <button id="cancel-profile-button" class="button secondary" type="button">
@@ -74,7 +91,20 @@
         <button id="new-set-button" class="button secondary new-set-button" type="button">
           Nytt ordsett
         </button>
+        <p id="set-limit-help" class="field-help" role="status" hidden>
+          Du har nådd grensen på 50 ordsett på denne enheten.
+        </p>
         <form id="word-set-form" hidden>
+          <div class="anti-bot-field" aria-hidden="true">
+            <label for="word-set-website">Nettside</label>
+            <input
+              id="word-set-website"
+              name="website"
+              type="text"
+              tabindex="-1"
+              autocomplete="off"
+            />
+          </div>
           <div class="editor-heading">
             <h2 id="editor-title">Nytt ordsett</h2>
             <button id="cancel-edit-button" class="text-button" type="button">Avbryt</button>
@@ -109,6 +139,12 @@
             >
           </div>
           <div class="actions">
+            <p
+              id="word-set-creation-error"
+              class="feedback error creation-error"
+              role="alert"
+              hidden
+            ></p>
             <button class="button primary" type="submit">Lagre ordsett</button>
             <button id="save-and-start-button" class="button secondary" type="button">
               Lagre og start øving
@@ -188,6 +224,6 @@
         </div>
       </section>
     </main>
-    <script type="module" src="./src/main.mjs?v=8"></script>
+    <script type="module" src="./src/main.mjs?v=9"></script>
   </body>
 </html>

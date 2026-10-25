@@ -34,6 +34,19 @@ shareable data in a URL. It will not require a server or account.
   user data stays in the browser and is not sent to a server.
 - There is no server write endpoint to abuse. Inputs still need validation, and
   user-provided content must be rendered as text.
+- Client-side abuse safeguards limit creation to five attempts per ten minutes
+  in browser storage, use a hidden honeypot and 250-millisecond minimum form time for
+  profile/word-set forms, and cap storage at 10 profiles and 50 word sets per
+  browser. Word sets remain capped at 100 entries, with 200 characters per
+  clue or answer. These checks deter accidental or unsophisticated automated
+  UI submission but are not a security boundary against modified clients.
+- User data is local rather than anonymous server data, so it is not expired
+  automatically after 90 days. It is not publicly listed or indexed; the site
+  sends `noindex` and its `robots.txt` disallows crawling. NGINX request logs
+  provide basic visibility but there is no spike alerting or IP-based write
+  throttling because the app has no server-side write endpoints.
+- No third-party challenge is used: without a server there is nowhere to
+  validate challenge tokens, and the app is intended to remain usable offline.
 - Progress does not sync between devices and can be lost when browser data is
   cleared. Users will need export/import for portable backups and sharing.
 - The service worker requires HTTPS outside localhost. The reverse proxy must

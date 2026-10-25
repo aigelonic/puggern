@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   loadWordSets,
   saveWordSets,
+  MAX_WORD_SETS,
   WORD_SETS_KEY,
   WORD_SETS_VERSION,
 } from '../frontend/src/word-sets.mjs';
@@ -57,4 +58,15 @@ test('ignores corrupt, unsupported, or invalid word-set storage', () => {
     }),
   );
   assert.deepEqual(loadWordSets(storage), []);
+});
+
+test('preserves valid saved word sets beyond the new creation limit', () => {
+  const storage = makeStorage();
+  const tooManySets = Array.from({ length: MAX_WORD_SETS + 1 }, (_, index) => ({
+    ...validSet,
+    id: `set-${index}`,
+  }));
+
+  saveWordSets(storage, tooManySets);
+  assert.deepEqual(loadWordSets(storage), tooManySets);
 });
