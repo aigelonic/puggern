@@ -105,6 +105,12 @@ require the `Quality`, `Tests`, and `Dependency security` checks in branch
 protection or rulesets for `main`. These repository settings cannot be
 configured from the workflow files.
 
+## Releases
+
+See [the release process](docs/releases.md) for versioning, release PR review,
+required administrator setup, and the human close/reopen step that runs CI on
+bot-created release PRs. Releases do not deploy or publish packages.
+
 ## Server Deployment
 
 The production image serves the static app with unprivileged NGINX. On a server
