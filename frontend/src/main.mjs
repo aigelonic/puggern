@@ -25,8 +25,8 @@ import {
   saveWordSets,
   MAX_WORD_SET_NAME_LENGTH,
   MAX_WORD_SETS,
-} from './word-sets.mjs?v=5';
-import { recordCreationAttempt, MIN_CREATION_FORM_TIME_MS } from './creation-guard.mjs?v=1';
+} from './word-sets.mjs?v=6';
+import { recordCreationAttempt, MIN_CREATION_FORM_TIME_MS } from './creation-guard.mjs?v=2';
 
 const status = document.querySelector('#connection-status');
 const appError = document.querySelector('#app-error');
@@ -190,7 +190,7 @@ function showCreationError(form, message) {
   if (message) error.scrollIntoView({ block: 'nearest' });
 }
 
-function checkCreationForm(form) {
+async function checkCreationForm(form) {
   const honeypot = form.querySelector('[name="website"]');
   if (honeypot.value) return 'Kunne ikke lagre. Sjekk feltene og prøv igjen.';
 
@@ -202,8 +202,8 @@ function checkCreationForm(form) {
   return checkCreationRate();
 }
 
-function checkCreationRate() {
-  const result = recordCreationAttempt(window.localStorage);
+async function checkCreationRate() {
+  const result = await recordCreationAttempt(window.localStorage);
   if (!result.allowed) {
     const seconds = Math.ceil(result.retryAfterMs / 1000);
     return `Du har lagret flere ting nettopp. Vent ${seconds} sekunder før du prøver igjen.`;
@@ -543,7 +543,7 @@ function renderPreview() {
   });
 }
 
-function saveEditor(startAfterSave = false) {
+async function saveEditor(startAfterSave = false) {
   const previous = wordSets.find((set) => set.id === editorSetId);
   const name = wordSetNameInput.value.trim();
   if (!name) {
@@ -573,7 +573,7 @@ function saveEditor(startAfterSave = false) {
   }
   if (!previous) {
     try {
-      const guardError = checkCreationForm(wordSetForm);
+      const guardError = await checkCreationForm(wordSetForm);
       if (guardError) {
         showCreationError(wordSetForm, guardError);
         return;
@@ -621,13 +621,13 @@ function changeArchived(set, archived) {
   updateWordSets(nextWordSets, archived ? 'arkivere' : 'gjenopprette');
 }
 
-function duplicateWordSet(set) {
+async function duplicateWordSet(set) {
   if (wordSets.length >= MAX_WORD_SETS) {
     showSetupError(`Du kan ha maksimalt ${MAX_WORD_SETS} ordsett på denne enheten.`);
     return;
   }
   try {
-    const guardError = checkCreationRate();
+    const guardError = await checkCreationRate();
     if (guardError) {
       showSetupError(guardError);
       return;
@@ -728,7 +728,7 @@ profileForm.addEventListener('submit', async (event) => {
     return;
   }
   try {
-    const guardError = checkCreationForm(profileForm);
+    const guardError = await checkCreationForm(profileForm);
     if (guardError) {
       showCreationError(profileForm, guardError);
       return;
@@ -774,11 +774,13 @@ document.querySelector('#archive-toggle').addEventListener('click', () => {
   renderWordSets();
 });
 wordSetInput.addEventListener('input', renderPreview);
-wordSetForm.addEventListener('submit', (event) => {
+wordSetForm.addEventListener('submit', async (event) => {
   event.preventDefault();
-  saveEditor();
+  await saveEditor();
 });
-document.querySelector('#save-and-start-button').addEventListener('click', () => saveEditor(true));
+document
+  .querySelector('#save-and-start-button')
+  .addEventListener('click', async () => await saveEditor(true));
 
 answerForm.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -831,8 +833,8 @@ document.querySelector('#completion-restart-button').addEventListener('click', (
 });
 document.querySelector('#completion-sets-button').addEventListener('click', () => {
   showView(setupView);
-  document.querySelector('#new-set-button').focus();
   renderWordSets();
+  (newSetButton.disabled ? document.querySelector('#saved-sets-title') : newSetButton).focus();
 });
 document.querySelector('#completion-new-set-button').addEventListener('click', () => {
   showView(setupView);

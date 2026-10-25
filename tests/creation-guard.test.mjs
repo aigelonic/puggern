@@ -17,18 +17,30 @@ function makeStorage() {
   };
 }
 
-test('limits creation attempts across the configured time window', () => {
+function makeLockManager() {
+  let tail = Promise.resolve();
+  return {
+    request(_name, callback) {
+      const result = tail.then(callback);
+      tail = result.catch(() => {});
+      return result;
+    },
+  };
+}
+
+test('limits creation attempts across the configured time window', async () => {
   const storage = makeStorage();
+  const locks = makeLockManager();
   const now = 1_000_000;
 
   for (let attempt = 0; attempt < MAX_CREATIONS_PER_WINDOW; attempt += 1) {
-    assert.deepEqual(recordCreationAttempt(storage, now + attempt), {
+    assert.deepEqual(await recordCreationAttempt(storage, now + attempt, locks), {
       allowed: true,
       retryAfterMs: 0,
     });
   }
 
-  const blocked = recordCreationAttempt(storage, now + MAX_CREATIONS_PER_WINDOW);
+  const blocked = await recordCreationAttempt(storage, now + MAX_CREATIONS_PER_WINDOW, locks);
   assert.equal(blocked.allowed, false);
   assert.equal(blocked.retryAfterMs, CREATION_WINDOW_MS - MAX_CREATIONS_PER_WINDOW);
   assert.equal(
@@ -37,19 +49,47 @@ test('limits creation attempts across the configured time window', () => {
   );
 });
 
-test('allows new attempts after the previous window expires', () => {
+test('allows new attempts after the previous window expires', async () => {
   const storage = makeStorage();
+  const locks = makeLockManager();
   const now = 1_000_000;
   for (let attempt = 0; attempt < MAX_CREATIONS_PER_WINDOW; attempt += 1) {
-    recordCreationAttempt(storage, now + attempt);
+    await recordCreationAttempt(storage, now + attempt, locks);
   }
 
-  assert.equal(recordCreationAttempt(storage, now + CREATION_WINDOW_MS).allowed, true);
+  assert.equal(
+    (await recordCreationAttempt(storage, now + CREATION_WINDOW_MS, locks)).allowed,
+    true,
+  );
 });
 
-test('reports malformed rate-limit state instead of resetting it', () => {
+test('serializes simultaneous attempts across the creation limit', async () => {
   const storage = makeStorage();
+  const locks = makeLockManager();
+  const now = 1_000_000;
+  for (let attempt = 0; attempt < MAX_CREATIONS_PER_WINDOW - 1; attempt += 1) {
+    await recordCreationAttempt(storage, now + attempt, locks);
+  }
+
+  const results = await Promise.all([
+    recordCreationAttempt(storage, now + 10, locks),
+    recordCreationAttempt(storage, now + 11, locks),
+  ]);
+
+  assert.equal(results.filter(({ allowed }) => allowed).length, 1);
+  assert.equal(
+    JSON.parse(storage.values.get(CREATION_ATTEMPTS_KEY)).length,
+    MAX_CREATIONS_PER_WINDOW,
+  );
+});
+
+test('reports malformed rate-limit state instead of resetting it', async () => {
+  const storage = makeStorage();
+  const locks = makeLockManager();
   storage.values.set(CREATION_ATTEMPTS_KEY, '{');
 
-  assert.throws(() => recordCreationAttempt(storage), /opprettingsbegrensningen/);
+  await assert.rejects(
+    recordCreationAttempt(storage, Date.now(), locks),
+    /opprettingsbegrensningen/,
+  );
 });

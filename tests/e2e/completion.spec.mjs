@@ -71,6 +71,32 @@ for (const { source, direction, count } of [
   });
 }
 
+test('focuses the saved-set heading when returning to a full set list', async ({ page }) => {
+  await startSet(page);
+  await answer(page, 'dog');
+  await expectCompletion(page, 1, 1);
+  await page.evaluate(() => {
+    const storage = JSON.parse(localStorage.getItem('puggern.word-sets'));
+    const [set] = storage.sets;
+    storage.sets = [
+      set,
+      ...Array.from({ length: 49 }, (_, index) => ({
+        ...set,
+        id: `extra-${index}`,
+        name: `Ekstra ${index}`,
+      })),
+    ];
+    localStorage.setItem('puggern.word-sets', JSON.stringify(storage));
+  });
+  await page.reload();
+  await expectCompletion(page, 1, 1);
+
+  await page.getByRole('button', { name: 'Til ordsettene' }).click();
+
+  await expect(page.locator('#new-set-button')).toBeDisabled();
+  await expect(page.locator('#saved-sets-title')).toBeFocused();
+});
+
 test('resumes corrections offline and counts independent answers, not correction copies', async ({
   page,
   context,
