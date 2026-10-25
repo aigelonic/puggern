@@ -119,16 +119,8 @@ test('rapid submissions replace effects; repeated mistakes and navigation leave 
 }) => {
   await start(page);
   await answer(page, 'wrong');
-  const firstAnimationStart = await page
-    .locator('#correction-feedback')
-    .evaluate((element) => element.getAnimations()[0]?.startTime);
-  expect(firstAnimationStart).not.toBeUndefined();
   await answer(page, 'dog');
   await answer(page, 'wrong');
-  const nextAnimationStart = await page
-    .locator('#correction-feedback')
-    .evaluate((element) => element.getAnimations()[0]?.startTime);
-  expect(nextAnimationStart).not.toBe(firstAnimationStart);
   await expect(page.locator('[data-effect="incorrect"]')).toHaveCount(1);
   await expect(page.locator('[data-effect="retry-scheduled"]')).toHaveCount(0);
   await answer(page, 'cat');
@@ -142,6 +134,35 @@ test('rapid submissions replace effects; repeated mistakes and navigation leave 
   await page.locator('#back-button').click();
   await expect(page.locator('[data-effect]')).toHaveCount(0);
   await expect(page.locator('.confetti')).toHaveCount(0);
+});
+
+test('restarts answer and progress animations when a cue is repeated immediately', async ({
+  page,
+}) => {
+  await start(page);
+  const animationsRestarted = await page.evaluate(async () => {
+    const { createPracticeEffects } = await import('/src/practice-feedback.mjs');
+    const feedback = document.querySelector('#feedback');
+    const progress = document.querySelector('#practice-progress');
+    const effects = createPracticeEffects({
+      feedback,
+      correction: document.querySelector('#correction-feedback'),
+      progress,
+      celebration: document.querySelector('.celebration'),
+      soundToggle: document.querySelector('#sound-toggle'),
+    });
+    const cue = { kind: 'correct', newlyLearned: true };
+    effects.play(cue);
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    const firstAnimations = [feedback.getAnimations()[0], progress.getAnimations()[0]];
+    effects.play(cue);
+    const nextAnimations = [feedback.getAnimations()[0], progress.getAnimations()[0]];
+    effects.cancel();
+    return firstAnimations.every(Boolean) && nextAnimations.every(Boolean)
+      ? nextAnimations.map((animation, index) => animation !== firstAnimations[index])
+      : [];
+  });
+  expect(animationsRestarted).toEqual([true, true]);
 });
 
 test('sound is opt-in, bounded, replaceable and stops immediately when toggled off', async ({
