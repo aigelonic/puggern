@@ -63,7 +63,9 @@
 
 ## Commits and pull requests
 
-- Use Conventional Commits for commit messages and PR titles: `type(scope): description`.
+- Use Conventional Commits for commit messages and ordinary PR/squash titles: `type: description` or `type(scope): description` (optional scope), for example `feat(profiles): add avatars` or `fix: restore focus`.
+- Mark breaking changes with `!` before the colon (`feat!: change import format`) or a `BREAKING CHANGE: description` footer separated from the body by a blank line. Preserve this information in the final squash commit.
+- Use `feat` for new behavior and `fix` for corrections; maintenance-only `docs`, `test`, `ci`, `chore`, and dependency updates normally do not initiate releases. Do not rename release-please's generated release PR titles or remove its tracking labels. See [the release process](docs/releases.md) for version policy and maintainer steps.
 - Keep each PR to one coherent, independently reviewable purpose.
 - Preserve PR descriptions as literal Markdown: use `##` headings and `-` list markers, and verify the submitted body rather than relying on rendered formatting. When providing a description for copy/paste in chat, wrap the complete body in a `markdown` code fence.
 - In PR descriptions, include:
