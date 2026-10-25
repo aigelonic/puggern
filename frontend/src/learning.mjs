@@ -2,6 +2,7 @@ export const PROGRESS_VERSION = 1;
 export const PROGRESS_KEY = 'puggern.progress';
 export const MAX_WORDS_PER_SET = 100;
 export const MAX_WORD_LENGTH = 200;
+export const POINTS_PER_CORRECT_ANSWER = 10;
 
 export function previewWordSet(source) {
   if (typeof source !== 'string') {
@@ -93,7 +94,16 @@ export function createSession(words, random = Math.random, settings = {}) {
     [queue[index], queue[swapIndex]] = [queue[swapIndex], queue[index]];
   }
 
-  return { queue, correction: false, learned: [], mistakes: {}, settings };
+  return {
+    queue,
+    correction: false,
+    learned: [],
+    mistakes: {},
+    settings,
+    points: 0,
+    streak: 0,
+    bestStreak: 0,
+  };
 }
 
 export function currentWord(session, words) {
@@ -109,6 +119,9 @@ export function submitAnswer(session, response, words, settings) {
     queue: [...session.queue],
     learned: [...session.learned],
     mistakes: { ...session.mistakes },
+    points: session.points ?? 0,
+    streak: session.streak ?? 0,
+    bestStreak: session.bestStreak ?? 0,
   };
 
   if (session.correction) {
@@ -123,10 +136,14 @@ export function submitAnswer(session, response, words, settings) {
   if (!answersMatch(response, word.answer, settings)) {
     next.correction = true;
     next.mistakes[word.id] = (next.mistakes[word.id] ?? 0) + 1;
+    next.streak = 0;
     return { session: next, result: 'incorrect' };
   }
 
   next.queue.shift();
+  next.points = Math.min(Number.MAX_SAFE_INTEGER, next.points + POINTS_PER_CORRECT_ANSWER);
+  next.streak = Math.min(Number.MAX_SAFE_INTEGER, next.streak + 1);
+  next.bestStreak = Math.max(next.bestStreak, next.streak);
   if (!next.learned.includes(word.id)) next.learned.push(word.id);
   return { session: next, result: next.queue.length ? 'correct' : 'complete' };
 }
@@ -167,6 +184,11 @@ export function isValidProgress(progress) {
         word.answer.length <= MAX_WORD_LENGTH,
     ) &&
     progress.session &&
+    ['points', 'streak', 'bestStreak'].every(
+      (key) =>
+        progress.session[key] === undefined ||
+        (Number.isSafeInteger(progress.session[key]) && progress.session[key] >= 0),
+    ) &&
     Array.isArray(progress.session.queue) &&
     progress.session.queue.every((id) => progress.words.some((word) => word.id === id)) &&
     typeof progress.session.correction === 'boolean' &&

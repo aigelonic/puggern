@@ -11,6 +11,7 @@ import {
   previewWordSet,
   PROGRESS_KEY,
   PROGRESS_VERSION,
+  POINTS_PER_CORRECT_ANSWER,
   saveProgress,
   submitAnswer,
   wordsForDirection,
@@ -99,4 +100,62 @@ test('persists supported progress and ignores corrupt or unknown versions', () =
   assert.equal(loadProgress(storage), null);
   values.set(PROGRESS_KEY, JSON.stringify({ version: PROGRESS_VERSION + 1, session, words }));
   assert.equal(loadProgress(storage), null);
+});
+
+test('awards independent correct answers, resets combos on mistakes, and leaves copies unrewarded', () => {
+  const words = parseWordSet('A;one\nB;two\nC;three');
+  const initial = createSession(words, () => 0.999);
+  const correct = submitAnswer(initial, 'one', words).session;
+  assert.equal(initial.points, 0);
+  assert.equal(correct.points, POINTS_PER_CORRECT_ANSWER);
+  assert.equal(correct.streak, 1);
+  assert.equal(correct.bestStreak, 1);
+
+  const missed = submitAnswer(correct, 'wrong', words).session;
+  assert.equal(missed.points, POINTS_PER_CORRECT_ANSWER);
+  assert.equal(missed.streak, 0);
+  assert.equal(missed.bestStreak, 1);
+  const copied = submitAnswer(missed, 'two', words).session;
+  assert.equal(copied.points, missed.points);
+  assert.equal(copied.streak, 0);
+  assert.equal(copied.bestStreak, 1);
+
+  let session = copied;
+  for (const response of ['three', 'two', 'two']) {
+    session = submitAnswer(session, response, words).session;
+  }
+  assert.equal(session.points, 4 * POINTS_PER_CORRECT_ANSWER);
+  assert.equal(session.streak, 3);
+  assert.equal(session.bestStreak, 3);
+  assert.deepEqual(submitAnswer(session, 'two', words).session, session);
+  assert.equal(createSession(words).points, 0);
+});
+
+test('resumes legacy sessions with zero rewards and rejects malformed saved reward counters', () => {
+  const words = parseWordSet('A;one');
+  const session = createSession(words);
+  delete session.points;
+  delete session.streak;
+  delete session.bestStreak;
+  const storage = {
+    value: '',
+    getItem() {
+      return this.value;
+    },
+    setItem(key, value) {
+      this.value = value;
+    },
+  };
+  saveProgress(storage, session, words);
+  assert.deepEqual(loadProgress(storage).session, session);
+  const completed = submitAnswer(session, 'one', words).session;
+  assert.equal(completed.points, POINTS_PER_CORRECT_ANSWER);
+  assert.equal(completed.streak, 1);
+
+  for (const key of ['points', 'streak', 'bestStreak']) {
+    for (const value of [-1, 0.5, '10', null, Number.MAX_SAFE_INTEGER + 1]) {
+      saveProgress(storage, { ...session, [key]: value }, words);
+      assert.equal(loadProgress(storage), null);
+    }
+  }
 });
