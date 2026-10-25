@@ -10,6 +10,7 @@ const APP_SHELL = [
   './src/learning.mjs?v=5',
   './src/profiles.mjs?v=5',
   './src/word-sets.mjs?v=5',
+  './src/creation-guard.mjs?v=1',
 ];
 
 self.addEventListener('install', (event) => {

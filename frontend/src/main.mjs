@@ -20,7 +20,13 @@ import {
   PROFILE_STATE_KEY,
   saveProfileState,
 } from './profiles.mjs?v=5';
-import { loadWordSets, saveWordSets, MAX_WORD_SET_NAME_LENGTH } from './word-sets.mjs?v=5';
+import {
+  loadWordSets,
+  saveWordSets,
+  MAX_WORD_SET_NAME_LENGTH,
+  MAX_WORD_SETS,
+} from './word-sets.mjs?v=5';
+import { recordCreationAttempt, MIN_CREATION_FORM_TIME_MS } from './creation-guard.mjs?v=1';
 
 const status = document.querySelector('#connection-status');
 const appError = document.querySelector('#app-error');
@@ -52,6 +58,8 @@ const prompt = document.querySelector('#prompt');
 const answerLabel = document.querySelector('#answer-label');
 const editorTitle = document.querySelector('#editor-title');
 const archiveToggle = document.querySelector('#archive-toggle');
+const newSetButton = document.querySelector('#new-set-button');
+const setLimitHelp = document.querySelector('#set-limit-help');
 let wordSets = loadWordSets(window.localStorage);
 let profileState = loadProfileState(window.localStorage);
 let showArchived = false;
@@ -172,6 +180,35 @@ function showView(view) {
 function showSetupError(message) {
   setupError.textContent = message;
   setupError.hidden = !message;
+  if (message) setupError.scrollIntoView({ block: 'nearest' });
+}
+
+function showCreationError(form, message) {
+  const error = form.querySelector('.creation-error');
+  error.textContent = message;
+  error.hidden = !message;
+  if (message) error.scrollIntoView({ block: 'nearest' });
+}
+
+function checkCreationForm(form) {
+  const honeypot = form.querySelector('[name="website"]');
+  if (honeypot.value) return 'Kunne ikke lagre. Sjekk feltene og prøv igjen.';
+
+  const elapsed = Date.now() - Number(form.dataset.openedAt);
+  if (!Number.isFinite(elapsed) || elapsed < MIN_CREATION_FORM_TIME_MS) {
+    return 'Vent et lite øyeblikk før du lagrer.';
+  }
+
+  return checkCreationRate();
+}
+
+function checkCreationRate() {
+  const result = recordCreationAttempt(window.localStorage);
+  if (!result.allowed) {
+    const seconds = Math.ceil(result.retryAfterMs / 1000);
+    return `Du har lagret flere ting nettopp. Vent ${seconds} sekunder før du prøver igjen.`;
+  }
+  return null;
 }
 
 function settingsFromForm() {
@@ -345,6 +382,7 @@ function updateWordSets(nextWordSets, action) {
   }
   wordSets = nextWordSets;
   showSetupError('');
+  showCreationError(wordSetForm, '');
   renderWordSets();
   return true;
 }
@@ -359,6 +397,11 @@ function renderWordSets() {
     ? 'Ingen arkiverte ordsett.'
     : 'Ingen ordsett ennå. Lag ditt første under.';
   archiveToggle.textContent = showArchived ? 'Vis aktive ordsett' : 'Vis arkiv';
+  newSetButton.disabled = wordSets.length >= MAX_WORD_SETS;
+  setLimitHelp.hidden = !newSetButton.disabled;
+  newSetButton.title = newSetButton.disabled
+    ? `Du kan ha maksimalt ${MAX_WORD_SETS} ordsett på denne enheten.`
+    : '';
 
   visibleSets.forEach((set) => {
     const item = document.createElement('li');
@@ -419,6 +462,9 @@ function openEditor(set = null) {
   document.querySelector('#case-sensitive').checked = set?.settings.caseSensitive ?? false;
   document.querySelector('#accent-sensitive').checked = set?.settings.accentSensitive ?? false;
   showSetupError('');
+  showCreationError(wordSetForm, '');
+  wordSetForm.dataset.openedAt = String(Date.now());
+  wordSetForm.querySelector('[name="website"]').value = '';
   renderPreview();
   wordSetForm.hidden = false;
   wordSetNameInput.focus();
@@ -498,6 +544,7 @@ function renderPreview() {
 }
 
 function saveEditor(startAfterSave = false) {
+  const previous = wordSets.find((set) => set.id === editorSetId);
   const name = wordSetNameInput.value.trim();
   if (!name) {
     showSetupError('Skriv inn et navn på ordsettet.');
@@ -520,9 +567,26 @@ function saveEditor(startAfterSave = false) {
     wordPreview.querySelector('.invalid input')?.focus();
     return;
   }
-
+  if (!previous && wordSets.length >= MAX_WORD_SETS) {
+    showSetupError(`Du kan ha maksimalt ${MAX_WORD_SETS} ordsett på denne enheten.`);
+    return;
+  }
+  if (!previous) {
+    try {
+      const guardError = checkCreationForm(wordSetForm);
+      if (guardError) {
+        showCreationError(wordSetForm, guardError);
+        return;
+      }
+    } catch (error) {
+      showCreationError(
+        wordSetForm,
+        `Kunne ikke kontrollere opprettingsbegrensningen: ${error.message}`,
+      );
+      return;
+    }
+  }
   const now = new Date().toISOString();
-  const previous = wordSets.find((set) => set.id === editorSetId);
   const set = {
     id: previous?.id ?? crypto.randomUUID(),
     name,
@@ -545,6 +609,7 @@ function saveEditor(startAfterSave = false) {
   renderWordSets();
   wordSetForm.hidden = true;
   showSetupError('');
+  showCreationError(wordSetForm, '');
   if (startAfterSave) startWordSet(set);
 }
 
@@ -557,6 +622,20 @@ function changeArchived(set, archived) {
 }
 
 function duplicateWordSet(set) {
+  if (wordSets.length >= MAX_WORD_SETS) {
+    showSetupError(`Du kan ha maksimalt ${MAX_WORD_SETS} ordsett på denne enheten.`);
+    return;
+  }
+  try {
+    const guardError = checkCreationRate();
+    if (guardError) {
+      showSetupError(guardError);
+      return;
+    }
+  } catch (error) {
+    showSetupError(`Kunne ikke kontrollere opprettingsbegrensningen: ${error.message}`);
+    return;
+  }
   const now = new Date().toISOString();
   const copy = {
     ...set,
@@ -624,6 +703,9 @@ profileSelect.addEventListener('change', async () => {
   else renderProfiles();
 });
 newProfileButton.addEventListener('click', () => {
+  profileForm.dataset.openedAt = String(Date.now());
+  profileForm.querySelector('[name="website"]').value = '';
+  showCreationError(profileForm, '');
   profileForm.hidden = false;
   profileNameInput.focus();
 });
@@ -645,6 +727,19 @@ profileForm.addEventListener('submit', async (event) => {
     setAppError('Profilnavnet eller emojien er for lang.');
     return;
   }
+  try {
+    const guardError = checkCreationForm(profileForm);
+    if (guardError) {
+      showCreationError(profileForm, guardError);
+      return;
+    }
+  } catch (error) {
+    showCreationError(
+      profileForm,
+      `Kunne ikke kontrollere opprettingsbegrensningen: ${error.message}`,
+    );
+    return;
+  }
   const profile = { id: crypto.randomUUID(), name, avatar, rewards: createRewards() };
   if (
     await persistProfileState((state) => {
@@ -664,13 +759,15 @@ profileForm.addEventListener('submit', async (event) => {
     profileForm.hidden = true;
     profileNameInput.value = '';
     profileAvatarInput.value = '';
+    showCreationError(profileForm, '');
   }
 });
 
-document.querySelector('#new-set-button').addEventListener('click', () => openEditor());
+newSetButton.addEventListener('click', () => openEditor());
 document.querySelector('#cancel-edit-button').addEventListener('click', () => {
   wordSetForm.hidden = true;
   showSetupError('');
+  showCreationError(wordSetForm, '');
 });
 document.querySelector('#archive-toggle').addEventListener('click', () => {
   showArchived = !showArchived;

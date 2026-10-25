@@ -1,12 +1,17 @@
 import { expect, test } from '@playwright/test';
 
+async function saveAfterMinimumTime(page, name) {
+  await page.waitForTimeout(300);
+  await page.getByRole('button', { name }).click();
+}
+
 async function startSet(page, source = 'hund;dog', direction = 'prompt-to-answer') {
   await page.goto('/');
   await page.getByRole('button', { name: 'Nytt ordsett' }).click();
   await page.getByLabel('Navn på ordsettet').fill('Øveord');
   await page.getByLabel('Hint og svar').fill(source);
   await page.getByLabel('Quizretning').selectOption(direction);
-  await page.getByRole('button', { name: 'Lagre og start øving' }).click();
+  await saveAfterMinimumTime(page, 'Lagre og start øving');
   await expect(page.getByLabel('Stavingen din')).toBeFocused();
 }
 
@@ -122,7 +127,7 @@ test('restores the latest summary for the active profile after revisiting an old
   await page.getByRole('button', { name: 'Lag et nytt ordsett' }).click();
   await page.getByLabel('Navn på ordsettet').fill('Flere ord');
   await page.getByLabel('Hint og svar').fill('katt;cat\nfugl;bird');
-  await page.getByRole('button', { name: 'Lagre og start øving' }).click();
+  await saveAfterMinimumTime(page, 'Lagre og start øving');
   await expect(page.getByLabel('Stavingen din')).toBeFocused();
   const answers = { katt: 'cat', fugl: 'bird' };
   for (let index = 0; index < 2; index += 1) {
@@ -143,7 +148,7 @@ test('restores the latest summary for the active profile after revisiting an old
   await page.getByRole('button', { name: 'Til ordsettene' }).click();
   await page.getByRole('button', { name: 'Legg til profil' }).click();
   await page.getByLabel('Navn', { exact: true }).fill('Ny profil');
-  await page.getByRole('button', { name: 'Lagre profil' }).click();
+  await saveAfterMinimumTime(page, 'Lagre profil');
   await expect(page.getByLabel('Profil').locator('option:checked')).toHaveText('Ny profil');
   await page.reload();
   await expect(page.locator('#complete-view')).toBeHidden();
@@ -187,7 +192,7 @@ test('restarts a summary for its original profile after another tab switches pro
   await otherPage.getByRole('button', { name: 'Til ordsettene' }).click();
   await otherPage.getByRole('button', { name: 'Legg til profil' }).click();
   await otherPage.getByLabel('Navn', { exact: true }).fill('Ny profil');
-  await otherPage.getByRole('button', { name: 'Lagre profil' }).click();
+  await saveAfterMinimumTime(otherPage, 'Lagre profil');
   await expect(otherPage.getByLabel('Profil').locator('option:checked')).toHaveText('Ny profil');
   await otherPage.getByRole('button', { name: 'Start øving' }).click();
   await expect(otherPage.getByLabel('Stavingen din')).toBeFocused();
@@ -260,7 +265,7 @@ test('saves points and combos across reloads, rewards repeats but not correction
   );
   await page.getByRole('button', { name: 'Legg til profil' }).click();
   await page.getByLabel('Navn', { exact: true }).fill('Ny profil');
-  await page.getByRole('button', { name: 'Lagre profil' }).click();
+  await saveAfterMinimumTime(page, 'Lagre profil');
   await expect(page.locator('#profile-rewards')).toHaveText(
     '0 poeng totalt · Beste rekke: 0 · 0 sett fullført',
   );
