@@ -636,6 +636,10 @@ select:focus {
   font-size: 1.2rem;
 }
 
+.complete-view > .eyebrow {
+  color: #7b402e;
+}
+
 .completion-stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
