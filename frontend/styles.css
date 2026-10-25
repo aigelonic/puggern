@@ -442,6 +442,58 @@ select:focus {
   margin: 0.75rem 0 1rem;
   color: #286448;
   line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.points-earned {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border: 1px solid #347457;
+  border-radius: 1rem;
+  background: #e0edcf;
+  color: #263a32;
+  font-weight: 700;
+}
+
+.correction-support {
+  color: #7b402e;
+  font-weight: 700;
+  padding-bottom: 0.5rem;
+}
+
+[data-effect='correct'] {
+  animation: answer-reward 600ms ease-out;
+}
+
+[data-effect='learned'] {
+  animation: progress-reward 600ms ease-out;
+}
+
+[data-effect='incorrect'] {
+  animation: correction-cue 600ms ease-out;
+}
+
+@keyframes answer-reward {
+  from {
+    transform: translateY(0.2rem);
+    background: #e0edcf;
+  }
+  to {
+    transform: translateY(0);
+    background: transparent;
+  }
+}
+
+@keyframes progress-reward {
+  50% {
+    box-shadow: 0 0 0 4px #34745740;
+  }
+}
+
+@keyframes correction-cue {
+  50% {
+    box-shadow: 0 0 0 3px #b4533d30;
+  }
 }
 
 .feedback.error {
@@ -517,21 +569,43 @@ select:focus {
 }
 
 .celebration {
-  width: fit-content;
+  position: relative;
+  width: 100%;
+  height: 4rem;
   margin: 0 auto 1.5rem;
   font-size: 2.5rem;
-  animation: celebrate 900ms ease-out;
+  text-align: center;
+  pointer-events: none;
 }
 
-@keyframes celebrate {
-  from {
-    transform: translateY(1rem) scale(0.7);
-  }
-  60% {
-    transform: translateY(-0.5rem) scale(1.1);
-  }
+.confetti {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.confetti i {
+  position: absolute;
+  top: -0.8rem;
+  left: var(--x);
+  width: 0.45rem;
+  height: 0.7rem;
+  background: #286448;
+  animation: confetti-fall 1300ms var(--delay) ease-out both;
+}
+
+.confetti i:nth-child(3n) {
+  background: #b4533d;
+}
+
+.confetti i:nth-child(3n + 1) {
+  background: #c39316;
+  border-radius: 50%;
+}
+
+@keyframes confetti-fall {
   to {
-    transform: translateY(0) scale(1);
+    transform: translateY(5rem) rotate(var(--turn));
   }
 }
 
@@ -661,7 +735,12 @@ select:focus {
     scroll-behavior: auto !important;
   }
 
-  .celebration {
+  [data-effect],
+  .confetti i {
     animation: none;
+  }
+
+  .confetti {
+    display: none;
   }
 }
