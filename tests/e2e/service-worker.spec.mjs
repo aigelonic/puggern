@@ -23,9 +23,11 @@ test('replaces an installed v8 shell with bad module MIME types and works offlin
         body = Buffer.from(
           body
             .toString()
-            .replaceAll('puggern-app-shell-v10', 'puggern-app-shell-v8')
-            .replaceAll('styles.css?v=8', 'styles.css?v=7')
-            .replaceAll('main.mjs?v=9', 'main.mjs?v=8')
+            .replaceAll('puggern-app-shell-v11', 'puggern-app-shell-v8')
+            .replaceAll('styles.css?v=9', 'styles.css?v=7')
+            .replaceAll('main.mjs?v=10', 'main.mjs?v=8')
+            .replaceAll('word-sets.mjs?v=7', 'word-sets.mjs?v=5')
+            .replaceAll('creation-guard.mjs?v=3', 'creation-guard.mjs?v=2')
             .replaceAll('.mjs?v=6', '.mjs?v=5')
             .replaceAll('#46574e', '#64766d'),
         );
@@ -98,9 +100,9 @@ test('replaces an installed v8 shell with bad module MIME types and works offlin
       await registration.update();
       await changed;
     });
-    await expect.poll(() => page.evaluate(() => caches.keys())).toEqual(['puggern-app-shell-v10']);
+    await expect.poll(() => page.evaluate(() => caches.keys())).toEqual(['puggern-app-shell-v11']);
     const cachedModules = await page.evaluate(async () => {
-      const cache = await caches.open('puggern-app-shell-v10');
+      const cache = await caches.open('puggern-app-shell-v11');
       const requests = (await cache.keys()).filter((request) =>
         new URL(request.url).pathname.endsWith('.mjs'),
       );
@@ -108,18 +110,18 @@ test('replaces an installed v8 shell with bad module MIME types and works offlin
         requests.map(async (request) => (await cache.match(request)).headers.get('content-type')),
       );
     });
-    expect(cachedModules).toHaveLength(4);
+    expect(cachedModules).toHaveLength(5);
     for (const type of cachedModules) expect(type).toMatch(/^(?:application|text)\/javascript\b/);
     expect(
       await page.evaluate(async () => {
-        const cache = await caches.open('puggern-app-shell-v10');
+        const cache = await caches.open('puggern-app-shell-v11');
         return (await cache.match('./index.html')).text();
       }),
-    ).toContain('./src/main.mjs?v=9');
+    ).toContain('./src/main.mjs?v=10');
     expect(
       await page.evaluate(async () => {
-        const cache = await caches.open('puggern-app-shell-v10');
-        return (await cache.match('./styles.css?v=8')).text();
+        const cache = await caches.open('puggern-app-shell-v11');
+        return (await cache.match('./styles.css?v=9')).text();
       }),
     ).toContain('#46574e');
 
@@ -127,6 +129,7 @@ test('replaces an installed v8 shell with bad module MIME types and works offlin
     await page.getByRole('button', { name: 'Legg til profil' }).click();
     await expect(page.locator('#profile-name')).toBeFocused();
     await page.locator('#profile-name').fill('Ada');
+    await page.waitForTimeout(300);
     await page.getByRole('button', { name: 'Lagre profil' }).click();
     await expect(page.locator('#profile-select option:checked')).toHaveText('Ada');
     await context.setOffline(true);

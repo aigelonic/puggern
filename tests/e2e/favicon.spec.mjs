@@ -44,7 +44,9 @@ test('keeps the favicon declaration and PNG available after an offline reload', 
   });
 
   const cachedIcon = await page.evaluate(async () => {
-    const cache = await caches.open('puggern-app-shell-v10');
+    const cacheName = (await caches.keys()).find((key) => key.startsWith('puggern-app-shell-'));
+    if (!cacheName) return 0;
+    const cache = await caches.open(cacheName);
     const response = await cache.match('./icons/pug-192.png');
     return response ? (await response.arrayBuffer()).byteLength : 0;
   });

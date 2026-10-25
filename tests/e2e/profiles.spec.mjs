@@ -56,6 +56,7 @@ for (const returning of [false, true]) {
         await page.getByRole('button', { name: 'Nytt ordsett' }).click();
         await page.getByLabel('Navn på ordsettet').fill('Frukt');
         await page.getByLabel('Hint og svar').fill('En rød frukt\teple\nEn gul frukt\tbanan');
+        await page.waitForTimeout(300);
         await page.getByRole('button', { name: 'Lagre og start øving' }).click();
         await expect(page.locator('#prompt')).toBeVisible();
         const prompt = await page.locator('#prompt').textContent();
@@ -90,6 +91,7 @@ for (const returning of [false, true]) {
       await expect(name).toBeFocused();
       await name.fill('Ada');
       await emoji.fill(avatar);
+      await page.waitForTimeout(300);
       await page.getByRole('button', { name: 'Lagre profil' }).click();
       await expect(form).toBeHidden();
       await expect(page.locator('#profile-select')).toBeFocused();
@@ -148,6 +150,7 @@ test('shows validation and storage errors without adding a profile', async ({ pa
     };
   });
   await page.locator('#profile-name').fill('Ada');
+  await page.waitForTimeout(300);
   await page.getByRole('button', { name: 'Lagre profil' }).click();
   await expect(page.locator('#app-error')).toContainText('Kunne ikke lagre profilen:');
   await expect(page.locator('#profile-form')).toBeVisible();
@@ -183,6 +186,7 @@ test('enforces ten profiles even when another tab fills the last slot while the 
     localStorage.setItem('puggern.profile-state', JSON.stringify(state));
   });
   const before = await savedData(page);
+  await page.waitForTimeout(300);
   await page.getByRole('button', { name: 'Lagre profil' }).click();
   await expect(page.locator('#app-error')).toContainText('maksimalt 10 profiler');
   expect(await savedData(page)).toEqual(before);

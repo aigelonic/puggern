@@ -26,6 +26,20 @@ optional emoji, and practice rewards.
 
 The current profile, progress, and word-set storage formats are version 1;
 corrupt or unsupported saved data is ignored rather than resumed or displayed.
+The app allows up to 10 profiles, 50 word sets per browser, 100 entries per
+set, and 200 characters per clue or answer. Creating profiles or sets is
+limited to five attempts per ten minutes in this browser, with a hidden
+honeypot and a 250-millisecond minimum form time. Practice and progress saving do
+not show a challenge or use this creation limit.
+
+These are client-side safeguards, not server-enforced abuse controls: browser
+storage and JavaScript can be changed by the device owner. The app has no
+account, shared-set endpoint, or server-side user data to expire; all user
+content stays local and is not publicly listed. The app is marked `noindex`
+and disallowed in `robots.txt`. NGINX logs requests, but spike alerting and
+per-IP write throttling require a backend/hosting layer and are not available
+for localStorage writes. No third-party challenge is used because the static
+app has no server to validate one and must remain usable offline.
 
 Finishing practice opens a summary with learned practice entries, first-try
 correct entries, and incorrect-answer counts for entries needing more practice.
