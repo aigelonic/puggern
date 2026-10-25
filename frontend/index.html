@@ -8,7 +8,7 @@
     <meta name="robots" content="noindex, nofollow, noarchive" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" type="image/png" sizes="192x192" href="./icons/pug-192.png" />
-    <link rel="stylesheet" href="./styles.css?v=9" />
+    <link rel="stylesheet" href="./styles.css?v=10" />
     <title>Puggern</title>
   </head>
   <body>
@@ -153,6 +153,33 @@
         </form>
       </section>
 
+      <dialog
+        id="exercise-config-dialog"
+        class="exercise-config-dialog"
+        aria-labelledby="exercise-config-title"
+      >
+        <form id="exercise-config-form">
+          <h2 id="exercise-config-title">Start øving</h2>
+          <label for="exercise-direction">Retning</label>
+          <select id="exercise-direction" autofocus>
+            <option value="forward">Forover (norsk → målspråk)</option>
+            <option value="reverse">Bakover (målspråk → norsk)</option>
+            <option value="mixed">Blandet</option>
+          </select>
+          <label for="exercise-order">Rekkefølge</label>
+          <select id="exercise-order">
+            <option value="shuffled">Tilfeldig rekkefølge</option>
+            <option value="original">Opprinnelig rekkefølge</option>
+          </select>
+          <div class="actions">
+            <button id="cancel-exercise-setup" class="button secondary" type="button">
+              Avbryt
+            </button>
+            <button class="button primary" type="submit">Start øving</button>
+          </div>
+        </form>
+      </dialog>
+
       <section id="practice-view" class="view practice-view" hidden>
         <div class="practice-topline">
           <button id="back-button" class="text-button" type="button">&#8592; Ordsett</button>
@@ -224,6 +251,6 @@
         </div>
       </section>
     </main>
-    <script type="module" src="./src/main.mjs?v=10"></script>
+    <script type="module" src="./src/main.mjs?v=12"></script>
   </body>
 </html>

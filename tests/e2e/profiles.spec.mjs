@@ -58,6 +58,7 @@ for (const returning of [false, true]) {
         await page.getByLabel('Hint og svar').fill('En rød frukt\teple\nEn gul frukt\tbanan');
         await page.waitForTimeout(300);
         await page.getByRole('button', { name: 'Lagre og start øving' }).click();
+        await page.getByRole('dialog').getByRole('button', { name: 'Start øving' }).click();
         await expect(page.locator('#prompt')).toBeVisible();
         const prompt = await page.locator('#prompt').textContent();
         await page.getByLabel('Stavingen din').fill(prompt === 'En rød frukt' ? 'eple' : 'banan');

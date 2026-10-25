@@ -170,6 +170,39 @@ select:focus {
   margin: 1.1rem 0 1.4rem;
 }
 
+.exercise-config-dialog {
+  width: min(100% - 2rem, 34rem);
+  max-width: calc(100% - 2rem);
+  padding: 1.5rem;
+  border: 1px solid #aeb8a9;
+  border-radius: 8px;
+  background: #fffefa;
+  color: #263a32;
+}
+
+.exercise-config-dialog::backdrop {
+  background: #263a3280;
+}
+
+.exercise-config-dialog h2 {
+  margin: 0 0 1.25rem;
+}
+
+.exercise-config-dialog label {
+  display: block;
+  margin: 0 0 0.55rem;
+  font-weight: 700;
+}
+
+.exercise-config-dialog select + label {
+  margin-top: 1.1rem;
+}
+
+.exercise-config-dialog .actions {
+  justify-content: flex-end;
+  margin-top: 1.5rem;
+}
+
 .saved-sets-heading,
 .editor-heading {
   display: flex;
