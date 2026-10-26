@@ -34,9 +34,12 @@ test('shows prominent correction feedback and practices a missed word until it i
     'Riktig stavemåte er eple. Skriv riktig svar for å gå videre.',
   );
   await expect(page.locator('#correction-announcement')).toHaveAttribute('aria-live', 'polite');
-  await expect(page.locator('#answer')).toHaveAttribute('aria-describedby', 'correction-feedback');
+  await expect(page.locator('#answer')).toHaveAttribute(
+    'aria-describedby',
+    'hint-language answer-language-instruction correction-feedback',
+  );
   await expect(page.locator('#answer')).toHaveAccessibleDescription(
-    'Ikke helt ennå – prøv igjen! Riktig stavemåte eple Skriv riktig svar for å gå videre.',
+    'Hint fra første kolonne Svar fra andre kolonne Ikke helt ennå – prøv igjen! Riktig stavemåte eple Skriv riktig svar for å gå videre.',
   );
   await expect(page.locator('#answer')).toBeFocused();
   await expect(correction).toBeInViewport();
@@ -69,6 +72,7 @@ test('shows prominent correction feedback and practices a missed word until it i
       session: Object.values(state.progress[profile.id])[0].session,
     };
   });
+
   expect(saved.rewards).toEqual({ points: 10, bestStreak: 1, completedSets: 1 });
   expect(saved.session).toMatchObject({ queue: [], learned: ['0'], mistakes: { 0: 2 } });
   await page.reload();
@@ -77,6 +81,166 @@ test('shows prominent correction feedback and practices a missed word until it i
   await expect(page.locator('#profile-rewards')).toHaveText(
     '10 poeng totalt · Beste rekke: 1 · 1 sett fullført',
   );
+});
+
+test('keeps mixed-direction language context through correction, reload, and restart', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Math.random = () => 0;
+  });
+  await page.goto('/');
+  await page.setViewportSize({ width: 320, height: 700 });
+  await page.getByRole('button', { name: 'Nytt ordsett' }).click();
+  await page.getByLabel('Navn på ordsettet').fill('Språkpar');
+  await page.getByLabel('Språk for hint (valgfritt)').fill('Norsk');
+  await page.getByLabel('Språk for svar (valgfritt)').fill('Engelsk');
+  await page.getByLabel('Hint og svar').fill('hund\tdog\nkatt\tcat');
+  await page.waitForTimeout(300);
+  await page.getByRole('button', { name: 'Lagre og start øving' }).click();
+  const config = page.getByRole('dialog');
+  await config.locator('#exercise-direction').selectOption('mixed');
+  await config.locator('#exercise-order').selectOption('original');
+  await config.getByRole('button', { name: 'Start øving' }).click();
+
+  await expect(page.locator('#prompt')).toHaveText('hund');
+  await expect(page.locator('#hint-language')).toHaveText('Hint på Norsk');
+  await expect(page.locator('#answer-language-instruction')).toHaveText('Skriv på Engelsk');
+  await expect(page.locator('#language-context-announcement')).toBeEmpty();
+  await expect(page.locator('#answer')).toHaveAttribute(
+    'aria-describedby',
+    'hint-language answer-language-instruction',
+  );
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
+    .toBe(true);
+
+  await page.getByLabel('Stavingen din').fill('wrong');
+  await page.getByLabel('Stavingen din').press('Enter');
+  await expect(page.locator('#correction-feedback')).toBeVisible();
+  await expect(page.locator('#language-context-announcement')).toBeEmpty();
+  await expect(page.locator('#answer')).toHaveAttribute(
+    'aria-describedby',
+    'hint-language answer-language-instruction correction-feedback',
+  );
+  await page.reload();
+  await page.getByRole('button', { name: 'Fortsett øvingen' }).click();
+  await expect(page.locator('#hint-language')).toHaveText('Hint på Norsk');
+  await expect(page.locator('#answer-language-instruction')).toHaveText('Skriv på Engelsk');
+  await expect(page.locator('#correction-feedback')).toBeVisible();
+
+  await page.getByLabel('Skriv riktig svar').fill('dog');
+  await page.getByLabel('Skriv riktig svar').press('Enter');
+  await expect(page.locator('#prompt')).toHaveText('cat');
+  await expect(page.locator('#hint-language')).toHaveText('Hint på Engelsk');
+  await expect(page.locator('#answer-language-instruction')).toHaveText('Skriv på Norsk');
+  await expect(page.locator('#language-context-announcement')).toHaveText(
+    'Hint på Engelsk. Skriv på Norsk',
+  );
+  await page.getByLabel('Stavingen din').fill('katt');
+  await page.getByLabel('Stavingen din').press('Enter');
+  await expect(page.getByRole('heading', { name: 'Godt jobbet!' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Øv på samme sett igjen' }).click();
+  await expect(page.locator('#hint-language')).toHaveText('Hint på Norsk');
+  await expect(page.locator('#answer-language-instruction')).toHaveText('Skriv på Engelsk');
+});
+
+test('announces same language context for new cards but not correction renders', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Nytt ordsett' }).click();
+  await page.getByLabel('Navn på ordsettet').fill('Dyr');
+  await page.getByLabel('Språk for hint (valgfritt)').fill('Norsk');
+  await page.getByLabel('Språk for svar (valgfritt)').fill('Engelsk');
+  await page.getByLabel('Hint og svar').fill('hund\tdog\nkatt\tcat\nfugl\tbird');
+  await page.waitForTimeout(300);
+  await page.getByRole('button', { name: 'Lagre og start øving' }).click();
+  const config = page.getByRole('dialog');
+  await config.locator('#exercise-direction').selectOption('forward');
+  await config.locator('#exercise-order').selectOption('original');
+  await config.getByRole('button', { name: 'Start øving' }).click();
+
+  await page.evaluate(() => {
+    const announcement = document.querySelector('#language-context-announcement');
+    window.languageContextMutationCount = 0;
+    window.languageContextObserver = new MutationObserver((mutations) => {
+      window.languageContextMutationCount += mutations.length;
+    });
+    window.languageContextObserver.observe(announcement, {
+      childList: true,
+      characterData: true,
+      subtree: true,
+    });
+  });
+  await page.getByLabel('Stavingen din').fill('dog');
+  await page.getByLabel('Stavingen din').press('Enter');
+  await expect(page.locator('#prompt')).toHaveText('katt');
+  const announcement = page.locator('#language-context-announcement');
+  await expect(announcement).toHaveText('Hint på Norsk. Skriv på Engelsk');
+  await expect
+    .poll(() => page.evaluate(() => window.languageContextMutationCount))
+    .toBeGreaterThan(0);
+  const announcedMutationCount = await page.evaluate(() => window.languageContextMutationCount);
+
+  await page.getByLabel('Stavingen din').fill('wrong');
+  await page.getByLabel('Stavingen din').press('Enter');
+  await expect(page.locator('#correction-feedback')).toBeVisible();
+  await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 0)));
+  await expect
+    .poll(() => page.evaluate(() => window.languageContextMutationCount))
+    .toBe(announcedMutationCount);
+
+  await page.getByLabel('Skriv riktig svar').fill('cat');
+  await page.getByLabel('Skriv riktig svar').press('Enter');
+  await expect(page.locator('#prompt')).toHaveText('fugl');
+  await expect(announcement).toHaveText('Hint på Norsk. Skriv på Engelsk');
+  await expect
+    .poll(() => page.evaluate(() => window.languageContextMutationCount))
+    .toBeGreaterThan(announcedMutationCount);
+});
+
+test('does not guess the direction of ambiguous legacy cards', async ({ page }) => {
+  await page.addInitScript(() => {
+    Math.random = () => 0;
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Nytt ordsett' }).click();
+  await page.getByLabel('Navn på ordsettet').fill('Tvetydig');
+  await page.getByLabel('Hint og svar').fill('samme\tsamme');
+  await page.waitForTimeout(300);
+  await page.getByRole('button', { name: 'Lagre og start øving' }).click();
+  const config = page.getByRole('dialog');
+  await config.locator('#exercise-direction').selectOption('mixed');
+  await config.locator('#exercise-order').selectOption('original');
+  await config.getByRole('button', { name: 'Start øving' }).click();
+
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const state = JSON.parse(localStorage.getItem('puggern.profile-state'));
+        const [set] = JSON.parse(localStorage.getItem('puggern.word-sets')).sets;
+        return Boolean(state.progress[state.activeProfileId][set.id]);
+      }),
+    )
+    .toBe(true);
+  await page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem('puggern.profile-state'));
+    const progress =
+      state.progress[state.activeProfileId][
+        JSON.parse(localStorage.getItem('puggern.word-sets')).sets[0].id
+      ];
+    delete progress.words[0].sourceDirection;
+    delete progress.words[0].hintLanguageLabel;
+    delete progress.words[0].answerLanguageInstruction;
+    localStorage.setItem('puggern.profile-state', JSON.stringify(state));
+  });
+  await page.reload();
+  await page.getByRole('button', { name: 'Fortsett øvingen' }).click();
+  await expect(page.locator('#hint-language')).toHaveText('Språk ikke angitt');
+  await expect(page.locator('#answer-language-instruction')).toHaveText('Svar på oversettelsen');
+  await expect(page.locator('#progress-label')).toHaveText('0 av 1 lært · 1 oppgaver igjen');
 });
 
 test('leaving practice during delayed saving does not reopen correction or replay effects', async ({
@@ -247,9 +411,12 @@ test('reloads and resumes a saved session during its correction step', async ({ 
     'Rettelsen vises ved svarfeltet.',
   );
   await expect(page.locator('#correction-announcement')).toHaveAttribute('aria-live', 'polite');
-  await expect(page.locator('#answer')).toHaveAttribute('aria-describedby', 'correction-feedback');
+  await expect(page.locator('#answer')).toHaveAttribute(
+    'aria-describedby',
+    'hint-language answer-language-instruction correction-feedback',
+  );
   await expect(page.locator('#answer')).toHaveAccessibleDescription(
-    'Ikke helt ennå – prøv igjen! Riktig stavemåte eple Skriv riktig svar for å gå videre.',
+    'Hint fra første kolonne Svar fra andre kolonne Ikke helt ennå – prøv igjen! Riktig stavemåte eple Skriv riktig svar for å gå videre.',
   );
   await expect(page.locator('#answer')).toBeFocused();
 
@@ -260,7 +427,7 @@ test('reloads and resumes a saved session during its correction step', async ({ 
     'Rettelsen vises ved svarfeltet.',
   );
   await expect(page.locator('#answer')).toHaveAccessibleDescription(
-    'Ikke helt ennå – prøv igjen! Riktig stavemåte eple Skriv riktig svar for å gå videre.',
+    'Hint fra første kolonne Svar fra andre kolonne Ikke helt ennå – prøv igjen! Riktig stavemåte eple Skriv riktig svar for å gå videre.',
   );
 
   await page.getByLabel('Skriv riktig svar').fill('eple');

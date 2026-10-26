@@ -1,4 +1,4 @@
-import { MAX_WORDS_PER_SET, MAX_WORD_LENGTH } from './learning.mjs?v=8';
+import { MAX_LANGUAGE_NAME_LENGTH, MAX_WORDS_PER_SET, MAX_WORD_LENGTH } from './learning.mjs?v=9';
 
 export const WORD_SETS_KEY = 'puggern.word-sets';
 export const WORD_SETS_VERSION = 1;
@@ -33,7 +33,12 @@ function isValidWordSet(set) {
     typeof set.settings?.accentSensitive === 'boolean' &&
     typeof set.archived === 'boolean' &&
     typeof set.createdAt === 'string' &&
-    typeof set.updatedAt === 'string'
+    typeof set.updatedAt === 'string' &&
+    ['promptLanguage', 'answerLanguage'].every(
+      (key) =>
+        set[key] === undefined ||
+        (typeof set[key] === 'string' && set[key].length <= MAX_LANGUAGE_NAME_LENGTH),
+    )
   );
 }
 
@@ -51,7 +56,17 @@ export function loadWordSets(storage) {
     ) {
       return [];
     }
-    return data.sets;
+    return data.sets.map((set) => {
+      const normalized = { ...set };
+      for (const key of ['promptLanguage', 'answerLanguage']) {
+        if (typeof normalized[key] === 'string') {
+          const language = normalized[key].trim();
+          if (language) normalized[key] = language;
+          else delete normalized[key];
+        }
+      }
+      return normalized;
+    });
   } catch {
     return [];
   }

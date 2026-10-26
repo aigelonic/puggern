@@ -1,5 +1,5 @@
-import { MAX_WORD_LENGTH, MAX_WORDS_PER_SET } from './learning.mjs?v=8';
-import { MAX_WORD_SET_NAME_LENGTH } from './word-sets.mjs?v=9';
+import { MAX_LANGUAGE_NAME_LENGTH, MAX_WORD_LENGTH, MAX_WORDS_PER_SET } from './learning.mjs?v=9';
+import { MAX_WORD_SET_NAME_LENGTH } from './word-sets.mjs?v=10';
 
 export const SHARE_PARAM = 'share';
 export const MAX_SHARE_URL_LENGTH = 8000;
@@ -45,10 +45,23 @@ function normalizeSet(set) {
   ) {
     throw new Error('Ordsettet må ha gyldige innstillinger for store bokstaver og aksenter.');
   }
+  const languages = {};
+  for (const [key, label] of [
+    ['promptLanguage', 'Språket for hint'],
+    ['answerLanguage', 'Språket for svar'],
+  ]) {
+    if (set[key] === undefined) continue;
+    if (typeof set[key] !== 'string' || set[key].length > MAX_LANGUAGE_NAME_LENGTH) {
+      throw new Error(`${label} må være tekst på maksimalt ${MAX_LANGUAGE_NAME_LENGTH} tegn.`);
+    }
+    const language = set[key].trim();
+    if (language) languages[key] = language;
+  }
   return {
     name,
     words,
     direction: set.direction,
+    ...languages,
     settings: {
       caseSensitive: set.settings.caseSensitive,
       accentSensitive: set.settings.accentSensitive,

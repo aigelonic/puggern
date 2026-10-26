@@ -42,6 +42,44 @@ test('saves independent per-word-set progress for multiple profiles', () => {
   assert.equal(JSON.parse(storage.values.get(PROFILE_STATE_KEY)).version, PROFILE_STATE_VERSION);
 });
 
+test('persists language snapshots and continues accepting legacy cards without metadata', () => {
+  const storage = makeStorage();
+  const state = createProfileState('profile-1');
+  const baseWords = parseWordSet('A\tone');
+  const progress = {
+    version: PROGRESS_VERSION,
+    words: [
+      {
+        ...baseWords[0],
+        sourceDirection: 'reverse',
+        hintLanguageLabel: 'Hint på Engelsk',
+        answerLanguageInstruction: 'Skriv på Norsk',
+      },
+    ],
+    session: createSession(baseWords, () => 0.5),
+  };
+  state.progress['profile-1']['set-1'] = progress;
+  saveProfileState(storage, state);
+  assert.deepEqual(loadProfileState(storage).progress['profile-1']['set-1'], progress);
+
+  state.progress['profile-1']['set-1'] = {
+    ...progress,
+    words: baseWords,
+  };
+  saveProfileState(storage, state);
+  assert.deepEqual(loadProfileState(storage).progress['profile-1']['set-1'].words, baseWords);
+
+  for (const invalidWord of [
+    { ...progress.words[0], sourceDirection: 'sideways' },
+    { ...progress.words[0], hintLanguageLabel: 2 },
+    { ...progress.words[0], answerLanguageInstruction: 'x'.repeat(83) },
+  ]) {
+    state.progress['profile-1']['set-1'] = { ...progress, words: [invalidWord] };
+    saveProfileState(storage, state);
+    assert.equal(loadProfileState(storage), null);
+  }
+});
+
 test('ignores corrupt, unsupported, or invalid profile state', () => {
   const storage = makeStorage();
   storage.values.set(PROFILE_STATE_KEY, '{');

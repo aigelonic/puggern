@@ -2,6 +2,7 @@ export const PROGRESS_VERSION = 1;
 export const PROGRESS_KEY = 'puggern.progress';
 export const MAX_WORDS_PER_SET = 100;
 export const MAX_WORD_LENGTH = 200;
+export const MAX_LANGUAGE_NAME_LENGTH = 50;
 export const POINTS_PER_CORRECT_ANSWER = 10;
 
 export function previewWordSet(source) {
@@ -60,15 +61,20 @@ export function parseWordSet(source) {
 
 export function wordsForDirection(words, direction = 'prompt-to-answer') {
   if (direction === 'prompt-to-answer') {
-    return words.map((word) => ({ ...word }));
+    return words.map((word) => ({ ...word, sourceDirection: 'forward' }));
   }
   if (direction === 'answer-to-prompt') {
-    return words.map(({ id, prompt, answer }) => ({ id, prompt: answer, answer: prompt }));
+    return words.map(({ id, prompt, answer }) => ({
+      id,
+      prompt: answer,
+      answer: prompt,
+      sourceDirection: 'reverse',
+    }));
   }
   if (direction === 'both') {
     return words.flatMap(({ id, prompt, answer }) => [
-      { id: `${id}:forward`, prompt, answer },
-      { id: `${id}:reverse`, prompt: answer, answer: prompt },
+      { id: `${id}:forward`, prompt, answer, sourceDirection: 'forward' },
+      { id: `${id}:reverse`, prompt: answer, answer: prompt, sourceDirection: 'reverse' },
     ]);
   }
   throw new TypeError('Velg en gyldig quizretning.');
@@ -111,6 +117,7 @@ export function wordsForExercise(words, directionMode, random = Math.random) {
     id,
     prompt: directions[index] === 'forward' ? prompt : answer,
     answer: directions[index] === 'forward' ? answer : prompt,
+    sourceDirection: directions[index],
   }));
 }
 
@@ -248,7 +255,14 @@ export function isValidProgress(progress) {
         word.prompt.length <= MAX_WORD_LENGTH &&
         typeof word.answer === 'string' &&
         word.answer.length > 0 &&
-        word.answer.length <= MAX_WORD_LENGTH,
+        word.answer.length <= MAX_WORD_LENGTH &&
+        (word.sourceDirection === undefined ||
+          ['forward', 'reverse'].includes(word.sourceDirection)) &&
+        ['hintLanguageLabel', 'answerLanguageInstruction'].every(
+          (key) =>
+            word[key] === undefined ||
+            (typeof word[key] === 'string' && word[key].length <= MAX_LANGUAGE_NAME_LENGTH + 32),
+        ),
     ) &&
     progress.session &&
     ['points', 'streak', 'bestStreak'].every(

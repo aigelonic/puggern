@@ -696,8 +696,35 @@ select:focus {
 
 .practice-view h1 {
   min-height: 1.1em;
-  margin-bottom: 2.2rem;
+  margin-bottom: 1.5rem;
   font-size: 3.5rem;
+  overflow-wrap: anywhere;
+}
+
+.language-badge {
+  display: table;
+  max-width: 100%;
+  margin: 1.25rem 0 0.35rem;
+  padding: 0.35rem 0.65rem;
+  border: 1px solid #8a9a8d;
+  border-radius: 999px;
+  background: #fffefa;
+  color: #263a32;
+  font-family: 'Trebuchet MS', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.answer-language-instruction {
+  margin: 0.35rem 0 0.75rem;
+  color: #40574c;
+  font-family: 'Trebuchet MS', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .practice-view .button {
@@ -819,5 +846,13 @@ select:focus {
 
   .confetti {
     display: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .language-badge {
+    border-color: CanvasText;
+    background: Canvas;
+    color: CanvasText;
   }
 }

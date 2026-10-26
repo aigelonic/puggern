@@ -8,7 +8,7 @@
     <meta name="robots" content="noindex, nofollow, noarchive" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" type="image/png" sizes="192x192" href="./icons/pug-192.png" />
-    <link rel="stylesheet" href="./styles.css?v=11" />
+    <link rel="stylesheet" href="./styles.css?v=12" />
     <title>Puggern</title>
   </head>
   <body>
@@ -25,6 +25,13 @@
       </button>
       <p
         id="correction-announcement"
+        class="visually-hidden"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      ></p>
+      <p
+        id="language-context-announcement"
         class="visually-hidden"
         role="status"
         aria-live="polite"
@@ -124,6 +131,26 @@
           </div>
           <label for="word-set-name">Navn på ordsettet</label>
           <input id="word-set-name" type="text" maxlength="80" required autocomplete="off" />
+          <label for="prompt-language">Språk for hint (valgfritt)</label>
+          <input
+            id="prompt-language"
+            type="text"
+            maxlength="50"
+            autocomplete="off"
+            aria-describedby="language-help"
+          />
+          <label for="answer-language">Språk for svar (valgfritt)</label>
+          <input
+            id="answer-language"
+            type="text"
+            maxlength="50"
+            autocomplete="off"
+            aria-describedby="language-help"
+          />
+          <p id="language-help" class="field-help">
+            Oppgi språket i hver kolonne, for eksempel Norsk og Engelsk. Dette følger kolonnene slik
+            de er skrevet inn, også når øvingen snur retningen.
+          </p>
           <label for="word-set">Hint og svar</label>
           <textarea
             id="word-set"
@@ -272,9 +299,11 @@
         ></progress>
         <p id="practice-rewards" class="reward-summary" role="status" aria-live="polite"></p>
         <p class="eyebrow">Stav svaret</p>
+        <p id="hint-language" class="language-badge"></p>
         <h1 id="prompt"></h1>
         <form id="answer-form">
           <label id="answer-label" for="answer">Stavingen din</label>
+          <p id="answer-language-instruction" class="answer-language-instruction"></p>
           <div id="correction-feedback" class="correction-feedback" hidden>
             <p class="correction-support">
               <span aria-hidden="true">↻</span> Ikke helt ennå – prøv igjen!
@@ -363,6 +392,6 @@
         <button class="button primary" value="update">Forkast inntasting og oppdater</button>
       </form>
     </dialog>
-    <script type="module" src="./src/main.mjs?v=14"></script>
+    <script type="module" src="./src/main.mjs?v=15"></script>
   </body>
 </html>
