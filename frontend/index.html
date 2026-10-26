@@ -20,6 +20,9 @@
         </a>
         <p id="connection-status" role="status" aria-live="polite"></p>
       </header>
+      <button id="sound-toggle" class="button secondary" type="button" aria-pressed="false">
+        Lydeffekter: av
+      </button>
       <p
         id="correction-announcement"
         class="visually-hidden"
@@ -273,6 +276,9 @@
         <form id="answer-form">
           <label id="answer-label" for="answer">Stavingen din</label>
           <div id="correction-feedback" class="correction-feedback" hidden>
+            <p class="correction-support">
+              <span aria-hidden="true">↻</span> Ikke helt ennå – prøv igjen!
+            </p>
             <p id="correction-label" class="correction-label">Riktig stavemåte</p>
             <p id="correct-answer" class="correct-answer"></p>
             <p id="correction-instruction" class="correction-instruction"></p>
@@ -294,7 +300,7 @@
 
       <section id="complete-view" class="view complete-view" hidden>
         <div class="celebration" aria-hidden="true">🎉 ⭐ 🎉</div>
-        <p class="eyebrow">Øving fullført</p>
+        <p class="eyebrow">Hurra! Du fullførte øvingen!</p>
         <h1 id="completion-heading" tabindex="-1">Godt jobbet!</h1>
         <p id="completion-rewards" class="reward-summary"></p>
         <p id="completion-message" class="intro"></p>

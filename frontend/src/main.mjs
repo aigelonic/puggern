@@ -34,6 +34,7 @@ import {
   createShareUrl,
   parseShareUrl,
 } from './share-word-set.mjs?v=1';
+import { answerFeedback, createPracticeEffects } from './practice-feedback.mjs?v=1';
 
 const status = document.querySelector('#connection-status');
 const appError = document.querySelector('#app-error');
@@ -82,6 +83,14 @@ const importSaveButton = document.querySelector('#import-save-button');
 const importPreview = document.querySelector('#import-preview');
 const importError = document.querySelector('#import-error');
 importLinkInput.maxLength = MAX_SHARE_URL_LENGTH;
+const effects = createPracticeEffects({
+  feedback,
+  correction: correctionFeedback,
+  progress: document.querySelector('#practice-progress'),
+  celebration: document.querySelector('.celebration'),
+  soundToggle: document.querySelector('#sound-toggle'),
+});
+let viewRevision = 0;
 let wordSets = loadWordSets(window.localStorage);
 let profileState = loadProfileState(window.localStorage);
 let showArchived = false;
@@ -201,6 +210,8 @@ function updateConnectionStatus() {
 }
 
 function showView(view) {
+  effects.cancel();
+  viewRevision += 1;
   setupView.hidden = view !== setupView;
   practiceView.hidden = view !== practiceView;
   completeView.hidden = view !== completeView;
@@ -295,6 +306,8 @@ async function startSession(
   setId,
   profileId = profileState.activeProfileId,
 ) {
+  effects.cancel();
+  viewRevision += 1;
   words = nextWords;
   session = nextSession;
   currentSetId = setId;
@@ -342,7 +355,7 @@ function wordSetProgress(setId) {
   return activeProfileProgress()[setId];
 }
 
-function renderPractice(message = '', { announceCorrection = false } = {}) {
+function renderPractice(message = '', { announceCorrection = false, points = 0, icon = '✓' } = {}) {
   const word = currentWord(session, words);
   if (!word) {
     finishSession();
@@ -365,6 +378,18 @@ function renderPractice(message = '', { announceCorrection = false } = {}) {
     ? 'Skriv ordet én gang, så kommer det tilbake senere.'
     : '';
   feedback.textContent = isCorrection ? '' : message;
+  if (!isCorrection && message) {
+    const marker = document.createElement('span');
+    marker.setAttribute('aria-hidden', 'true');
+    marker.textContent = `${icon} `;
+    feedback.prepend(marker);
+    if (points > 0) {
+      const badge = document.createElement('span');
+      badge.className = 'points-earned';
+      badge.textContent = `+${points} poeng`;
+      feedback.append(' ', badge);
+    }
+  }
   feedback.classList.toggle('error', false);
   if (isCorrection) {
     answerInput.setAttribute('aria-describedby', 'correction-feedback');
@@ -938,6 +963,8 @@ if (savedProgress?.session.queue.length === 0 && wordSets.some((set) => set.id =
   finishSession();
 }
 profileSelect.addEventListener('change', async () => {
+  effects.cancel();
+  viewRevision += 1;
   const activeProfileId = profileSelect.value;
   if (await persistProfileState((state) => ({ ...state, activeProfileId }), 'bytte profil'))
     renderWordSets();
@@ -1035,8 +1062,13 @@ answerForm.addEventListener('submit', async (event) => {
   if (answerButton.disabled) return;
   answerButton.disabled = true;
   answerInput.readOnly = true;
+  effects.cancel();
+  effects.prepareSound();
+  const submissionRevision = viewRevision;
   try {
+    const answeredWord = currentWord(session, words);
     const outcome = submitAnswer(session, answerInput.value, words, session.settings);
+    const cue = answerFeedback(session, outcome, answeredWord);
     const earned = {
       points: (outcome.session.points ?? 0) - (session.points ?? 0),
       bestStreak: outcome.session.bestStreak ?? 0,
@@ -1045,22 +1077,27 @@ answerForm.addEventListener('submit', async (event) => {
     pendingRewards.set(currentProfileId, addRewards(pendingRewards.get(currentProfileId), earned));
     session = outcome.session;
     await persistProgress();
+    if (submissionRevision !== viewRevision) return;
 
     if (outcome.result === 'incorrect') {
       renderPractice('', {
         announceCorrection: document.activeElement === answerInput,
       });
+      effects.play(cue);
       return;
     }
     if (outcome.result === 'retry-scheduled') {
-      renderPractice('Takk! Dette ordet kommer tilbake litt senere.');
+      renderPractice(cue.message, { icon: '↻' });
+      effects.play(cue);
       return;
     }
     if (outcome.result === 'complete') {
       finishSession();
+      effects.play(cue);
       return;
     }
-    renderPractice('Riktig! Fortsett slik.');
+    renderPractice(cue.message, { points: cue.points });
+    effects.play(cue);
   } finally {
     answerButton.disabled = false;
     answerInput.readOnly = false;

@@ -36,7 +36,7 @@ test('shows prominent correction feedback and practices a missed word until it i
   await expect(page.locator('#correction-announcement')).toHaveAttribute('aria-live', 'polite');
   await expect(page.locator('#answer')).toHaveAttribute('aria-describedby', 'correction-feedback');
   await expect(page.locator('#answer')).toHaveAccessibleDescription(
-    'Riktig stavemåte eple Skriv ordet én gang, så kommer det tilbake senere.',
+    'Ikke helt ennå – prøv igjen! Riktig stavemåte eple Skriv ordet én gang, så kommer det tilbake senere.',
   );
   await expect(page.locator('#answer')).toBeFocused();
   await expect(correction).toBeInViewport();
@@ -49,10 +49,10 @@ test('shows prominent correction feedback and practices a missed word until it i
   await expect(page.getByText('Takk! Dette ordet kommer tilbake litt senere.')).toBeVisible();
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    if (attempt > 0) await expect(page.getByText('Riktig! Fortsett slik.')).toBeVisible();
+    if (attempt > 0) await expect(page.locator('#feedback')).toContainText('Riktig! Bra jobbet');
     await page.getByLabel('Stavingen din').fill('eple');
     await page.getByRole('button', { name: 'Sjekk svaret' }).click();
-    if (attempt === 0) await expect(page.getByText('Riktig! Fortsett slik.')).toBeVisible();
+    if (attempt === 0) await expect(page.locator('#feedback')).toContainText('Riktig! Bra jobbet');
   }
 
   await expect(page.getByRole('heading', { name: 'Godt jobbet!' })).toBeVisible();
@@ -62,7 +62,9 @@ test('shows prominent correction feedback and practices a missed word until it i
   await expect(page.getByText('En rød frukt → eple · 1 feilsvar')).toBeVisible();
 });
 
-test('chooses correction announcement after delayed progress saving', async ({ page }) => {
+test('leaving practice during delayed saving does not reopen correction or replay effects', async ({
+  page,
+}) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Nytt ordsett' }).click();
   await page.getByLabel('Navn på ordsettet').fill('Frukt');
@@ -88,14 +90,11 @@ test('chooses correction announcement after delayed progress saving', async ({ p
   await page.getByRole('button', { name: 'Ordsett' }).click();
   await page.evaluate(() => window.releaseProfileStateLock());
 
-  await expect(page.locator('#correction-feedback')).toBeVisible();
-  await expect(page.locator('#correction-announcement')).toHaveText(
-    'Rettelsen vises ved svarfeltet.',
-  );
-  await expect(page.locator('#answer')).toHaveAccessibleDescription(
-    'Riktig stavemåte eple Skriv ordet én gang, så kommer det tilbake senere.',
-  );
-  await expect(page.locator('#answer')).toBeFocused();
+  await expect(page.locator('#answer')).not.toHaveAttribute('readonly', '');
+  await expect(page.locator('#setup-view')).toBeVisible();
+  await expect(page.locator('#practice-view')).toBeHidden();
+  await expect(page.locator('#correction-announcement')).toBeEmpty();
+  await expect(page.locator('[data-effect]')).toHaveCount(0);
 });
 
 test('does not exceed the set limit when copies are requested concurrently', async ({ page }) => {
@@ -233,7 +232,7 @@ test('reloads and resumes a saved session during its correction step', async ({ 
   await expect(page.locator('#correction-announcement')).toHaveAttribute('aria-live', 'polite');
   await expect(page.locator('#answer')).toHaveAttribute('aria-describedby', 'correction-feedback');
   await expect(page.locator('#answer')).toHaveAccessibleDescription(
-    'Riktig stavemåte eple Skriv ordet én gang, så kommer det tilbake senere.',
+    'Ikke helt ennå – prøv igjen! Riktig stavemåte eple Skriv ordet én gang, så kommer det tilbake senere.',
   );
   await expect(page.locator('#answer')).toBeFocused();
 
@@ -244,7 +243,7 @@ test('reloads and resumes a saved session during its correction step', async ({ 
     'Rettelsen vises ved svarfeltet.',
   );
   await expect(page.locator('#answer')).toHaveAccessibleDescription(
-    'Riktig stavemåte eple Skriv ordet én gang, så kommer det tilbake senere.',
+    'Ikke helt ennå – prøv igjen! Riktig stavemåte eple Skriv ordet én gang, så kommer det tilbake senere.',
   );
 
   await page.getByLabel('Skriv ordet én gang').fill('eple');
@@ -550,7 +549,7 @@ test('uses Mixed direction mode for a saved word set configured in both directio
   await expect(page.locator('#prompt')).toHaveText('hund');
   await page.getByLabel('Stavingen din').fill('hound');
   await page.getByRole('button', { name: 'Sjekk svaret' }).click();
-  await expect(page.getByText('Riktig! Fortsett slik.')).toBeVisible();
+  await expect(page.locator('#feedback')).toContainText('Riktig! Bra jobbet');
   await expect(page.locator('#prompt')).toHaveText('cat');
   await page.getByLabel('Stavingen din').fill('katt');
   await page.getByRole('button', { name: 'Sjekk svaret' }).click();

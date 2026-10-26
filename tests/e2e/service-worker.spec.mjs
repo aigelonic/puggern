@@ -137,7 +137,7 @@ test('replaces an installed v11 shell with bad module MIME types and works offli
         requests.map(async (request) => (await cache.match(request)).headers.get('content-type')),
       );
     });
-    expect(cachedModules).toHaveLength(6);
+    expect(cachedModules).toHaveLength(7);
     for (const type of cachedModules) expect(type).toMatch(/^(?:application|text)\/javascript\b/);
     expect(
       await page.evaluate(async () => {
@@ -145,6 +145,7 @@ test('replaces an installed v11 shell with bad module MIME types and works offli
         return Promise.all(
           [
             './src/main.mjs?v=13',
+            './src/practice-feedback.mjs?v=1',
             './src/learning.mjs?v=7',
             './src/profiles.mjs?v=7',
             './src/word-sets.mjs?v=8',
@@ -153,7 +154,7 @@ test('replaces an installed v11 shell with bad module MIME types and works offli
           ].map(async (url) => Boolean(await cache.match(url))),
         );
       }),
-    ).toEqual([true, true, true, true, true, true]);
+    ).toEqual([true, true, true, true, true, true, true]);
     expect(
       await page.evaluate(async () => {
         const cache = await caches.open('puggern-app-shell-v14');

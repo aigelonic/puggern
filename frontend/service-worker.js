@@ -7,6 +7,7 @@ const APP_SHELL = [
   './icons/pug-192.png',
   './icons/pug-512.png',
   './src/main.mjs?v=13',
+  './src/practice-feedback.mjs?v=1',
   './src/learning.mjs?v=7',
   './src/profiles.mjs?v=7',
   './src/word-sets.mjs?v=8',

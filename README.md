@@ -54,14 +54,22 @@ Each independent correct answer earns 10 points, including scheduled repetitions
 Copying a correction earns no points. The combo counts consecutive correct answers
 within a session and resets on an incorrect answer; there is no time limit or
 speed bonus. A labeled progress bar shows learned entries, and completing a set
-shows a brief celebration (static when reduced motion is requested).
+shows a brief confetti celebration only when finishing live, not when restoring
+a completed summary. Answer cues last 600 milliseconds; confetti is removed within
+1.6 seconds. Reduced motion keeps the text and icons without moving effects,
+including when the preference changes during practice.
+
+Optional, locally generated sound effects work offline. Use the “Lydeffekter”
+toggle above the views to turn them on or off at any time. Sound starts off on
+each page load and is not stored with a child's profile. Answer effects and
+sounds are replaced rather than queued, and stop when leaving practice.
 
 Storage retains each profile's current session per word set, not a history of
 completed attempts. Session points and combos survive reloads. Total points, best
 combo, and the number of completed sets are saved in the profile and retained when
 starting a new session or deleting a set. Existing profiles and sessions without
 rewards start their reward counters at zero. Daily streaks, stars, badges,
-unlockables, sounds, and leaderboards are not part of this MVP.
+unlockables, and leaderboards are not part of this MVP.
 
 ## Sharing between devices
 
