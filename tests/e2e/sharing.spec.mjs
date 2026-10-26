@@ -95,6 +95,27 @@ test('invalid links and payload text fail safely, with keyboard cancellation and
   expect(await page.evaluate(() => localStorage.getItem('puggern.word-sets'))).toBeNull();
 });
 
+test('keeps keyboard focus within both import dialog steps', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Importer lenke', exact: true }).click();
+  const linkInput = page.locator('#import-link-input');
+  const cancelButton = page.locator('#cancel-import-button');
+  await linkInput.focus();
+  await page.keyboard.press('Shift+Tab');
+  await expect(cancelButton).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(linkInput).toBeFocused();
+  await linkInput.fill(createShareUrl(content, 'https://example.test/'));
+  await page.getByRole('button', { name: 'Forhåndsvis', exact: true }).click();
+  const saveButton = page.locator('#import-save-button');
+  await expect(saveButton).toBeVisible();
+  await cancelButton.focus();
+  await page.keyboard.press('Tab');
+  await expect(saveButton).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(cancelButton).toBeFocused();
+});
+
 test('import cannot exceed the global set limit', async ({ page, baseURL }) => {
   await page.addInitScript(
     (sets) => {
