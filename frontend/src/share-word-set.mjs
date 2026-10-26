@@ -1,5 +1,5 @@
-import { MAX_WORD_LENGTH, MAX_WORDS_PER_SET } from './learning.mjs?v=7';
-import { MAX_WORD_SET_NAME_LENGTH } from './word-sets.mjs?v=8';
+import { MAX_WORD_LENGTH, MAX_WORDS_PER_SET } from './learning.mjs?v=8';
+import { MAX_WORD_SET_NAME_LENGTH } from './word-sets.mjs?v=9';
 
 export const SHARE_PARAM = 'share';
 export const MAX_SHARE_URL_LENGTH = 8000;

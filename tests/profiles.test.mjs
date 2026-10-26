@@ -79,6 +79,53 @@ test('ignores corrupt, unsupported, or invalid profile state', () => {
   assert.equal(loadProfileState(storage), null);
 });
 
+test('normalizes duplicate progress in every profile without writing or altering other data', () => {
+  const storage = makeStorage();
+  const state = createProfileState('profile-1');
+  const words = parseWordSet('A\tone\nB\ttwo');
+  const duplicateProgress = {
+    version: PROGRESS_VERSION,
+    words,
+    session: {
+      queue: ['0', '1', '0', '1'],
+      correction: true,
+      learned: [],
+      mistakes: {},
+      settings: {},
+      legacySessionField: 'preserved',
+    },
+    legacyProgressField: 'preserved',
+  };
+  state.profiles.push({ id: 'profile-2', name: 'Ada', avatar: '' });
+  state.progress['profile-1']['set-1'] = duplicateProgress;
+  state.progress['profile-2'] = {
+    'set-2': {
+      version: PROGRESS_VERSION,
+      words,
+      session: {
+        queue: ['1', '0', '1'],
+        correction: false,
+        learned: ['0'],
+        mistakes: {},
+        settings: {},
+      },
+    },
+  };
+  saveProfileState(storage, state);
+  const stored = storage.values.get(PROFILE_STATE_KEY);
+
+  const loaded = loadProfileState(storage);
+
+  assert.deepEqual(loaded.progress['profile-1']['set-1'].session.queue, ['0', '1']);
+  assert.equal(loaded.progress['profile-1']['set-1'].session.correction, true);
+  assert.equal(loaded.progress['profile-1']['set-1'].legacyProgressField, 'preserved');
+  assert.equal(loaded.progress['profile-1']['set-1'].session.legacySessionField, 'preserved');
+  assert.deepEqual(loaded.progress['profile-2']['set-2'].session.queue, ['1']);
+  assert.equal(loaded.progress['profile-2']['set-2'].session.correction, false);
+  assert.equal(storage.values.get(PROFILE_STATE_KEY), stored);
+  assert.deepEqual(state.progress['profile-1']['set-1'], duplicateProgress);
+});
+
 test('persists accumulated profile rewards independently of replaced practice progress', () => {
   const storage = makeStorage();
   const state = createProfileState('profile-1');

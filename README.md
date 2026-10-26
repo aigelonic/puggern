@@ -44,14 +44,16 @@ app has no server to validate one and must remain usable offline.
 
 Finishing practice opens a summary with learned practice entries, first-try
 correct entries, and incorrect-answer counts for entries needing more practice.
-Practicing both directions counts each direction as a separate entry; copying a
-correction does not count as learning an entry. The latest completed summary
+Practicing both directions counts each direction as a separate entry. Each entry
+needs one correct answer per session; mistakes, including repeated ones, never add
+extra repetitions, and the first correct answer after a mistake finishes the entry. The latest completed summary
 survives reload, and you can practice the same set again or return to word sets.
 If saving progress fails, practice still continues and a warning explains that
 progress may be lost on reload.
 
-Each independent correct answer earns 10 points, including scheduled repetitions.
-Copying a correction earns no points. The combo counts consecutive correct answers
+Each entry earns 10 points once, on its first correct answer; incorrect answers
+earn no points. Saved sessions with duplicated or already-learned queue entries are
+repaired when loaded, without awarding points or completion credit. The combo counts consecutive correct answers
 within a session and resets on an incorrect answer; there is no time limit or
 speed bonus. A labeled progress bar shows learned entries, and completing a set
 shows a brief confetti celebration only when finishing live, not when restoring

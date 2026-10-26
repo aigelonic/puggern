@@ -37,12 +37,12 @@ test('replaces an installed v11 shell with bad module MIME types and works offli
         body = Buffer.from(
           body
             .toString()
-            .replaceAll('puggern-app-shell-v14', 'puggern-app-shell-v11')
+            .replaceAll('puggern-app-shell-v15', 'puggern-app-shell-v11')
             .replaceAll('styles.css?v=11', 'styles.css?v=9')
-            .replaceAll('main.mjs?v=13', 'main.mjs?v=10')
-            .replaceAll('profiles.mjs?v=7', 'profiles.mjs?v=6')
-            .replaceAll('word-sets.mjs?v=8', 'word-sets.mjs?v=7')
-            .replaceAll('learning.mjs?v=7', 'learning.mjs?v=6')
+            .replaceAll('main.mjs?v=14', 'main.mjs?v=10')
+            .replaceAll('profiles.mjs?v=8', 'profiles.mjs?v=6')
+            .replaceAll('word-sets.mjs?v=9', 'word-sets.mjs?v=7')
+            .replaceAll('learning.mjs?v=8', 'learning.mjs?v=6')
             .replaceAll('#46574e', '#64766d'),
         );
       }
@@ -127,9 +127,9 @@ test('replaces an installed v11 shell with bad module MIME types and works offli
       await registration.update();
       await changed;
     });
-    await expect.poll(() => page.evaluate(() => caches.keys())).toEqual(['puggern-app-shell-v14']);
+    await expect.poll(() => page.evaluate(() => caches.keys())).toEqual(['puggern-app-shell-v15']);
     const cachedModules = await page.evaluate(async () => {
-      const cache = await caches.open('puggern-app-shell-v14');
+      const cache = await caches.open('puggern-app-shell-v15');
       const requests = (await cache.keys()).filter((request) =>
         new URL(request.url).pathname.endsWith('.mjs'),
       );
@@ -141,29 +141,29 @@ test('replaces an installed v11 shell with bad module MIME types and works offli
     for (const type of cachedModules) expect(type).toMatch(/^(?:application|text)\/javascript\b/);
     expect(
       await page.evaluate(async () => {
-        const cache = await caches.open('puggern-app-shell-v14');
+        const cache = await caches.open('puggern-app-shell-v15');
         return Promise.all(
           [
-            './src/main.mjs?v=13',
-            './src/practice-feedback.mjs?v=1',
-            './src/learning.mjs?v=7',
-            './src/profiles.mjs?v=7',
-            './src/word-sets.mjs?v=8',
+            './src/main.mjs?v=14',
+            './src/practice-feedback.mjs?v=2',
+            './src/learning.mjs?v=8',
+            './src/profiles.mjs?v=8',
+            './src/word-sets.mjs?v=9',
             './src/creation-guard.mjs?v=3',
-            './src/share-word-set.mjs?v=1',
+            './src/share-word-set.mjs?v=2',
           ].map(async (url) => Boolean(await cache.match(url))),
         );
       }),
     ).toEqual([true, true, true, true, true, true, true]);
     expect(
       await page.evaluate(async () => {
-        const cache = await caches.open('puggern-app-shell-v14');
+        const cache = await caches.open('puggern-app-shell-v15');
         return (await cache.match('./index.html')).text();
       }),
-    ).toContain('./src/main.mjs?v=13');
+    ).toContain('./src/main.mjs?v=14');
     expect(
       await page.evaluate(async () => {
-        const cache = await caches.open('puggern-app-shell-v14');
+        const cache = await caches.open('puggern-app-shell-v15');
         return (await cache.match('./styles.css?v=11')).text();
       }),
     ).toContain('#46574e');
