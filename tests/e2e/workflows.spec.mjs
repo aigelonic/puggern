@@ -146,6 +146,61 @@ test('keeps mixed-direction language context through correction, reload, and res
   await expect(page.locator('#answer-language-instruction')).toHaveText('Skriv på Engelsk');
 });
 
+test('announces same language context for new cards but not correction renders', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Nytt ordsett' }).click();
+  await page.getByLabel('Navn på ordsettet').fill('Dyr');
+  await page.getByLabel('Språk for hint (valgfritt)').fill('Norsk');
+  await page.getByLabel('Språk for svar (valgfritt)').fill('Engelsk');
+  await page.getByLabel('Hint og svar').fill('hund\tdog\nkatt\tcat\nfugl\tbird');
+  await page.waitForTimeout(300);
+  await page.getByRole('button', { name: 'Lagre og start øving' }).click();
+  const config = page.getByRole('dialog');
+  await config.locator('#exercise-direction').selectOption('forward');
+  await config.locator('#exercise-order').selectOption('original');
+  await config.getByRole('button', { name: 'Start øving' }).click();
+
+  await page.evaluate(() => {
+    const announcement = document.querySelector('#language-context-announcement');
+    window.languageContextMutationCount = 0;
+    window.languageContextObserver = new MutationObserver((mutations) => {
+      window.languageContextMutationCount += mutations.length;
+    });
+    window.languageContextObserver.observe(announcement, {
+      childList: true,
+      characterData: true,
+      subtree: true,
+    });
+  });
+  await page.getByLabel('Stavingen din').fill('dog');
+  await page.getByLabel('Stavingen din').press('Enter');
+  await expect(page.locator('#prompt')).toHaveText('katt');
+  const announcement = page.locator('#language-context-announcement');
+  await expect(announcement).toHaveText('Hint på Norsk. Skriv på Engelsk');
+  await expect
+    .poll(() => page.evaluate(() => window.languageContextMutationCount))
+    .toBeGreaterThan(0);
+  const announcedMutationCount = await page.evaluate(() => window.languageContextMutationCount);
+
+  await page.getByLabel('Stavingen din').fill('wrong');
+  await page.getByLabel('Stavingen din').press('Enter');
+  await expect(page.locator('#correction-feedback')).toBeVisible();
+  await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 0)));
+  await expect
+    .poll(() => page.evaluate(() => window.languageContextMutationCount))
+    .toBe(announcedMutationCount);
+
+  await page.getByLabel('Skriv riktig svar').fill('cat');
+  await page.getByLabel('Skriv riktig svar').press('Enter');
+  await expect(page.locator('#prompt')).toHaveText('fugl');
+  await expect(announcement).toHaveText('Hint på Norsk. Skriv på Engelsk');
+  await expect
+    .poll(() => page.evaluate(() => window.languageContextMutationCount))
+    .toBeGreaterThan(announcedMutationCount);
+});
+
 test('does not guess the direction of ambiguous legacy cards', async ({ page }) => {
   await page.addInitScript(() => {
     Math.random = () => 0;
