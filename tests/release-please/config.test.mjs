@@ -73,7 +73,7 @@ test('ordinary CI retains all required checks, reopen events and container cover
     'docker build -t puggern:test .',
     'docker run -d --name puggern-test -p 127.0.0.1:8080:8080 puggern:test',
     'PLAYWRIGHT_BASE_URL=http://127.0.0.1:8080 npm run test:e2e',
-    'tests/e2e/modules.spec.mjs tests/e2e/profiles.spec.mjs tests/e2e/service-worker.spec.mjs',
+    'tests/e2e/modules.spec.mjs tests/e2e/profiles.spec.mjs tests/e2e/service-worker.spec.mjs tests/e2e/production-update.spec.mjs',
     'node --test tests/release-please/*.test.mjs',
   ]) {
     assert.ok(commands.includes(expected), `missing existing or release check: ${expected}`);

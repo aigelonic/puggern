@@ -123,7 +123,7 @@ PLAYWRIGHT_BASE_URL=http://127.0.0.1:8080 npm run test:e2e
 This uses the running server instead of the development server. All `.mjs`
 modules must be served as JavaScript, not `application/octet-stream`. When
 changing module URLs, update their imports and the service-worker shell together
-and bump the shell cache version so existing installations replace stale assets.
+and bump `SHELL_REVISION` so existing installations can prepare a distinct shell.
 
 ## Pull Request Checks
 
@@ -146,6 +146,37 @@ See [the release process](docs/releases.md) for versioning, release PR review,
 required administrator setup, and the human close/reopen step that runs CI on
 bot-created release PRs. Releases do not deploy or publish packages.
 
+## Application Version and Updates
+
+The footer shows the version of the loaded application, including offline.
+`0.0.0` is labeled `Utviklingsversjon`, not a published release. Other versions
+offer an optional `Utgivelsesnotater` link to the matching GitHub tag; the app
+does not poll GitHub. Untagged development deployments retain the last release
+number, so a version label alone is not proof of a published release.
+
+`Se etter oppdateringer` checks this server for a complete new app shell.
+Prepared updates offer `Oppdater og last inn på nytt` or `Senere`; deferring
+keeps practice running and leaves an `Oppdatering klar` footer action. The app
+never automatically reloads on discovery. A same-version shell update or a
+deployed rollback can also be offered. Close other Puggern tabs and installed
+app windows before applying, then retry. Progress and pending rewards must save
+successfully before activation; failed saves block the update. Unsaved editor,
+profile, or unsubmitted answer input requires explicit discard confirmation.
+
+Offline practice and already prepared updates can work without a connection;
+discovering or downloading an update requires internet access. Closed or suspended
+mobile PWAs check after reopening or returning to the foreground; exact timing
+depends on the browser. The first installation does not prompt or reload.
+Legacy installed clients need to load this implementation before they can show
+these controls. Do not unregister workers or clear site data to update, as that
+can lose local profiles and progress.
+
+Version metadata is checked in and works with both the static development server
+and Docker, without startup generation. See the [operating guide](docs/releases.md#deployed-updates)
+for marker ownership, shell revisions, deployment verification, recovery, and the
+mobile checklist. Physical Android and iOS/iPadOS device coverage is unavailable
+in this development environment and remains a required maintainer smoke test.
+
 ## Server Deployment
 
 The production image serves the static app with unprivileged NGINX. On a server
@@ -163,6 +194,13 @@ loopback bind when the proxy runs on the host; only change
 with the server firewall. The container runs read-only as a non-root user with
 all Linux capabilities dropped. The NGINX base image is digest-pinned in
 `Dockerfile`; review and update that digest regularly for security fixes.
+
+Deploy production from the corresponding `v<version>` tag as a complete image,
+switching traffic only after all assets and health checks pass. Never publish
+the index or worker ahead of the rest of the shell. A tag or GitHub Release alone
+does not deploy anything or notify app users. Keep the stable worker URL and
+preserve JavaScript MIME types, security headers, and cache revalidation through
+the reverse proxy; see the [deployment checks](docs/releases.md#deployment-verification).
 
 The app is a static site with no build step, backend, or runtime dependencies.
 Progress stays in the browser on the current device; word sets can be explicitly

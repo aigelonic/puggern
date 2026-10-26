@@ -361,7 +361,37 @@
           </button>
         </div>
       </section>
+      <footer class="app-footer" aria-label="Appversjon og oppdateringer">
+        <span id="app-version"></span>
+        <a id="release-notes" hidden target="_blank" rel="noopener noreferrer">Utgivelsesnotater</a>
+        <button id="check-updates" class="text-button" type="button">Se etter oppdateringer</button>
+        <button id="update-ready" class="text-button" type="button" hidden>Oppdatering klar</button>
+        <p id="update-status" role="status" aria-live="polite" aria-atomic="true"></p>
+        <section id="update-banner" aria-label="Oppdatering" hidden>
+          <p>En oppdatering er klar.</p>
+          <div class="actions">
+            <button id="apply-update" class="button primary" type="button">
+              Oppdater og last inn på nytt
+            </button>
+            <button id="defer-update" class="button secondary" type="button">Senere</button>
+          </div>
+        </section>
+      </footer>
     </main>
+    <dialog
+      id="update-confirmation"
+      aria-labelledby="update-confirmation-title"
+      aria-describedby="update-input-warning"
+    >
+      <h2 id="update-confirmation-title">Forkaste inntasting?</h2>
+      <p id="update-input-warning"></p>
+      <form method="dialog" class="actions">
+        <button id="cancel-update-button" class="button secondary" value="cancel" autofocus>
+          Avbryt
+        </button>
+        <button class="button primary" value="update">Forkast inntasting og oppdater</button>
+      </form>
+    </dialog>
     <script type="module" src="./src/main.mjs?v=15"></script>
   </body>
 </html>
