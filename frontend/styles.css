@@ -184,6 +184,10 @@ select:focus {
   background: #263a3280;
 }
 
+.share-preview {
+  overflow-wrap: anywhere;
+}
+
 .exercise-config-dialog h2 {
   margin: 0 0 1.25rem;
 }

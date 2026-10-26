@@ -28,6 +28,12 @@ import {
   MAX_WORD_SETS,
 } from './word-sets.mjs?v=8';
 import { recordCreationAttempt, MIN_CREATION_FORM_TIME_MS } from './creation-guard.mjs?v=3';
+import {
+  SHARE_PARAM,
+  MAX_SHARE_URL_LENGTH,
+  createShareUrl,
+  parseShareUrl,
+} from './share-word-set.mjs?v=1';
 import { answerFeedback, createPracticeEffects } from './practice-feedback.mjs?v=1';
 
 const status = document.querySelector('#connection-status');
@@ -64,6 +70,19 @@ const newSetButton = document.querySelector('#new-set-button');
 const setLimitHelp = document.querySelector('#set-limit-help');
 const exerciseConfigDialog = document.querySelector('#exercise-config-dialog');
 const exerciseConfigForm = document.querySelector('#exercise-config-form');
+const shareStatus = document.querySelector('#share-status');
+const shareError = document.querySelector('#share-error');
+const shareLinkDialog = document.querySelector('#share-link-dialog');
+const shareLinkInput = document.querySelector('#share-link-input');
+const importButton = document.querySelector('#import-link-button');
+const importDialog = document.querySelector('#import-link-dialog');
+const importLinkForm = document.querySelector('#import-link-form');
+const importLinkInput = document.querySelector('#import-link-input');
+const importConfirmForm = document.querySelector('#import-confirm-form');
+const importSaveButton = document.querySelector('#import-save-button');
+const importPreview = document.querySelector('#import-preview');
+const importError = document.querySelector('#import-error');
+importLinkInput.maxLength = MAX_SHARE_URL_LENGTH;
 const effects = createPracticeEffects({
   feedback,
   correction: correctionFeedback,
@@ -85,6 +104,10 @@ let pendingExerciseSet = null;
 let pendingExerciseProfileId = null;
 let exerciseConfigTrigger = null;
 let unsavedProgress = false;
+let shareLinkTrigger = null;
+let importTrigger = null;
+let importDraft = null;
+let importSaving = false;
 const pendingRewards = new Map();
 
 function setAppError(message, source = 'app') {
@@ -428,6 +451,180 @@ function makeButton(label, action, className = 'button secondary') {
   return button;
 }
 
+function restoreDialogFocus(trigger) {
+  const target =
+    trigger?.isConnected && !trigger.closest('[hidden]') && !trigger.disabled
+      ? trigger
+      : !setupView.hidden
+        ? importButton
+        : !practiceView.hidden
+          ? document.querySelector('#back-button')
+          : document.querySelector('#completion-heading');
+  target.focus();
+}
+
+function showShareFeedback(message = '', error = '') {
+  shareStatus.textContent = message;
+  shareError.textContent = error;
+  shareError.hidden = !error;
+}
+
+async function shareWordSet(set, trigger) {
+  if (trigger.disabled) return;
+  trigger.disabled = true;
+  showShareFeedback();
+  try {
+    const url = createShareUrl(set, window.location.href);
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: set.name, url });
+        showShareFeedback('Ordsettet er delt.');
+        return;
+      } catch (error) {
+        if (error.name === 'AbortError') {
+          showShareFeedback('Delingen ble avbrutt.');
+          return;
+        }
+      }
+    }
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(url);
+        showShareFeedback('Lenken er kopiert. Du kan lime den inn og dele den.');
+        return;
+      } catch {
+        // Manuell kopiering fungerer også uten tilgang til utklippstavlen.
+      }
+    }
+    shareLinkTrigger = trigger;
+    shareLinkInput.value = url;
+    shareLinkDialog.showModal();
+    shareLinkInput.focus();
+    shareLinkInput.select();
+  } catch (error) {
+    showShareFeedback('', `Kunne ikke dele ordsettet: ${error.message}`);
+  } finally {
+    trigger.disabled = false;
+  }
+}
+
+function showImportError(message = '') {
+  importError.textContent = message;
+  importError.hidden = !message;
+}
+
+function openImportDialog(trigger = importButton) {
+  importTrigger = trigger;
+  importDraft = null;
+  importLinkForm.reset();
+  importConfirmForm.reset();
+  importConfirmForm.dataset.openedAt = String(Date.now());
+  importLinkForm.hidden = false;
+  importConfirmForm.hidden = true;
+  importPreview.replaceChildren();
+  showImportError();
+  importDialog.showModal();
+  importLinkInput.focus();
+}
+
+function previewImport(input) {
+  importDraft = null;
+  importPreview.replaceChildren();
+  showImportError();
+  try {
+    const draft = parseShareUrl(input);
+    const title = document.createElement('h3');
+    title.tabIndex = -1;
+    title.textContent = draft.name;
+    const summary = document.createElement('p');
+    const direction = {
+      'prompt-to-answer': 'Hint → svar',
+      'answer-to-prompt': 'Svar → hint',
+      both: 'Begge retninger',
+    }[draft.direction];
+    summary.textContent = `${draft.words.length} ord · Retning: ${direction}`;
+    const settings = document.createElement('p');
+    settings.textContent =
+      `Skill mellom store og små bokstaver: ${draft.settings.caseSensitive ? 'Ja' : 'Nei'}. ` +
+      `Ta hensyn til aksenter: ${draft.settings.accentSensitive ? 'Ja' : 'Nei'}.`;
+    const help = document.createElement('p');
+    help.textContent = 'De første fem oppføringene (hint → svar):';
+    const rows = document.createElement('ol');
+    draft.words.slice(0, 5).forEach((word) => {
+      const row = document.createElement('li');
+      row.textContent = `${word.prompt} → ${word.answer}`;
+      rows.append(row);
+    });
+    importPreview.append(title, summary, settings, help, rows);
+    importDraft = draft;
+    importLinkForm.hidden = true;
+    importConfirmForm.hidden = false;
+    title.focus();
+  } catch (error) {
+    importLinkForm.hidden = false;
+    importConfirmForm.hidden = true;
+    showImportError(error.message);
+    importLinkInput.focus();
+  }
+}
+
+async function saveImportedWordSet() {
+  if (importSaving || !importDraft) return;
+  const draft = importDraft;
+  const restoreSaveFocus = document.activeElement === importSaveButton;
+  importSaving = true;
+  importSaveButton.disabled = true;
+  showImportError();
+  try {
+    if (loadWordSets(window.localStorage).length >= MAX_WORD_SETS) {
+      showImportError(`Du kan ha maksimalt ${MAX_WORD_SETS} ordsett på denne enheten.`);
+      return;
+    }
+    const guardError = await checkCreationForm(importConfirmForm);
+    if (importDraft !== draft || !importDialog.open) return;
+    if (guardError) {
+      showImportError(guardError);
+      return;
+    }
+    const latestSets = loadWordSets(window.localStorage);
+    if (latestSets.length >= MAX_WORD_SETS) {
+      showImportError(`Du kan ha maksimalt ${MAX_WORD_SETS} ordsett på denne enheten.`);
+      return;
+    }
+    const now = new Date().toISOString();
+    const set = {
+      ...draft,
+      id: crypto.randomUUID(),
+      archived: false,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const nextSets = [set, ...latestSets];
+    saveWordSets(window.localStorage, nextSets);
+    wordSets = nextSets;
+    showArchived = false;
+    showView(setupView);
+    renderWordSets();
+    importDialog.close();
+    showShareFeedback('Ordsettet er importert som et nytt ordsett.');
+  } catch (error) {
+    if (importDraft === draft && importDialog.open) {
+      showImportError(`Kunne ikke importere ordsettet: ${error.message}`);
+    }
+  } finally {
+    importSaving = false;
+    importSaveButton.disabled = false;
+    if (
+      restoreSaveFocus &&
+      importDialog.open &&
+      importDraft === draft &&
+      document.activeElement === document.body
+    ) {
+      importSaveButton.focus();
+    }
+  }
+}
+
 function updateWordSets(nextWordSets, action) {
   if (nextWordSets.length > wordSets.length && nextWordSets.length > MAX_WORD_SETS) {
     showSetupError(`Du kan ha maksimalt ${MAX_WORD_SETS} ordsett på denne enheten.`);
@@ -505,6 +702,8 @@ function renderWordSets() {
       actions.append(makeButton('Gjenopprett', () => changeArchived(set, false)));
       actions.append(makeButton('Rediger', () => openEditor(set)));
     }
+    const shareButton = makeButton('Del', () => shareWordSet(set, shareButton));
+    actions.append(shareButton);
     actions.append(makeButton('Slett', () => deleteWordSet(set), 'button danger'));
     item.append(details, actions);
     wordSetList.append(item);
@@ -966,6 +1165,50 @@ document.querySelector('#completion-new-set-button').addEventListener('click', (
   renderWordSets();
   openEditor();
 });
+
+importButton.addEventListener('click', () => openImportDialog());
+importLinkForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  previewImport(importLinkInput.value);
+});
+importConfirmForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  await saveImportedWordSet();
+});
+document.querySelector('#cancel-import-button').addEventListener('click', () => {
+  importDialog.close();
+});
+importDialog.addEventListener('close', () => {
+  importDraft = null;
+  importLinkForm.reset();
+  importConfirmForm.reset();
+  importPreview.replaceChildren();
+  showImportError();
+  restoreDialogFocus(importTrigger);
+  importTrigger = null;
+});
+document.querySelector('#close-share-link-button').addEventListener('click', () => {
+  shareLinkDialog.close();
+});
+shareLinkDialog.addEventListener('close', () => {
+  shareLinkInput.value = '';
+  restoreDialogFocus(shareLinkTrigger);
+  shareLinkTrigger = null;
+});
+
+const incomingShareUrl = new URL(window.location.href);
+if (incomingShareUrl.searchParams.has(SHARE_PARAM)) {
+  const input = incomingShareUrl.href;
+  incomingShareUrl.searchParams.delete(SHARE_PARAM);
+  window.history.replaceState(
+    window.history.state,
+    '',
+    `${incomingShareUrl.pathname}${incomingShareUrl.search}${incomingShareUrl.hash}`,
+  );
+  showView(setupView);
+  openImportDialog();
+  previewImport(input);
+}
 
 if ('serviceWorker' in navigator) {
   const registerServiceWorker = () => {

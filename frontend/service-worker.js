@@ -12,6 +12,7 @@ const APP_SHELL = [
   './src/profiles.mjs?v=7',
   './src/word-sets.mjs?v=8',
   './src/creation-guard.mjs?v=3',
+  './src/share-word-set.mjs?v=1',
 ];
 
 self.addEventListener('install', (event) => {
