@@ -44,21 +44,28 @@
 
 ### Verification and specialist reviews
 
-- For behavior changes, bug fixes, and final executable validation, use the [Verification agent](.github/agents/verification.agent.md) to run relevant existing checks and verify acceptance criteria. Documentation-only changes need only applicable documentation/format checks.
-- Use the [Security Review agent](.github/agents/security-review.agent.md) for security-sensitive changes, such as authorization, untrusted input, sensitive data, or dependency changes.
-- Use the [UI / Accessibility Review agent](.github/agents/ui-accessibility-review.agent.md) for user-facing UI changes, including keyboard, focus, responsive layout, and reduced-motion behavior.
-- Give each agent the task, acceptance criteria, intended PR base, complete change scope, and relevant check results. Run only applicable specialists; do not add unrelated handoffs.
-- These agents report evidence and findings without fixing the implementation. The implementing agent owns fixes and reruns affected validation/reviews. They must not recursively invoke this workflow.
+- Default workflow: implement, run targeted checks, obtain one independent local review, then create the PR and let CI run its configured checks.
+- The implementing agent owns routine tests, lint, format checks, and acceptance-criteria validation. Use the [Verification agent](.github/agents/verification.agent.md) when substantial changes, complex reproductions, long-running checks, or independent execution warrant a separate context; it is not a mandatory handoff. Documentation-only changes need only applicable documentation/format checks.
+- Use the [Security Review agent](.github/agents/security-review.agent.md) when changes affect authentication, authorization, trust boundaries, sensitive-data handling, unsafe rendering, or meaningful dependency risk (such as new install scripts, permissions, or security advisories). Routine dependency maintenance without these risks does not automatically require a specialist.
+- Use the [UI / Accessibility Review agent](.github/agents/ui-accessibility-review.agent.md) when changes affect interactions, keyboard operation, focus, dialogs, dynamic announcements, or significant layout behavior. Small copy or cosmetic changes do not automatically require a specialist; the implementer must still check applicable accessibility and responsive behavior.
+- Record why specialist reviews apply or are unnecessary. Give each invoked agent the task, acceptance criteria, intended PR base, complete change scope, and existing check results. Run independent checks/reviews in parallel only when they will not conflict over shared tooling or state.
+- These agents report evidence and findings without fixing the implementation or invoking other agents. The implementing agent batches related fixes and reruns only checks/reviews invalidated by those fixes. Reuse evidence for unchanged code, identifying its tested/reviewed state and relevant paths.
 - If a custom agent cannot be invoked, use an available separate agent with the same instructions. If required verification or an applicable review cannot be completed, report the blocker and stop before PR creation.
 - Complete applicable verification and specialist reviews before the independent local review. Pass their results, limitations, and finding resolutions to the local reviewer; they do not replace its final pass.
+
+### Findings and rechecks
+
+- Distinguish blocking defects from optional suggestions. Unresolved critical/high findings and concrete correctness, security, accessibility, or acceptance-criteria failures block a pass regardless of severity. Optional improvements and style preferences do not.
+- Fix blocking defects and batch corrections before requesting a recheck. Record non-blocking suggestions without requiring a fix or user acceptance; explicitly user-accepted lower-severity risks must include the rationale and must not waive an unmet acceptance criterion.
+- Any later change requires a final state/diff check, but not an automatic full re-review. Recheck the delta since the last reviewed state, affected paths, and invalidated validation evidence. Expand to a full review when scope materially grows or prior reasoning no longer holds.
 
 ### Independent local review gate
 
 - After implementation and relevant checks, invoke the [Local Review agent](.github/agents/local-review.agent.md) in a separate agent context. Prefer a different model when available; a separate reviewer agent is required even when only the same model is available.
 - If the runtime cannot invoke that custom agent, use an available independent review agent with the same review instructions. If no independent reviewer is available, stop before PR creation and report the blocker; never substitute the implementing agent's own review.
 - Give the reviewer the task and acceptance criteria, intended PR base branch, full diff against the merge base (including committed, staged, unstaged, and intended untracked files), and check commands/results. Include relevant context and known limitations, not just a summary of the edits.
-- Fix actionable findings and rerun affected checks. Have the independent reviewer recheck fixes and the final diff; any subsequent change invalidates the prior pass until reviewed.
-- Do not create the PR until the reviewer explicitly reports `PASS` for the final state. Unresolved critical/high-severity findings block a pass. Other actionable findings must be fixed or explicitly accepted by the user with the rationale recorded.
+- Have the independent reviewer consume existing verification/specialist evidence and investigate gaps or cross-cutting regressions, rather than routinely repeating completed checks. Apply the findings and recheck rules above.
+- Do not create the PR until the reviewer explicitly reports `PASS` for the final state, with no unresolved blocking findings or missing required evidence.
 - This gate applies to all PR changes, including documentation and agent instructions. A local pass is not a GitHub approval and does not replace CI or human review.
 
 ## Commits and pull requests
@@ -73,7 +80,7 @@
   - non-goals,
   - relevant risks or migrations,
   - test commands and results, or reasons checks were not run,
-  - applicable verification and specialist review results, including limitations and finding resolutions,
+  - check ownership and applicable specialist review results (or why specialists were unnecessary), including limitations and finding resolutions,
   - independent local review evidence: reviewer agent/model (if known), reviewed base and final commit/worktree state, verdict, findings and resolutions or user-accepted risks, and recheck results,
   - links to related issues only when they exist.
 - Use closing keywords only when the linked issue is actually resolved; otherwise mark it as related work.

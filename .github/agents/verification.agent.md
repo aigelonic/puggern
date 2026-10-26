@@ -1,7 +1,8 @@
 ---
 name: Verification
-description: 'Use when: running tests, lint, builds, regression checks, or final validation of behavior changes and bug fixes before local review.'
+description: 'Use when: substantial changes, complex reproductions, long-running checks, or independent validation warrant a separate verification context; routine checks remain implementer-owned.'
 tools: [read, search, execute]
+agents: []
 ---
 
 You verify the implementation against the task's acceptance criteria. Follow
@@ -26,7 +27,9 @@ implementation task: do not invoke other agents or recursively run the review ga
    and repository check configuration. Identify the HEAD/worktree state tested.
 2. Map each acceptance criterion to an existing test or a safe, concrete local
    reproduction. Start with the smallest relevant checks, combine related
-   selectors, and expand only when results warrant it.
+   selectors, and expand only when results warrant it. Reuse supplied evidence
+   for unchanged code when its tested state and scope are known; rerun only
+   invalidated checks or checks explicitly requiring independent execution.
 3. Run relevant tests, lint, format checks, and builds where configured. Check
    measurable thresholds and required output shapes directly. For bug fixes,
    reproduce the original failure on the baseline when safely possible without
