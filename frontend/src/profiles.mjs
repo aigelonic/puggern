@@ -1,4 +1,4 @@
-import { isValidProgress } from './learning.mjs?v=7';
+import { isValidProgress, normalizeProgress } from './learning.mjs?v=8';
 
 export const PROFILE_STATE_KEY = 'puggern.profile-state';
 export const PROFILE_STATE_VERSION = 1;
@@ -76,7 +76,18 @@ export function loadProfileState(storage) {
 
   try {
     const state = JSON.parse(stored);
-    return isValidProfileState(state) ? state : null;
+    if (!isValidProfileState(state)) return null;
+    return {
+      ...state,
+      progress: Object.fromEntries(
+        Object.entries(state.progress).map(([profileId, sets]) => [
+          profileId,
+          Object.fromEntries(
+            Object.entries(sets).map(([setId, progress]) => [setId, normalizeProgress(progress)]),
+          ),
+        ]),
+      ),
+    };
   } catch {
     return null;
   }

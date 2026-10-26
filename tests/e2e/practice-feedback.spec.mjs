@@ -58,17 +58,11 @@ test('rewards answers, supports correction, celebrates once and restores quietly
   await expect(page.locator('#practice-progress')).not.toHaveAttribute('data-effect');
   await expect(page.locator('.points-earned')).toHaveCount(0);
   await answer(page, 'cat');
-  await expect(page.locator('#feedback')).toContainText('Takk!');
-  await expect(page.locator('#practice-progress')).not.toHaveAttribute('data-effect');
-  await expect(page.locator('.points-earned')).toHaveCount(0);
-  await answer(page, 'cat');
-  await expect(page.locator('.points-earned')).toHaveText('+10 poeng');
-  await answer(page, 'cat');
   await expect(page.locator('#completion-heading')).toBeFocused();
   await expect(page.locator('.confetti')).toHaveCount(1);
   await expect(page.locator('.confetti i')).toHaveCount(24);
   await expect(page.locator('[data-effect="correct"]')).toHaveCount(0);
-  await expect(page.locator('#completion-rewards')).toContainText('30 poeng');
+  await expect(page.locator('#completion-rewards')).toContainText('20 poeng');
   await expect(page.locator('.confetti')).toHaveCount(0);
   const saved = await page.evaluate(() => localStorage.getItem('puggern.profile-state'));
   await page.evaluate(async () => {
@@ -119,17 +113,17 @@ test('rapid submissions replace effects; repeated mistakes and navigation leave 
 }) => {
   await start(page);
   await answer(page, 'wrong');
-  await answer(page, 'dog');
-  await answer(page, 'wrong');
+  await answer(page, 'still wrong');
   await expect(page.locator('[data-effect="incorrect"]')).toHaveCount(1);
-  await expect(page.locator('[data-effect="retry-scheduled"]')).toHaveCount(0);
-  await answer(page, 'cat');
+  await expect(page.locator('#correction-instruction')).toHaveText(
+    'Skriv riktig svar for å gå videre.',
+  );
   await answer(page, 'dog');
   await expect(page.locator('[data-effect="correct"]')).toHaveCount(1);
   await expect(page.locator('#practice-progress')).toHaveAttribute('data-effect', 'learned');
-  await answer(page, 'dog');
-  await expect(page.locator('#feedback')).not.toContainText('Nytt ord');
   await expect(page.locator('.points-earned')).toHaveText('+10 poeng');
+  await answer(page, 'wrong');
+  await expect(page.locator('[data-effect="incorrect"]')).toHaveCount(1);
   await expect(page.locator('#practice-progress')).not.toHaveAttribute('data-effect');
   await page.locator('#back-button').click();
   await expect(page.locator('[data-effect]')).toHaveCount(0);
@@ -202,7 +196,7 @@ test('sound is opt-in, bounded, replaceable and stops immediately when toggled o
   await answer(page, 'dog');
   expect(
     await page.evaluate(() => window.soundEvents.filter(([kind]) => kind === 'start')),
-  ).toHaveLength(1);
+  ).toHaveLength(2);
   await page.getByRole('button', { name: 'Lydeffekter: på' }).click();
   expect(await page.evaluate(() => window.soundEvents.at(-1))).toEqual(['stop', undefined]);
   await expect(page.locator('#sound-toggle')).toHaveAttribute('aria-pressed', 'false');

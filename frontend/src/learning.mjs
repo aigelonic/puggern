@@ -151,27 +151,32 @@ export function currentWord(session, words) {
 }
 
 export function submitAnswer(session, response, words, settings) {
-  const word = currentWord(session, words);
-  if (!word) return { session, result: 'complete' };
+  if (session.queue.length === 0) return { session, result: 'complete' };
+
+  const learned = [...new Set(session.learned)];
+  const learnedIds = new Set(learned);
+  const queue = [...new Set(session.queue.filter((id) => !learnedIds.has(id)))];
+  const word = words.find(({ id }) => id === queue[0]);
+  if (!word) {
+    if (queue.length === session.queue.length && learned.length === session.learned.length) {
+      return { session, result: 'complete' };
+    }
+    return {
+      session: { ...session, queue, correction: false, learned },
+      result: 'complete',
+    };
+  }
 
   const next = {
     ...session,
-    queue: [...session.queue],
-    learned: [...session.learned],
+    queue,
+    correction: false,
+    learned,
     mistakes: { ...session.mistakes },
     points: session.points ?? 0,
     streak: session.streak ?? 0,
     bestStreak: session.bestStreak ?? 0,
   };
-
-  if (session.correction) {
-    next.queue.shift();
-    const delayedIndex = Math.min(2, next.queue.length);
-    next.queue.splice(delayedIndex, 0, word.id);
-    next.queue.push(word.id);
-    next.correction = false;
-    return { session: next, result: 'retry-scheduled' };
-  }
 
   if (!answersMatch(response, word.answer, settings)) {
     next.correction = true;
@@ -180,11 +185,13 @@ export function submitAnswer(session, response, words, settings) {
     return { session: next, result: 'incorrect' };
   }
 
-  next.queue.shift();
-  next.points = Math.min(Number.MAX_SAFE_INTEGER, next.points + POINTS_PER_CORRECT_ANSWER);
-  next.streak = Math.min(Number.MAX_SAFE_INTEGER, next.streak + 1);
-  next.bestStreak = Math.max(next.bestStreak, next.streak);
-  if (!next.learned.includes(word.id)) next.learned.push(word.id);
+  next.queue = next.queue.filter((id) => id !== word.id);
+  if (!next.learned.includes(word.id)) {
+    next.learned.push(word.id);
+    next.points = Math.min(Number.MAX_SAFE_INTEGER, next.points + POINTS_PER_CORRECT_ANSWER);
+    next.streak = Math.min(Number.MAX_SAFE_INTEGER, next.streak + 1);
+    next.bestStreak = Math.max(next.bestStreak, next.streak);
+  }
   return { session: next, result: next.queue.length ? 'correct' : 'complete' };
 }
 
@@ -198,10 +205,30 @@ export function loadProgress(storage) {
 
   try {
     const progress = JSON.parse(stored);
-    return isValidProgress(progress) ? progress : null;
+    return normalizeProgress(progress);
   } catch {
     return null;
   }
+}
+
+export function normalizeProgress(progress) {
+  if (!isValidProgress(progress)) return null;
+
+  const { session } = progress;
+  const learned = [...session.learned];
+  const learnedIds = new Set(learned);
+  const queue = [...new Set(session.queue.filter((id) => !learnedIds.has(id)))];
+  const currentWasRemoved = session.queue.length > 0 && !queue.includes(session.queue[0]);
+
+  return {
+    ...progress,
+    session: {
+      ...session,
+      queue,
+      learned,
+      correction: session.correction && !currentWasRemoved && queue.length > 0,
+    },
+  };
 }
 
 export function isValidProgress(progress) {

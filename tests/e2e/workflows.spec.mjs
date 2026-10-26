@@ -28,15 +28,15 @@ test('shows prominent correction feedback and practices a missed word until it i
   await expect(correction.locator('.correction-label')).toHaveText('Riktig stavemåte');
   await expect(page.locator('#correct-answer')).toHaveText('eple');
   await expect(page.locator('#correction-instruction')).toHaveText(
-    'Skriv ordet én gang, så kommer det tilbake senere.',
+    'Skriv riktig svar for å gå videre.',
   );
   await expect(page.locator('#correction-announcement')).toHaveText(
-    'Riktig stavemåte er eple. Skriv ordet én gang, så kommer det tilbake senere.',
+    'Riktig stavemåte er eple. Skriv riktig svar for å gå videre.',
   );
   await expect(page.locator('#correction-announcement')).toHaveAttribute('aria-live', 'polite');
   await expect(page.locator('#answer')).toHaveAttribute('aria-describedby', 'correction-feedback');
   await expect(page.locator('#answer')).toHaveAccessibleDescription(
-    'Ikke helt ennå – prøv igjen! Riktig stavemåte eple Skriv ordet én gang, så kommer det tilbake senere.',
+    'Ikke helt ennå – prøv igjen! Riktig stavemåte eple Skriv riktig svar for å gå videre.',
   );
   await expect(page.locator('#answer')).toBeFocused();
   await expect(correction).toBeInViewport();
@@ -44,22 +44,39 @@ test('shows prominent correction feedback and practices a missed word until it i
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
     .toBe(true);
 
-  await page.getByLabel('Skriv ordet én gang').fill('eple');
+  await expect(page.locator('#progress-label')).toHaveText('0 av 1 lært · 1 oppgaver igjen');
+  await page.getByLabel('Skriv riktig svar').fill('feil igjen');
   await page.getByRole('button', { name: 'Sjekk svaret' }).click();
-  await expect(page.getByText('Takk! Dette ordet kommer tilbake litt senere.')).toBeVisible();
-
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    if (attempt > 0) await expect(page.locator('#feedback')).toContainText('Riktig! Bra jobbet');
-    await page.getByLabel('Stavingen din').fill('eple');
-    await page.getByRole('button', { name: 'Sjekk svaret' }).click();
-    if (attempt === 0) await expect(page.locator('#feedback')).toContainText('Riktig! Bra jobbet');
-  }
+  await expect(correction).toBeVisible();
+  await expect(page.locator('#progress-label')).toHaveText('0 av 1 lært · 1 oppgaver igjen');
+  await expect(page.locator('#practice-rewards')).toHaveText('0 poeng · 0 riktige på rad');
+  await page.getByLabel('Skriv riktig svar').fill('eple');
+  await page.getByRole('button', { name: 'Sjekk svaret' }).click();
 
   await expect(page.getByRole('heading', { name: 'Godt jobbet!' })).toBeVisible();
   await expect(page.locator('#completion-practiced-count')).toHaveText('1');
   await expect(page.locator('#completion-first-try-count')).toHaveText('0');
   await expect(page.locator('#completion-extra-practice-count')).toHaveText('1');
-  await expect(page.getByText('En rød frukt → eple · 1 feilsvar')).toBeVisible();
+  await expect(page.getByText('En rød frukt → eple · 2 feilsvar')).toBeVisible();
+  await expect(page.locator('#completion-rewards')).toHaveText(
+    '10 poeng · Beste rekke: 1 riktige på rad',
+  );
+  const saved = await page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem('puggern.profile-state'));
+    const profile = state.profiles[0];
+    return {
+      rewards: profile.rewards,
+      session: Object.values(state.progress[profile.id])[0].session,
+    };
+  });
+  expect(saved.rewards).toEqual({ points: 10, bestStreak: 1, completedSets: 1 });
+  expect(saved.session).toMatchObject({ queue: [], learned: ['0'], mistakes: { 0: 2 } });
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Godt jobbet!' })).toBeVisible();
+  await page.getByRole('button', { name: 'Til ordsettene' }).click();
+  await expect(page.locator('#profile-rewards')).toHaveText(
+    '10 poeng totalt · Beste rekke: 1 · 1 sett fullført',
+  );
 });
 
 test('leaving practice during delayed saving does not reopen correction or replay effects', async ({
@@ -220,11 +237,11 @@ test('reloads and resumes a saved session during its correction step', async ({ 
   await expect(page.getByRole('heading', { name: 'Frukt' })).toBeVisible();
   await page.getByRole('button', { name: 'Fortsett øvingen' }).click();
   await expect(page.getByRole('heading', { name: 'En rød frukt' })).toBeVisible();
-  await expect(page.getByLabel('Skriv ordet én gang')).toBeVisible();
+  await expect(page.getByLabel('Skriv riktig svar')).toBeVisible();
   await expect(page.locator('#correction-feedback')).toBeVisible();
   await expect(page.locator('#correct-answer')).toHaveText('eple');
   await expect(page.locator('#correction-instruction')).toHaveText(
-    'Skriv ordet én gang, så kommer det tilbake senere.',
+    'Skriv riktig svar for å gå videre.',
   );
   await expect(page.locator('#correction-announcement')).toHaveText(
     'Rettelsen vises ved svarfeltet.',
@@ -232,7 +249,7 @@ test('reloads and resumes a saved session during its correction step', async ({ 
   await expect(page.locator('#correction-announcement')).toHaveAttribute('aria-live', 'polite');
   await expect(page.locator('#answer')).toHaveAttribute('aria-describedby', 'correction-feedback');
   await expect(page.locator('#answer')).toHaveAccessibleDescription(
-    'Ikke helt ennå – prøv igjen! Riktig stavemåte eple Skriv ordet én gang, så kommer det tilbake senere.',
+    'Ikke helt ennå – prøv igjen! Riktig stavemåte eple Skriv riktig svar for å gå videre.',
   );
   await expect(page.locator('#answer')).toBeFocused();
 
@@ -243,16 +260,11 @@ test('reloads and resumes a saved session during its correction step', async ({ 
     'Rettelsen vises ved svarfeltet.',
   );
   await expect(page.locator('#answer')).toHaveAccessibleDescription(
-    'Ikke helt ennå – prøv igjen! Riktig stavemåte eple Skriv ordet én gang, så kommer det tilbake senere.',
+    'Ikke helt ennå – prøv igjen! Riktig stavemåte eple Skriv riktig svar for å gå videre.',
   );
 
-  await page.getByLabel('Skriv ordet én gang').fill('eple');
+  await page.getByLabel('Skriv riktig svar').fill('eple');
   await page.getByRole('button', { name: 'Sjekk svaret' }).click();
-  await expect(page.getByText('Takk! Dette ordet kommer tilbake litt senere.')).toBeVisible();
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    await page.getByLabel('Stavingen din').fill('eple');
-    await page.getByRole('button', { name: 'Sjekk svaret' }).click();
-  }
   await expect(page.getByRole('heading', { name: 'Godt jobbet!' })).toBeVisible();
   await expect(page.locator('#completion-first-try-count')).toHaveText('0');
   await expect(page.locator('#completion-extra-practice-count')).toHaveText('1');
@@ -302,9 +314,9 @@ test('preserves concurrent profile and progress changes across tabs', async ({ p
   await saveAfterMinimumTime(otherPage, 'Lagre profil');
   await expect(otherPage.getByLabel('Profil').locator('option', { hasText: 'Ada' })).toHaveCount(1);
 
-  await page.getByLabel('Skriv ordet én gang').fill('eple');
+  await page.getByLabel('Skriv riktig svar').fill('feil igjen');
   await page.getByRole('button', { name: 'Sjekk svaret' }).click();
-  await expect(page.getByText('Takk! Dette ordet kommer tilbake litt senere.')).toBeVisible();
+  await expect(page.locator('#progress-label')).toHaveText('0 av 1 lært · 1 oppgaver igjen');
   await page.getByRole('button', { name: 'Ordsett' }).click();
   await page.reload();
   await page.getByLabel('Profil').selectOption({ label: 'Min profil' });
@@ -399,7 +411,7 @@ test('keeps each profile progress separate and offers continue or restart', asyn
   await set.getByRole('button', { name: 'Start på nytt' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Start øving' }).click();
   await expect(page.getByLabel('Stavingen din')).toBeVisible();
-  await expect(page.getByLabel('Skriv ordet én gang')).toHaveCount(0);
+  await expect(page.getByLabel('Skriv riktig svar')).toHaveCount(0);
 });
 
 test('migrates an older in-progress session into the default profile', async ({ page }) => {
@@ -425,7 +437,7 @@ test('migrates an older in-progress session into the default profile', async ({ 
   await page.reload();
   const set = page.getByRole('listitem').filter({ hasText: 'Frukt' });
   await set.getByRole('button', { name: 'Fortsett øvingen' }).click();
-  await expect(page.getByLabel('Skriv ordet én gang')).toBeVisible();
+  await expect(page.getByLabel('Skriv riktig svar')).toBeVisible();
   await expect(page.locator('#correction-feedback')).toBeVisible();
   await expect(page.locator('#correct-answer')).toHaveText('eple');
 });
