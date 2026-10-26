@@ -106,6 +106,7 @@ test('keeps mixed-direction language context through correction, reload, and res
   await expect(page.locator('#prompt')).toHaveText('hund');
   await expect(page.locator('#hint-language')).toHaveText('Hint på Norsk');
   await expect(page.locator('#answer-language-instruction')).toHaveText('Skriv på Engelsk');
+  await expect(page.locator('#language-context-announcement')).toBeEmpty();
   await expect(page.locator('#answer')).toHaveAttribute(
     'aria-describedby',
     'hint-language answer-language-instruction',
@@ -117,6 +118,7 @@ test('keeps mixed-direction language context through correction, reload, and res
   await page.getByLabel('Stavingen din').fill('wrong');
   await page.getByLabel('Stavingen din').press('Enter');
   await expect(page.locator('#correction-feedback')).toBeVisible();
+  await expect(page.locator('#language-context-announcement')).toBeEmpty();
   await expect(page.locator('#answer')).toHaveAttribute(
     'aria-describedby',
     'hint-language answer-language-instruction correction-feedback',
@@ -132,6 +134,9 @@ test('keeps mixed-direction language context through correction, reload, and res
   await expect(page.locator('#prompt')).toHaveText('cat');
   await expect(page.locator('#hint-language')).toHaveText('Hint på Engelsk');
   await expect(page.locator('#answer-language-instruction')).toHaveText('Skriv på Norsk');
+  await expect(page.locator('#language-context-announcement')).toHaveText(
+    'Hint på Engelsk. Skriv på Norsk',
+  );
   await page.getByLabel('Stavingen din').fill('katt');
   await page.getByLabel('Stavingen din').press('Enter');
   await expect(page.getByRole('heading', { name: 'Godt jobbet!' })).toBeVisible();

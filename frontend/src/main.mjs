@@ -59,6 +59,7 @@ const answerButton = answerForm.querySelector('button[type="submit"]');
 const answerInput = document.querySelector('#answer');
 const feedback = document.querySelector('#feedback');
 const correctionAnnouncement = document.querySelector('#correction-announcement');
+const languageContextAnnouncement = document.querySelector('#language-context-announcement');
 const correctionFeedback = document.querySelector('#correction-feedback');
 const correctAnswer = document.querySelector('#correct-answer');
 const correctionInstruction = document.querySelector('#correction-instruction');
@@ -103,6 +104,7 @@ let words = [];
 let session = null;
 let currentSetId = null;
 let currentProfileId = null;
+let lastRenderedPracticeCardId = null;
 let pendingExerciseSet = null;
 let pendingExerciseProfileId = null;
 let exerciseConfigTrigger = null;
@@ -407,6 +409,8 @@ async function startSession(
   session = nextSession;
   currentSetId = setId;
   currentProfileId = profileId;
+  lastRenderedPracticeCardId = null;
+  languageContextAnnouncement.textContent = '';
   await persistProgress();
   renderPractice();
 }
@@ -457,6 +461,8 @@ function renderPractice(message = '', { announceCorrection = false, points = 0, 
     return;
   }
 
+  const cardChanged = lastRenderedPracticeCardId !== null && lastRenderedPracticeCardId !== word.id;
+  lastRenderedPracticeCardId = word.id;
   const learnedCount = session.learned.length;
   const isCorrection = session.correction;
   progressLabel.textContent = `${learnedCount} av ${words.length} lært · ${session.queue.length} oppgaver igjen`;
@@ -468,6 +474,9 @@ function renderPractice(message = '', { announceCorrection = false, points = 0, 
   prompt.textContent = word.prompt;
   hintLanguage.textContent = word.hintLanguageLabel ?? 'Språk ikke angitt';
   answerLanguageInstruction.textContent = word.answerLanguageInstruction ?? 'Svar på oversettelsen';
+  if (cardChanged && document.activeElement === answerInput) {
+    languageContextAnnouncement.textContent = `${hintLanguage.textContent}. ${answerLanguageInstruction.textContent}`;
+  }
   answerLabel.textContent = isCorrection ? 'Skriv riktig svar' : 'Stavingen din';
   correctionFeedback.hidden = !isCorrection;
   correctAnswer.textContent = isCorrection ? word.answer : '';
