@@ -127,12 +127,34 @@ and bump `SHELL_REVISION` so existing installations can prepare a distinct shell
 
 ## Pull Request Checks
 
-GitHub Actions runs separate `Quality`, `Tests`, and `Dependency security`
-checks on pull requests and pushes to `main`. Quality runs ESLint and checks
-formatting with Prettier. Dependency security runs `npm audit` and reviews
+GitHub Actions runs `Quality`, `Unit`, `Release planning`, `E2E`, `E2E production`,
+and `Dependency security` in parallel on pull requests and pushes to `main`.
+`Tests` remains the required aggregate check: it succeeds only when all four
+test jobs succeed, and fails if any fail, are canceled, or are skipped.
+Quality runs ESLint and checks formatting with Prettier.
+Dependency security runs `npm audit` and reviews
 dependency changes in pull requests; moderate and higher severity
 vulnerabilities fail the check. Dependabot checks npm packages and GitHub
 Actions weekly.
+
+Unit runs the core tests without browser setup. Release planning installs only
+its own dependencies and runs the offline GitHub fixtures. E2E runs all browser
+specs against the static server. E2E production builds and health-checks the NGINX
+image, then runs `modules`, `profiles`, `service-worker`, and `production-update`
+specs against it; container cleanup runs even after failures.
+
+Superseded PR runs are canceled per workflow/ref; pushes to `main` are not
+canceled. Both browser jobs cache `~/.cache/ms-playwright` using the runner OS,
+installed Playwright version, and root lockfile hash, while still installing
+system dependencies on cache hits. The production image uses Buildx with the
+GitHub Actions layer cache and loads the image locally without publishing it.
+Look for browser-cache hit/miss messages and Buildx `CACHED` layers in the logs.
+
+To validate the speedup after rollout, compare the median elapsed time of 3–5
+successful PR runs with recent successful runs of the old workflow, separating
+cold-cache and warm-cache results. Confirm parallel startup, cache reuse, and
+cancellation on rapid PR pushes, and monitor retries for flake regressions.
+Hosted-run evidence is needed; local test timings do not establish CI speedup.
 
 Repository administrators must enable Dependabot alerts and security updates
 in the repository's **Settings → Code security and analysis** page, then

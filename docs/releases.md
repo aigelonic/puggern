@@ -11,7 +11,8 @@ Release-please uses the manifest-based `simple` strategy. It owns
 `.release-please-manifest.json`, root `version.txt` (with a trailing newline),
 the generated root `CHANGELOG.md`, `frontend/src/app-version.mjs`, and the
 application version constant in `frontend/service-worker.js`. All four version
-copies must agree; `npm run test:unit` enforces this in the existing Tests CI job.
+copies must agree; `npm run test:unit` enforces this in the Unit CI job, which
+feeds the required Tests aggregate check.
 Root `package.json` and `package-lock.json` remain unversioned development tooling.
 Application versions do not change browser-storage schema versions. Shell cache
 identity includes both application version and an independent `SHELL_REVISION`;
