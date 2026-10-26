@@ -8,7 +8,7 @@
     <meta name="robots" content="noindex, nofollow, noarchive" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" type="image/png" sizes="192x192" href="./icons/pug-192.png" />
-    <link rel="stylesheet" href="./styles.css?v=9" />
+    <link rel="stylesheet" href="./styles.css?v=11" />
     <title>Puggern</title>
   </head>
   <body>
@@ -20,6 +20,9 @@
         </a>
         <p id="connection-status" role="status" aria-live="polite"></p>
       </header>
+      <button id="sound-toggle" class="button secondary" type="button" aria-pressed="false">
+        Lydeffekter: av
+      </button>
       <p
         id="correction-announcement"
         class="visually-hidden"
@@ -86,11 +89,21 @@
           <button id="archive-toggle" class="text-button" type="button">Vis arkiv</button>
         </div>
         <p id="setup-error" class="feedback error" role="alert" hidden></p>
+        <p id="share-status" class="feedback" role="status" aria-live="polite"></p>
+        <p id="share-error" class="feedback error" role="alert" hidden></p>
         <ul id="word-set-list" class="word-set-list" aria-labelledby="saved-sets-title"></ul>
         <p id="empty-sets" class="field-help">Ingen ordsett ennå. Lag ditt første under.</p>
         <button id="new-set-button" class="button secondary new-set-button" type="button">
           Nytt ordsett
         </button>
+        <button id="import-link-button" class="button secondary" type="button">
+          Importer lenke
+        </button>
+        <p class="field-help">
+          Deling tar bare med navn, ord, retning og innstillinger, ikke profiler eller fremgang.
+          Innholdet er lesbart for alle som har lenken og kan bli liggende i historikk og meldinger.
+          Ikke del sensitive opplysninger.
+        </p>
         <p id="set-limit-help" class="field-help" role="status" hidden>
           Du har nådd grensen på 50 ordsett på denne enheten.
         </p>
@@ -153,6 +166,99 @@
         </form>
       </section>
 
+      <dialog
+        id="share-link-dialog"
+        class="exercise-config-dialog"
+        aria-labelledby="share-link-title"
+        aria-describedby="share-link-help"
+      >
+        <h2 id="share-link-title">Del ordsett</h2>
+        <p id="share-link-help" class="field-help">
+          Kopier den markerte lenken manuelt. Alle som har lenken kan lese innholdet.
+        </p>
+        <label for="share-link-input">Lenke til ordsettet</label>
+        <textarea id="share-link-input" rows="3" readonly spellcheck="false"></textarea>
+        <div class="actions">
+          <button id="close-share-link-button" class="button secondary" type="button">Lukk</button>
+        </div>
+      </dialog>
+
+      <dialog
+        id="import-link-dialog"
+        class="exercise-config-dialog"
+        aria-labelledby="import-title"
+        aria-describedby="import-help"
+      >
+        <h2 id="import-title">Importer ordsett fra lenke</h2>
+        <p id="import-help" class="field-help">
+          Lenken leses lokalt, uten å hente innhold fra nettet. Ordsettet lagres som et nytt sett på
+          denne enheten, uten profiler eller fremgang. Like ordsett kan importeres flere ganger.
+        </p>
+        <form id="import-link-form">
+          <label for="import-link-input">Lenke til ordsettet</label>
+          <textarea
+            id="import-link-input"
+            rows="3"
+            maxlength="8000"
+            required
+            spellcheck="false"
+            autocomplete="off"
+          ></textarea>
+          <div class="actions">
+            <button class="button primary" type="submit">Forhåndsvis</button>
+          </div>
+        </form>
+        <form id="import-confirm-form" hidden>
+          <div class="anti-bot-field" aria-hidden="true">
+            <label for="import-website">Nettside</label>
+            <input
+              id="import-website"
+              name="website"
+              type="text"
+              tabindex="-1"
+              autocomplete="off"
+            />
+          </div>
+          <div id="import-preview" class="share-preview"></div>
+          <div class="actions">
+            <button id="import-save-button" class="button primary" type="submit">
+              Lagre ordsett
+            </button>
+          </div>
+        </form>
+        <p id="import-error" class="feedback error" role="alert" hidden></p>
+        <div class="actions">
+          <button id="cancel-import-button" class="button secondary" type="button">Avbryt</button>
+        </div>
+      </dialog>
+
+      <dialog
+        id="exercise-config-dialog"
+        class="exercise-config-dialog"
+        aria-labelledby="exercise-config-title"
+      >
+        <form id="exercise-config-form">
+          <h2 id="exercise-config-title">Start øving</h2>
+          <label for="exercise-direction">Retning</label>
+          <select id="exercise-direction" autofocus>
+            <option value="forward">Forover (norsk → målspråk)</option>
+            <option value="reverse">Bakover (målspråk → norsk)</option>
+            <option value="mixed">Blandet</option>
+          </select>
+          <label for="exercise-order">Rekkefølge</label>
+          <select id="exercise-order">
+            <option value="shuffled">Tilfeldig rekkefølge</option>
+            <option value="original">Opprinnelig rekkefølge</option>
+          </select>
+          <div class="actions">
+            <button id="cancel-exercise-setup" class="button secondary" type="button">
+              Avbryt
+            </button>
+            <button class="button primary" type="submit">Start øving</button>
+          </div>
+        </form>
+      </dialog>
+
       <section id="practice-view" class="view practice-view" hidden>
         <div class="practice-topline">
           <button id="back-button" class="text-button" type="button">&#8592; Ordsett</button>
@@ -170,6 +276,9 @@
         <form id="answer-form">
           <label id="answer-label" for="answer">Stavingen din</label>
           <div id="correction-feedback" class="correction-feedback" hidden>
+            <p class="correction-support">
+              <span aria-hidden="true">↻</span> Ikke helt ennå – prøv igjen!
+            </p>
             <p id="correction-label" class="correction-label">Riktig stavemåte</p>
             <p id="correct-answer" class="correct-answer"></p>
             <p id="correction-instruction" class="correction-instruction"></p>
@@ -191,7 +300,7 @@
 
       <section id="complete-view" class="view complete-view" hidden>
         <div class="celebration" aria-hidden="true">🎉 ⭐ 🎉</div>
-        <p class="eyebrow">Øving fullført</p>
+        <p class="eyebrow">Hurra! Du fullførte øvingen!</p>
         <h1 id="completion-heading" tabindex="-1">Godt jobbet!</h1>
         <p id="completion-rewards" class="reward-summary"></p>
         <p id="completion-message" class="intro"></p>
@@ -254,6 +363,6 @@
         <button class="button primary" value="update">Forkast inntasting og oppdater</button>
       </form>
     </dialog>
-    <script type="module" src="./src/main.mjs?v=10"></script>
+    <script type="module" src="./src/main.mjs?v=13"></script>
   </body>
 </html>

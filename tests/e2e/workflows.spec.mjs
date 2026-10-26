@@ -3,6 +3,11 @@ import { expect, test } from '@playwright/test';
 async function saveAfterMinimumTime(page, name) {
   await page.waitForTimeout(300);
   await page.getByRole('button', { name }).click();
+  if (name === 'Lagre og start øving') {
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Start øving' }).click();
+  }
 }
 
 test('shows prominent correction feedback and practices a missed word until it is learned', async ({
@@ -31,7 +36,7 @@ test('shows prominent correction feedback and practices a missed word until it i
   await expect(page.locator('#correction-announcement')).toHaveAttribute('aria-live', 'polite');
   await expect(page.locator('#answer')).toHaveAttribute('aria-describedby', 'correction-feedback');
   await expect(page.locator('#answer')).toHaveAccessibleDescription(
-    'Riktig stavemåte eple Skriv ordet én gang, så kommer det tilbake senere.',
+    'Ikke helt ennå – prøv igjen! Riktig stavemåte eple Skriv ordet én gang, så kommer det tilbake senere.',
   );
   await expect(page.locator('#answer')).toBeFocused();
   await expect(correction).toBeInViewport();
@@ -44,10 +49,10 @@ test('shows prominent correction feedback and practices a missed word until it i
   await expect(page.getByText('Takk! Dette ordet kommer tilbake litt senere.')).toBeVisible();
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    if (attempt > 0) await expect(page.getByText('Riktig! Fortsett slik.')).toBeVisible();
+    if (attempt > 0) await expect(page.locator('#feedback')).toContainText('Riktig! Bra jobbet');
     await page.getByLabel('Stavingen din').fill('eple');
     await page.getByRole('button', { name: 'Sjekk svaret' }).click();
-    if (attempt === 0) await expect(page.getByText('Riktig! Fortsett slik.')).toBeVisible();
+    if (attempt === 0) await expect(page.locator('#feedback')).toContainText('Riktig! Bra jobbet');
   }
 
   await expect(page.getByRole('heading', { name: 'Godt jobbet!' })).toBeVisible();
@@ -57,7 +62,9 @@ test('shows prominent correction feedback and practices a missed word until it i
   await expect(page.getByText('En rød frukt → eple · 1 feilsvar')).toBeVisible();
 });
 
-test('chooses correction announcement after delayed progress saving', async ({ page }) => {
+test('leaving practice during delayed saving does not reopen correction or replay effects', async ({
+  page,
+}) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Nytt ordsett' }).click();
   await page.getByLabel('Navn på ordsettet').fill('Frukt');
@@ -83,14 +90,11 @@ test('chooses correction announcement after delayed progress saving', async ({ p
   await page.getByRole('button', { name: 'Ordsett' }).click();
   await page.evaluate(() => window.releaseProfileStateLock());
 
-  await expect(page.locator('#correction-feedback')).toBeVisible();
-  await expect(page.locator('#correction-announcement')).toHaveText(
-    'Rettelsen vises ved svarfeltet.',
-  );
-  await expect(page.locator('#answer')).toHaveAccessibleDescription(
-    'Riktig stavemåte eple Skriv ordet én gang, så kommer det tilbake senere.',
-  );
-  await expect(page.locator('#answer')).toBeFocused();
+  await expect(page.locator('#answer')).not.toHaveAttribute('readonly', '');
+  await expect(page.locator('#setup-view')).toBeVisible();
+  await expect(page.locator('#practice-view')).toBeHidden();
+  await expect(page.locator('#correction-announcement')).toBeEmpty();
+  await expect(page.locator('[data-effect]')).toHaveCount(0);
 });
 
 test('does not exceed the set limit when copies are requested concurrently', async ({ page }) => {
@@ -228,7 +232,7 @@ test('reloads and resumes a saved session during its correction step', async ({ 
   await expect(page.locator('#correction-announcement')).toHaveAttribute('aria-live', 'polite');
   await expect(page.locator('#answer')).toHaveAttribute('aria-describedby', 'correction-feedback');
   await expect(page.locator('#answer')).toHaveAccessibleDescription(
-    'Riktig stavemåte eple Skriv ordet én gang, så kommer det tilbake senere.',
+    'Ikke helt ennå – prøv igjen! Riktig stavemåte eple Skriv ordet én gang, så kommer det tilbake senere.',
   );
   await expect(page.locator('#answer')).toBeFocused();
 
@@ -239,7 +243,7 @@ test('reloads and resumes a saved session during its correction step', async ({ 
     'Rettelsen vises ved svarfeltet.',
   );
   await expect(page.locator('#answer')).toHaveAccessibleDescription(
-    'Riktig stavemåte eple Skriv ordet én gang, så kommer det tilbake senere.',
+    'Ikke helt ennå – prøv igjen! Riktig stavemåte eple Skriv ordet én gang, så kommer det tilbake senere.',
   );
 
   await page.getByLabel('Skriv ordet én gang').fill('eple');
@@ -393,6 +397,7 @@ test('keeps each profile progress separate and offers continue or restart', asyn
   await expect(set.getByRole('button', { name: 'Start på nytt' })).toBeVisible();
 
   await set.getByRole('button', { name: 'Start på nytt' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Start øving' }).click();
   await expect(page.getByLabel('Stavingen din')).toBeVisible();
   await expect(page.getByLabel('Skriv ordet én gang')).toHaveCount(0);
 });
@@ -439,6 +444,7 @@ test('completed practice remains saved and can be restarted', async ({ page }) =
   const set = page.getByRole('listitem').filter({ hasText: 'Frukt' });
   await expect(set).toContainText('Fullført');
   await set.getByRole('button', { name: 'Øv på nytt' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Start øving' }).click();
   await expect(page.getByRole('heading', { name: 'En rød frukt' })).toBeVisible();
 });
 
@@ -516,11 +522,16 @@ test('completes a practice session while offline', async ({ page, context }) => 
   await expect(page.locator('#completion-first-try-count')).toHaveText('1');
 });
 
-test('creates and practices a saved word set in both directions', async ({ page }) => {
+test('uses Mixed direction mode for a saved word set configured in both directions', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Math.random = () => 0;
+  });
   await page.goto('/');
   await page.getByRole('button', { name: 'Nytt ordsett' }).click();
   await page.getByLabel('Navn på ordsettet').fill('Uke 42');
-  await page.getByLabel('Hint og svar').fill('hund;dog');
+  await page.getByLabel('Hint og svar').fill('hund;dog\nkatt;cat');
   await page.getByLabel('Quizretning').selectOption('both');
 
   await expect(page.getByLabel('Hint, linje 1')).toHaveValue('hund');
@@ -530,15 +541,19 @@ test('creates and practices a saved word set in both directions', async ({ page 
   const set = page.getByRole('listitem').filter({ hasText: 'Uke 42' });
   await expect(set).toBeVisible();
   await set.getByRole('button', { name: 'Start øving' }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.locator('#exercise-order').selectOption('original');
+  await dialog.getByRole('button', { name: 'Start øving' }).click();
   await expect(page.getByText('0 av 2 lært')).toBeVisible();
 
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    if (attempt > 0) await expect(page.getByText('Riktig! Fortsett slik.')).toBeVisible();
-    const currentPrompt = await page.locator('#prompt').textContent();
-    await page.getByLabel('Stavingen din').fill(currentPrompt === 'hund' ? 'hound' : 'hund');
-    await page.getByRole('button', { name: 'Sjekk svaret' }).click();
-    if (attempt === 0) await expect(page.getByText('Riktig! Fortsett slik.')).toBeVisible();
-  }
+  await expect(page.locator('#prompt')).toHaveText('hund');
+  await page.getByLabel('Stavingen din').fill('hound');
+  await page.getByRole('button', { name: 'Sjekk svaret' }).click();
+  await expect(page.locator('#feedback')).toContainText('Riktig! Bra jobbet');
+  await expect(page.locator('#prompt')).toHaveText('cat');
+  await page.getByLabel('Stavingen din').fill('katt');
+  await page.getByRole('button', { name: 'Sjekk svaret' }).click();
+
   await expect(page.getByRole('heading', { name: 'Godt jobbet!' })).toBeVisible();
   await expect(page.locator('#completion-practiced-count')).toHaveText('2');
   await expect(page.locator('#completion-first-try-count')).toHaveText('2');
@@ -640,6 +655,7 @@ test('throttles repeated set creation while leaving practice available', async (
     .filter({ hasText: 'Set 1' })
     .getByRole('button', { name: 'Start øving' })
     .click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Start øving' }).click();
   await expect(page.getByRole('heading', { name: 'Hint 1' })).toBeVisible();
 });
 

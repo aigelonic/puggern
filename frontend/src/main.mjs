@@ -7,8 +7,9 @@ import {
   previewWordSet,
   PROGRESS_VERSION,
   submitAnswer,
+  wordsForExercise,
   wordsForDirection,
-} from './learning.mjs?v=6';
+} from './learning.mjs?v=7';
 import {
   addRewards,
   createProfileState,
@@ -19,16 +20,23 @@ import {
   MAX_PROFILES,
   PROFILE_STATE_KEY,
   saveProfileState,
-} from './profiles.mjs?v=6';
+} from './profiles.mjs?v=7';
 import {
   loadWordSets,
   saveWordSets,
   MAX_WORD_SET_NAME_LENGTH,
   MAX_WORD_SETS,
-} from './word-sets.mjs?v=7';
+} from './word-sets.mjs?v=8';
 import { recordCreationAttempt, MIN_CREATION_FORM_TIME_MS } from './creation-guard.mjs?v=3';
 import { APP_VERSION, isValidAppVersion } from './app-version.mjs';
 import { createAppUpdates } from './app-updates.mjs';
+import {
+  SHARE_PARAM,
+  MAX_SHARE_URL_LENGTH,
+  createShareUrl,
+  parseShareUrl,
+} from './share-word-set.mjs?v=1';
+import { answerFeedback, createPracticeEffects } from './practice-feedback.mjs?v=1';
 
 const status = document.querySelector('#connection-status');
 const appError = document.querySelector('#app-error');
@@ -62,6 +70,29 @@ const editorTitle = document.querySelector('#editor-title');
 const archiveToggle = document.querySelector('#archive-toggle');
 const newSetButton = document.querySelector('#new-set-button');
 const setLimitHelp = document.querySelector('#set-limit-help');
+const exerciseConfigDialog = document.querySelector('#exercise-config-dialog');
+const exerciseConfigForm = document.querySelector('#exercise-config-form');
+const shareStatus = document.querySelector('#share-status');
+const shareError = document.querySelector('#share-error');
+const shareLinkDialog = document.querySelector('#share-link-dialog');
+const shareLinkInput = document.querySelector('#share-link-input');
+const importButton = document.querySelector('#import-link-button');
+const importDialog = document.querySelector('#import-link-dialog');
+const importLinkForm = document.querySelector('#import-link-form');
+const importLinkInput = document.querySelector('#import-link-input');
+const importConfirmForm = document.querySelector('#import-confirm-form');
+const importSaveButton = document.querySelector('#import-save-button');
+const importPreview = document.querySelector('#import-preview');
+const importError = document.querySelector('#import-error');
+importLinkInput.maxLength = MAX_SHARE_URL_LENGTH;
+const effects = createPracticeEffects({
+  feedback,
+  correction: correctionFeedback,
+  progress: document.querySelector('#practice-progress'),
+  celebration: document.querySelector('.celebration'),
+  soundToggle: document.querySelector('#sound-toggle'),
+});
+let viewRevision = 0;
 let wordSets = loadWordSets(window.localStorage);
 let profileState = loadProfileState(window.localStorage);
 let showArchived = false;
@@ -71,7 +102,14 @@ let words = [];
 let session = null;
 let currentSetId = null;
 let currentProfileId = null;
+let pendingExerciseSet = null;
+let pendingExerciseProfileId = null;
+let exerciseConfigTrigger = null;
 let unsavedProgress = false;
+let shareLinkTrigger = null;
+let importTrigger = null;
+let importDraft = null;
+let importSaving = false;
 const pendingRewards = new Map();
 const operations = new Set();
 let updateTransition = false;
@@ -311,6 +349,8 @@ function updateConnectionStatus() {
 }
 
 function showView(view) {
+  effects.cancel();
+  viewRevision += 1;
   setupView.hidden = view !== setupView;
   practiceView.hidden = view !== practiceView;
   completeView.hidden = view !== completeView;
@@ -358,6 +398,16 @@ function settingsFromForm() {
   };
 }
 
+function directionModeForSet(set) {
+  return (
+    {
+      'prompt-to-answer': 'forward',
+      'answer-to-prompt': 'reverse',
+      both: 'mixed',
+    }[set.direction] ?? 'forward'
+  );
+}
+
 async function persistProgress() {
   const progress = { version: PROGRESS_VERSION, session, words };
   const saved = await persistProfileState(
@@ -395,6 +445,8 @@ async function startSessionOperation(
   setId,
   profileId = profileState.activeProfileId,
 ) {
+  effects.cancel();
+  viewRevision += 1;
   words = nextWords;
   session = nextSession;
   currentSetId = setId;
@@ -403,12 +455,25 @@ async function startSessionOperation(
   renderPractice();
 }
 
-async function startWordSet(set) {
-  const practiceWords = wordsForDirection(set.words, set.direction);
+function openExerciseSetup(set) {
+  const savedConfig = wordSetProgress(set.id)?.session.exerciseConfig;
+  const directionMode = savedConfig?.directionMode ?? directionModeForSet(set);
+  document.querySelector('#exercise-direction').value = directionMode;
+  document.querySelector('#exercise-order').value = savedConfig?.orderMode ?? 'shuffled';
+  document.querySelector('#exercise-config-title').textContent = `Start øving: ${set.name}`;
+  exerciseConfigTrigger = document.activeElement;
+  pendingExerciseSet = set;
+  pendingExerciseProfileId = profileState.activeProfileId;
+  exerciseConfigDialog.showModal();
+}
+
+async function startWordSet(set, exerciseConfig, profileId) {
+  const practiceWords = wordsForExercise(set.words, exerciseConfig.directionMode);
   await startSession(
     practiceWords,
-    createSession(practiceWords, Math.random, set.settings),
+    createSession(practiceWords, Math.random, set.settings, exerciseConfig),
     set.id,
+    profileId,
   );
 }
 
@@ -429,7 +494,7 @@ function wordSetProgress(setId) {
   return activeProfileProgress()[setId];
 }
 
-function renderPractice(message = '', { announceCorrection = false } = {}) {
+function renderPractice(message = '', { announceCorrection = false, points = 0, icon = '✓' } = {}) {
   const word = currentWord(session, words);
   if (!word) {
     finishSession();
@@ -452,6 +517,18 @@ function renderPractice(message = '', { announceCorrection = false } = {}) {
     ? 'Skriv ordet én gang, så kommer det tilbake senere.'
     : '';
   feedback.textContent = isCorrection ? '' : message;
+  if (!isCorrection && message) {
+    const marker = document.createElement('span');
+    marker.setAttribute('aria-hidden', 'true');
+    marker.textContent = `${icon} `;
+    feedback.prepend(marker);
+    if (points > 0) {
+      const badge = document.createElement('span');
+      badge.className = 'points-earned';
+      badge.textContent = `+${points} poeng`;
+      feedback.append(' ', badge);
+    }
+  }
   feedback.classList.toggle('error', false);
   if (isCorrection) {
     answerInput.setAttribute('aria-describedby', 'correction-feedback');
@@ -511,6 +588,180 @@ function makeButton(label, action, className = 'button secondary') {
   button.textContent = label;
   button.addEventListener('click', action);
   return button;
+}
+
+function restoreDialogFocus(trigger) {
+  const target =
+    trigger?.isConnected && !trigger.closest('[hidden]') && !trigger.disabled
+      ? trigger
+      : !setupView.hidden
+        ? importButton
+        : !practiceView.hidden
+          ? document.querySelector('#back-button')
+          : document.querySelector('#completion-heading');
+  target.focus();
+}
+
+function showShareFeedback(message = '', error = '') {
+  shareStatus.textContent = message;
+  shareError.textContent = error;
+  shareError.hidden = !error;
+}
+
+async function shareWordSet(set, trigger) {
+  if (trigger.disabled) return;
+  trigger.disabled = true;
+  showShareFeedback();
+  try {
+    const url = createShareUrl(set, window.location.href);
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: set.name, url });
+        showShareFeedback('Ordsettet er delt.');
+        return;
+      } catch (error) {
+        if (error.name === 'AbortError') {
+          showShareFeedback('Delingen ble avbrutt.');
+          return;
+        }
+      }
+    }
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(url);
+        showShareFeedback('Lenken er kopiert. Du kan lime den inn og dele den.');
+        return;
+      } catch {
+        // Manuell kopiering fungerer også uten tilgang til utklippstavlen.
+      }
+    }
+    shareLinkTrigger = trigger;
+    shareLinkInput.value = url;
+    shareLinkDialog.showModal();
+    shareLinkInput.focus();
+    shareLinkInput.select();
+  } catch (error) {
+    showShareFeedback('', `Kunne ikke dele ordsettet: ${error.message}`);
+  } finally {
+    trigger.disabled = false;
+  }
+}
+
+function showImportError(message = '') {
+  importError.textContent = message;
+  importError.hidden = !message;
+}
+
+function openImportDialog(trigger = importButton) {
+  importTrigger = trigger;
+  importDraft = null;
+  importLinkForm.reset();
+  importConfirmForm.reset();
+  importConfirmForm.dataset.openedAt = String(Date.now());
+  importLinkForm.hidden = false;
+  importConfirmForm.hidden = true;
+  importPreview.replaceChildren();
+  showImportError();
+  importDialog.showModal();
+  importLinkInput.focus();
+}
+
+function previewImport(input) {
+  importDraft = null;
+  importPreview.replaceChildren();
+  showImportError();
+  try {
+    const draft = parseShareUrl(input);
+    const title = document.createElement('h3');
+    title.tabIndex = -1;
+    title.textContent = draft.name;
+    const summary = document.createElement('p');
+    const direction = {
+      'prompt-to-answer': 'Hint → svar',
+      'answer-to-prompt': 'Svar → hint',
+      both: 'Begge retninger',
+    }[draft.direction];
+    summary.textContent = `${draft.words.length} ord · Retning: ${direction}`;
+    const settings = document.createElement('p');
+    settings.textContent =
+      `Skill mellom store og små bokstaver: ${draft.settings.caseSensitive ? 'Ja' : 'Nei'}. ` +
+      `Ta hensyn til aksenter: ${draft.settings.accentSensitive ? 'Ja' : 'Nei'}.`;
+    const help = document.createElement('p');
+    help.textContent = 'De første fem oppføringene (hint → svar):';
+    const rows = document.createElement('ol');
+    draft.words.slice(0, 5).forEach((word) => {
+      const row = document.createElement('li');
+      row.textContent = `${word.prompt} → ${word.answer}`;
+      rows.append(row);
+    });
+    importPreview.append(title, summary, settings, help, rows);
+    importDraft = draft;
+    importLinkForm.hidden = true;
+    importConfirmForm.hidden = false;
+    title.focus();
+  } catch (error) {
+    importLinkForm.hidden = false;
+    importConfirmForm.hidden = true;
+    showImportError(error.message);
+    importLinkInput.focus();
+  }
+}
+
+async function saveImportedWordSet() {
+  if (importSaving || !importDraft) return;
+  const draft = importDraft;
+  const restoreSaveFocus = document.activeElement === importSaveButton;
+  importSaving = true;
+  importSaveButton.disabled = true;
+  showImportError();
+  try {
+    if (loadWordSets(window.localStorage).length >= MAX_WORD_SETS) {
+      showImportError(`Du kan ha maksimalt ${MAX_WORD_SETS} ordsett på denne enheten.`);
+      return;
+    }
+    const guardError = await checkCreationForm(importConfirmForm);
+    if (importDraft !== draft || !importDialog.open) return;
+    if (guardError) {
+      showImportError(guardError);
+      return;
+    }
+    const latestSets = loadWordSets(window.localStorage);
+    if (latestSets.length >= MAX_WORD_SETS) {
+      showImportError(`Du kan ha maksimalt ${MAX_WORD_SETS} ordsett på denne enheten.`);
+      return;
+    }
+    const now = new Date().toISOString();
+    const set = {
+      ...draft,
+      id: crypto.randomUUID(),
+      archived: false,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const nextSets = [set, ...latestSets];
+    saveWordSets(window.localStorage, nextSets);
+    wordSets = nextSets;
+    showArchived = false;
+    showView(setupView);
+    renderWordSets();
+    importDialog.close();
+    showShareFeedback('Ordsettet er importert som et nytt ordsett.');
+  } catch (error) {
+    if (importDraft === draft && importDialog.open) {
+      showImportError(`Kunne ikke importere ordsettet: ${error.message}`);
+    }
+  } finally {
+    importSaving = false;
+    importSaveButton.disabled = false;
+    if (
+      restoreSaveFocus &&
+      importDialog.open &&
+      importDraft === draft &&
+      document.activeElement === document.body
+    ) {
+      importSaveButton.focus();
+    }
+  }
 }
 
 function updateWordSets(nextWordSets, action) {
@@ -577,11 +828,11 @@ function renderWordSets() {
         actions.append(
           makeButton('Fortsett øvingen', () => continueWordSet(set), 'button primary'),
         );
-        actions.append(makeButton('Start på nytt', () => startWordSet(set)));
+        actions.append(makeButton('Start på nytt', () => openExerciseSetup(set)));
       } else if (progress) {
-        actions.append(makeButton('Øv på nytt', () => startWordSet(set), 'button primary'));
+        actions.append(makeButton('Øv på nytt', () => openExerciseSetup(set), 'button primary'));
       } else {
-        actions.append(makeButton('Start øving', () => startWordSet(set), 'button primary'));
+        actions.append(makeButton('Start øving', () => openExerciseSetup(set), 'button primary'));
       }
       actions.append(makeButton('Rediger', () => openEditor(set)));
       actions.append(makeButton('Kopier', () => duplicateWordSet(set)));
@@ -590,6 +841,8 @@ function renderWordSets() {
       actions.append(makeButton('Gjenopprett', () => changeArchived(set, false)));
       actions.append(makeButton('Rediger', () => openEditor(set)));
     }
+    const shareButton = makeButton('Del', () => shareWordSet(set, shareButton));
+    actions.append(shareButton);
     actions.append(makeButton('Slett', () => deleteWordSet(set), 'button danger'));
     item.append(details, actions);
     wordSetList.append(item);
@@ -759,7 +1012,7 @@ async function saveEditorOperation(startAfterSave = false) {
   wordSetForm.hidden = true;
   showSetupError('');
   showCreationError(wordSetForm, '');
-  if (startAfterSave) startWordSet(set);
+  if (startAfterSave) openExerciseSetup(set);
 }
 
 function changeArchived(set, archived) {
@@ -852,6 +1105,8 @@ if (savedProgress?.session.queue.length === 0 && wordSets.some((set) => set.id =
 profileSelect.addEventListener(
   'change',
   trackOperation(async () => {
+    effects.cancel();
+    viewRevision += 1;
     const activeProfileId = profileSelect.value;
     if (await persistProfileState((state) => ({ ...state, activeProfileId }), 'bytte profil'))
       renderWordSets();
@@ -955,8 +1210,13 @@ answerForm.addEventListener(
     if (answerButton.disabled) return;
     answerButton.disabled = true;
     answerInput.readOnly = true;
+    effects.cancel();
+    effects.prepareSound();
+    const submissionRevision = viewRevision;
     try {
+      const answeredWord = currentWord(session, words);
       const outcome = submitAnswer(session, answerInput.value, words, session.settings);
+      const cue = answerFeedback(session, outcome, answeredWord);
       const earned = {
         points: (outcome.session.points ?? 0) - (session.points ?? 0),
         bestStreak: outcome.session.bestStreak ?? 0,
@@ -968,22 +1228,27 @@ answerForm.addEventListener(
       );
       session = outcome.session;
       await persistProgress();
+      if (submissionRevision !== viewRevision) return;
 
       if (outcome.result === 'incorrect') {
         renderPractice('', {
           announceCorrection: document.activeElement === answerInput,
         });
+        effects.play(cue);
         return;
       }
       if (outcome.result === 'retry-scheduled') {
-        renderPractice('Takk! Dette ordet kommer tilbake litt senere.');
+        renderPractice(cue.message, { icon: '↻' });
+        effects.play(cue);
         return;
       }
       if (outcome.result === 'complete') {
         finishSession();
+        effects.play(cue);
         return;
       }
-      renderPractice('Riktig! Fortsett slik.');
+      renderPractice(cue.message, { points: cue.points });
+      effects.play(cue);
     } finally {
       answerButton.disabled = false;
       answerInput.readOnly = false;
@@ -995,10 +1260,49 @@ document.querySelector('#back-button').addEventListener('click', () => {
   showView(setupView);
   renderWordSets();
 });
+function cancelExerciseSetup() {
+  const focusTarget =
+    exerciseConfigTrigger?.isConnected && !exerciseConfigTrigger.closest('[hidden]')
+      ? exerciseConfigTrigger
+      : newSetButton.disabled
+        ? document.querySelector('#saved-sets-title')
+        : newSetButton;
+  pendingExerciseSet = null;
+  pendingExerciseProfileId = null;
+  exerciseConfigTrigger = null;
+  exerciseConfigDialog.close();
+  focusTarget.focus();
+}
+
+document.querySelector('#cancel-exercise-setup').addEventListener('click', cancelExerciseSetup);
+exerciseConfigDialog.addEventListener('cancel', (event) => {
+  event.preventDefault();
+  cancelExerciseSetup();
+});
+exerciseConfigForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const set = pendingExerciseSet;
+  const profileId = pendingExerciseProfileId;
+  const exerciseConfig = {
+    directionMode: document.querySelector('#exercise-direction').value,
+    orderMode: document.querySelector('#exercise-order').value,
+  };
+  pendingExerciseSet = null;
+  pendingExerciseProfileId = null;
+  exerciseConfigTrigger = null;
+  exerciseConfigDialog.close();
+  if (set) await startWordSet(set, exerciseConfig, profileId);
+});
 document.querySelector('#completion-restart-button').addEventListener('click', () => {
+  const set = wordSets.find(({ id }) => id === currentSetId);
+  const exerciseConfig = session.exerciseConfig ?? {
+    directionMode: set ? directionModeForSet(set) : 'forward',
+    orderMode: 'shuffled',
+  };
+  const restartWords = wordsForExercise(set?.words ?? words, exerciseConfig.directionMode);
   startSession(
-    words,
-    createSession(words, Math.random, session.settings),
+    restartWords,
+    createSession(restartWords, Math.random, session.settings, exerciseConfig),
     currentSetId,
     currentProfileId,
   );
@@ -1013,3 +1317,63 @@ document.querySelector('#completion-new-set-button').addEventListener('click', (
   renderWordSets();
   openEditor();
 });
+
+importButton.addEventListener('click', () => openImportDialog());
+importLinkForm.addEventListener(
+  'submit',
+  trackOperation(() => previewImport(importLinkInput.value)),
+);
+importConfirmForm.addEventListener(
+  'submit',
+  trackOperation(() => saveImportedWordSet()),
+);
+document.querySelector('#cancel-import-button').addEventListener('click', () => {
+  importDialog.close();
+});
+importDialog.addEventListener('keydown', (event) => {
+  if (event.key !== 'Tab') return;
+  const focusable = [
+    ...importDialog.querySelectorAll('button:not([disabled]), textarea:not([disabled])'),
+  ].filter((element) => element.getClientRects().length > 0);
+  const first = focusable[0];
+  const last = focusable.at(-1);
+  if (!first || !last) return;
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+});
+importDialog.addEventListener('close', () => {
+  importDraft = null;
+  importLinkForm.reset();
+  importConfirmForm.reset();
+  importPreview.replaceChildren();
+  showImportError();
+  restoreDialogFocus(importTrigger);
+  importTrigger = null;
+});
+document.querySelector('#close-share-link-button').addEventListener('click', () => {
+  shareLinkDialog.close();
+});
+shareLinkDialog.addEventListener('close', () => {
+  shareLinkInput.value = '';
+  restoreDialogFocus(shareLinkTrigger);
+  shareLinkTrigger = null;
+});
+
+const incomingShareUrl = new URL(window.location.href);
+if (incomingShareUrl.searchParams.has(SHARE_PARAM)) {
+  const input = incomingShareUrl.href;
+  incomingShareUrl.searchParams.delete(SHARE_PARAM);
+  window.history.replaceState(
+    window.history.state,
+    '',
+    `${incomingShareUrl.pathname}${incomingShareUrl.search}${incomingShareUrl.hash}`,
+  );
+  showView(setupView);
+  openImportDialog();
+  previewImport(input);
+}

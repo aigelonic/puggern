@@ -17,7 +17,9 @@ test('serves the complete startup module graph as JavaScript', async ({ page, re
     '/src/creation-guard.mjs',
     '/src/learning.mjs',
     '/src/main.mjs',
+    '/src/practice-feedback.mjs',
     '/src/profiles.mjs',
+    '/src/share-word-set.mjs',
     '/src/word-sets.mjs',
   ]);
   for (const url of modules) {

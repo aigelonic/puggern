@@ -15,6 +15,7 @@ import {
   saveProgress,
   submitAnswer,
   wordsForDirection,
+  wordsForExercise,
 } from '../frontend/src/learning.mjs';
 
 test('parses non-empty prompt and answer pairs and reports malformed lines', () => {
@@ -50,6 +51,75 @@ test('creates practice entries in the selected direction', () => {
   assert.throws(() => wordsForDirection(words, 'unknown'), /quizretning/);
 });
 
+test('creates forward, reverse, and mixed questions once per word', () => {
+  const words = parseWordSet('hund\tdog\nkatt\tcat\nfugl\tbird');
+  assert.deepEqual(wordsForExercise(words, 'forward'), words);
+  assert.deepEqual(wordsForExercise(words, 'reverse'), [
+    { id: '0', prompt: 'dog', answer: 'hund' },
+    { id: '1', prompt: 'cat', answer: 'katt' },
+    { id: '2', prompt: 'bird', answer: 'fugl' },
+  ]);
+
+  const mixed = wordsForExercise(words, 'mixed', () => 0);
+  assert.equal(mixed.length, words.length);
+  assert.equal(
+    mixed.some(({ prompt, answer }) => prompt === 'hund' && answer === 'dog'),
+    true,
+  );
+  assert.equal(
+    mixed.some(({ prompt, answer }) => prompt === 'bird' && answer === 'fugl'),
+    true,
+  );
+  assert.deepEqual(
+    wordsForExercise(words.slice(0, 1), 'mixed', () => 0),
+    [{ id: '0', prompt: 'hund', answer: 'dog' }],
+  );
+  assert.deepEqual(
+    wordsForExercise(words.slice(0, 1), 'mixed', () => 0.99),
+    [{ id: '0', prompt: 'dog', answer: 'hund' }],
+  );
+  assert.throws(() => wordsForExercise(words, 'unknown'), /øvingsretning/);
+});
+
+test('creates a stable session queue in shuffled or original order', () => {
+  const words = parseWordSet('A\tone\nB\ttwo\nC\tthree');
+  const shuffled = createSession(
+    words,
+    () => 0,
+    {},
+    {
+      directionMode: 'forward',
+      orderMode: 'shuffled',
+    },
+  );
+  const original = createSession(
+    words,
+    () => 0,
+    {},
+    {
+      directionMode: 'reverse',
+      orderMode: 'original',
+    },
+  );
+
+  assert.notDeepEqual(
+    shuffled.queue,
+    words.map(({ id }) => id),
+  );
+  assert.deepEqual(
+    original.queue,
+    words.map(({ id }) => id),
+  );
+  assert.deepEqual(shuffled.exerciseConfig, {
+    directionMode: 'forward',
+    orderMode: 'shuffled',
+  });
+  assert.throws(
+    () => createSession(words, Math.random, {}, { orderMode: 'unknown' }),
+    /ordrekkefølge/,
+  );
+});
+
 test('normalizes whitespace, case, and accents according to set settings', () => {
   assert.equal(normalizeAnswer('  CAFÉ  '), 'cafe');
   assert.equal(answersMatch('CAFÉ ', 'cafe'), true);
@@ -59,7 +129,7 @@ test('normalizes whitespace, case, and accents according to set settings', () =>
 
 test('retries an incorrect answer, then repeats it later until correctly answered', () => {
   const words = parseWordSet('A\tone\nB\ttwo\nC\tthree');
-  let session = createSession(words, () => 0.999);
+  let session = createSession(words, () => 0.999, {}, { orderMode: 'original' });
 
   let outcome = submitAnswer(session, 'wrong', words);
   session = outcome.session;
@@ -104,7 +174,7 @@ test('persists supported progress and ignores corrupt or unknown versions', () =
 
 test('awards independent correct answers, resets combos on mistakes, and leaves copies unrewarded', () => {
   const words = parseWordSet('A;one\nB;two\nC;three');
-  const initial = createSession(words, () => 0.999);
+  const initial = createSession(words, () => 0.999, {}, { orderMode: 'original' });
   const correct = submitAnswer(initial, 'one', words).session;
   assert.equal(initial.points, 0);
   assert.equal(correct.points, POINTS_PER_CORRECT_ANSWER);

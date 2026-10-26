@@ -86,6 +86,7 @@ async function createPractice(page, { profile = false, single = false } = {}) {
     .locator('#word-set')
     .fill(single ? 'Rød frukt\teple' : 'Rød frukt\teple\nGul frukt\tbanan');
   await saveForm(page, '#word-set-form', 'Lagre og start øving');
+  await page.locator('#exercise-config-form button[type="submit"]').click();
   await expect(page.locator('#answer')).toBeVisible();
 }
 
@@ -476,7 +477,7 @@ test('unsolicited controllerchange offers a guarded reload, never reloads either
     return {
       keys: await caches.keys(),
       version: await (await cache.match(new URL('./src/app-version.mjs', location.href))).text(),
-      profilesAvailable: (await fetch('./src/profiles.mjs?v=6')).ok,
+      profilesAvailable: (await fetch('./src/profiles.mjs?v=7')).ok,
     };
   });
   expect(retained.keys).toEqual(

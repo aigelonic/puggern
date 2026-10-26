@@ -87,11 +87,50 @@ export function answersMatch(answer, expected, settings) {
   return normalizeAnswer(answer, settings) === normalizeAnswer(expected, settings);
 }
 
-export function createSession(words, random = Math.random, settings = {}) {
-  const queue = words.map(({ id }) => id);
-  for (let index = queue.length - 1; index > 0; index -= 1) {
+function shuffle(items, random) {
+  const shuffled = [...items];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
     const swapIndex = Math.floor(random() * (index + 1));
-    [queue[index], queue[swapIndex]] = [queue[swapIndex], queue[index]];
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+  return shuffled;
+}
+
+export function wordsForExercise(words, directionMode, random = Math.random) {
+  if (!['forward', 'reverse', 'mixed'].includes(directionMode)) {
+    throw new TypeError('Velg en gyldig øvingsretning.');
+  }
+  if (directionMode === 'forward') return wordsForDirection(words);
+  if (directionMode === 'reverse') return wordsForDirection(words, 'answer-to-prompt');
+
+  const directions = words.map(() => (random() < 0.5 ? 'forward' : 'reverse'));
+  if (directions.length > 1 && directions.every((direction) => direction === directions[0])) {
+    directions[directions.length - 1] = directions[0] === 'forward' ? 'reverse' : 'forward';
+  }
+  return words.map(({ id, prompt, answer }, index) => ({
+    id,
+    prompt: directions[index] === 'forward' ? prompt : answer,
+    answer: directions[index] === 'forward' ? answer : prompt,
+  }));
+}
+
+export function createSession(words, random = Math.random, settings = {}, exerciseConfig = {}) {
+  const directionMode = exerciseConfig.directionMode ?? 'forward';
+  const orderMode = exerciseConfig.orderMode ?? 'shuffled';
+  if (!['forward', 'reverse', 'mixed'].includes(directionMode)) {
+    throw new TypeError('Velg en gyldig øvingsretning.');
+  }
+  if (!['shuffled', 'original'].includes(orderMode)) {
+    throw new TypeError('Velg en gyldig ordrekkefølge.');
+  }
+
+  const queue = words.map(({ id }) => id);
+  if (orderMode === 'shuffled') {
+    const shuffled = shuffle(queue, random);
+    if (shuffled.length > 1 && shuffled.every((id, index) => id === queue[index])) {
+      shuffled.push(shuffled.shift());
+    }
+    queue.splice(0, queue.length, ...shuffled);
   }
 
   return {
@@ -100,6 +139,7 @@ export function createSession(words, random = Math.random, settings = {}) {
     learned: [],
     mistakes: {},
     settings,
+    exerciseConfig: { directionMode, orderMode },
     points: 0,
     streak: 0,
     bestStreak: 0,
@@ -209,6 +249,12 @@ export function isValidProgress(progress) {
       (setting) =>
         progress.session.settings[setting] === undefined ||
         typeof progress.session.settings[setting] === 'boolean',
-    )
+    ) &&
+    (progress.session.exerciseConfig === undefined ||
+      (progress.session.exerciseConfig &&
+        typeof progress.session.exerciseConfig === 'object' &&
+        !Array.isArray(progress.session.exerciseConfig) &&
+        ['forward', 'reverse', 'mixed'].includes(progress.session.exerciseConfig.directionMode) &&
+        ['shuffled', 'original'].includes(progress.session.exerciseConfig.orderMode)))
   );
 }

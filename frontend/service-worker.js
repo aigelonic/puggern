@@ -1,22 +1,24 @@
 const APP_VERSION = '0.0.0'; // x-release-please-version
-const SHELL_REVISION = '13';
+const SHELL_REVISION = '14';
 const CACHE_NAME = `puggern-app-shell-${APP_VERSION}-${SHELL_REVISION}`;
 const SCOPE = new URL(self.registration.scope);
 let requestedActivation = false;
 const APP_SHELL = [
   './',
   './index.html',
-  './styles.css?v=9',
+  './styles.css?v=11',
   './manifest.webmanifest',
   './icons/pug-192.png',
   './icons/pug-512.png',
-  './src/main.mjs?v=10',
-  './src/learning.mjs?v=6',
-  './src/profiles.mjs?v=6',
-  './src/word-sets.mjs?v=7',
+  './src/main.mjs?v=13',
+  './src/practice-feedback.mjs?v=1',
+  './src/learning.mjs?v=7',
+  './src/profiles.mjs?v=7',
+  './src/word-sets.mjs?v=8',
   './src/creation-guard.mjs?v=3',
   './src/app-version.mjs',
   './src/app-updates.mjs',
+  './src/share-word-set.mjs?v=1',
 ];
 const SHELL_URLS = new Set(APP_SHELL.map((path) => new URL(path, SCOPE).href));
 
