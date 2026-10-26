@@ -59,6 +59,51 @@ test('query import previews safely and saves only content as a new set with fres
   expect(await page.evaluate(() => localStorage.getItem('puggern.profile-state'))).toBe(profiles);
 });
 
+test('imports optional language names and renders markup-like labels as plain text', async ({
+  page,
+  baseURL,
+}) => {
+  const namedContent = {
+    ...content,
+    name: 'Markup',
+    direction: 'prompt-to-answer',
+    promptLanguage: '<em>Norsk</em>',
+    answerLanguage: 'English',
+  };
+  await page.goto(createShareUrl(namedContent, baseURL));
+  await saveImport(page);
+  const imported = page.locator('#word-set-list > li').first();
+  await imported.getByRole('button', { name: 'Rediger' }).click();
+  await expect(page.getByLabel('Språk for hint (valgfritt)')).toHaveValue('<em>Norsk</em>');
+  await expect(page.getByLabel('Språk for svar (valgfritt)')).toHaveValue('English');
+  await page.getByRole('button', { name: 'Avbryt', exact: true }).click();
+
+  await imported.getByRole('button', { name: 'Kopier' }).click();
+  const copy = page.locator('#word-set-list > li').first();
+  await copy.getByRole('button', { name: 'Rediger' }).click();
+  await expect(page.getByLabel('Språk for hint (valgfritt)')).toHaveValue('<em>Norsk</em>');
+  await expect(page.getByLabel('Språk for svar (valgfritt)')).toHaveValue('English');
+  await page.getByRole('button', { name: 'Avbryt', exact: true }).click();
+  await copy.getByRole('button', { name: 'Arkiver' }).click();
+  await page.getByRole('button', { name: 'Vis arkiv' }).click();
+  await page
+    .locator('#word-set-list > li')
+    .first()
+    .getByRole('button', { name: 'Gjenopprett' })
+    .click();
+  await page.getByRole('button', { name: 'Vis aktive ordsett' }).click();
+  const restoredCopy = page.locator('#word-set-list > li').first();
+  await restoredCopy.getByRole('button', { name: 'Rediger' }).click();
+  await expect(page.getByLabel('Språk for hint (valgfritt)')).toHaveValue('<em>Norsk</em>');
+  await page.getByRole('button', { name: 'Avbryt', exact: true }).click();
+
+  await restoredCopy.getByRole('button', { name: 'Start øving' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Start øving' }).click();
+  await expect(page.locator('#hint-language')).toHaveText('Hint på <em>Norsk</em>');
+  await expect(page.locator('#hint-language em')).toHaveCount(0);
+  await expect(page.locator('#answer-language-instruction')).toHaveText('Skriv på English');
+});
+
 test('manual paste imports without navigating or fetching the supplied host', async ({ page }) => {
   await page.goto('/');
   const requestedHosts = [];

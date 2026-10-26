@@ -7,7 +7,11 @@ import {
   MAX_SHARE_URL_LENGTH,
   SHARE_PARAM,
 } from '../frontend/src/share-word-set.mjs';
-import { MAX_WORD_LENGTH, MAX_WORDS_PER_SET } from '../frontend/src/learning.mjs';
+import {
+  MAX_LANGUAGE_NAME_LENGTH,
+  MAX_WORD_LENGTH,
+  MAX_WORDS_PER_SET,
+} from '../frontend/src/learning.mjs';
 import { MAX_WORD_SET_NAME_LENGTH } from '../frontend/src/word-sets.mjs';
 
 const set = {
@@ -66,8 +70,30 @@ test('only exports explicitly allowed content, never local metadata or profile d
       settings: set.settings,
     },
   });
+
   const imported = parseShareUrl(link({ ...payload(), set: { ...set, id: 'untrusted' } }));
   assert.equal('id' in imported, false);
+});
+
+test('roundtrips optional language names and preserves old links without them', () => {
+  const namedSet = {
+    ...set,
+    promptLanguage: '  Norsk ',
+    answerLanguage: '<img src=x>',
+  };
+  const imported = parseShareUrl(createShareUrl(namedSet, 'https://example.test/'));
+  assert.deepEqual(imported, {
+    ...set,
+    name: set.name.trim(),
+    promptLanguage: 'Norsk',
+    answerLanguage: '<img src=x>',
+    words: [{ id: '0', prompt: 'hund æøå', answer: '犬 🐕' }],
+  });
+  assert.deepEqual(parseShareUrl(link(payload())), {
+    ...set,
+    name: set.name.trim(),
+    words: [{ id: '0', prompt: 'hund æøå', answer: '犬 🐕' }],
+  });
 });
 
 test('rejects unsupported types, versions, malformed JSON, encoding and URLs', () => {
@@ -123,6 +149,9 @@ test('validates every imported content field and existing effective limits', () 
     { ...set, settings: null },
     { ...set, settings: { caseSensitive: 'false', accentSensitive: false } },
     { ...set, settings: { caseSensitive: false } },
+    { ...set, promptLanguage: null },
+    { ...set, answerLanguage: 4 },
+    { ...set, promptLanguage: 'x'.repeat(MAX_LANGUAGE_NAME_LENGTH + 1) },
   ]) {
     assert.throws(() => parseShareUrl(link(payload(invalid))));
   }
@@ -137,6 +166,11 @@ test('validates every imported content field and existing effective limits', () 
       link(payload({ ...set, words: Array(MAX_WORDS_PER_SET).fill({ prompt: 'a', answer: 'b' }) })),
     ).words.length,
     MAX_WORDS_PER_SET,
+  );
+  assert.deepEqual(
+    parseShareUrl(link(payload({ ...set, promptLanguage: '  ', answerLanguage: ' 日本語 ' })))
+      .answerLanguage,
+    '日本語',
   );
   for (const direction of ['prompt-to-answer', 'answer-to-prompt', 'both']) {
     assert.equal(parseShareUrl(link(payload({ ...set, direction }))).direction, direction);

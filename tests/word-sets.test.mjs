@@ -8,6 +8,7 @@ import {
   WORD_SETS_KEY,
   WORD_SETS_VERSION,
 } from '../frontend/src/word-sets.mjs';
+import { MAX_LANGUAGE_NAME_LENGTH } from '../frontend/src/learning.mjs';
 
 function makeStorage() {
   const values = new Map();
@@ -36,6 +37,20 @@ test('saves and loads valid word sets from local storage', () => {
   assert.equal(JSON.parse(storage.values.get(WORD_SETS_KEY)).version, WORD_SETS_VERSION);
 });
 
+test('normalizes optional language names and keeps legacy sets valid', () => {
+  const storage = makeStorage();
+  const namedSet = {
+    ...validSet,
+    promptLanguage: '  Norsk  ',
+    answerLanguage: ' 日本語 ',
+  };
+  saveWordSets(storage, [namedSet, { ...validSet, id: 'set-2' }]);
+  assert.deepEqual(loadWordSets(storage), [
+    { ...validSet, promptLanguage: 'Norsk', answerLanguage: '日本語' },
+    { ...validSet, id: 'set-2' },
+  ]);
+});
+
 test('ignores corrupt, unsupported, or invalid word-set storage', () => {
   const storage = makeStorage();
   storage.values.set(WORD_SETS_KEY, '{');
@@ -58,6 +73,16 @@ test('ignores corrupt, unsupported, or invalid word-set storage', () => {
     }),
   );
   assert.deepEqual(loadWordSets(storage), []);
+  for (const promptLanguage of [null, 42, 'x'.repeat(MAX_LANGUAGE_NAME_LENGTH + 1)]) {
+    storage.values.set(
+      WORD_SETS_KEY,
+      JSON.stringify({
+        version: WORD_SETS_VERSION,
+        sets: [{ ...validSet, promptLanguage }],
+      }),
+    );
+    assert.deepEqual(loadWordSets(storage), []);
+  }
 });
 
 test('preserves valid saved word sets beyond the new creation limit', () => {

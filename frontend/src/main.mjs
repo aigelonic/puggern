@@ -2,6 +2,7 @@ import {
   createSession,
   currentWord,
   loadProgress,
+  MAX_LANGUAGE_NAME_LENGTH,
   MAX_WORD_LENGTH,
   MAX_WORDS_PER_SET,
   previewWordSet,
@@ -9,7 +10,7 @@ import {
   submitAnswer,
   wordsForExercise,
   wordsForDirection,
-} from './learning.mjs?v=8';
+} from './learning.mjs?v=9';
 import {
   addRewards,
   createProfileState,
@@ -20,20 +21,20 @@ import {
   MAX_PROFILES,
   PROFILE_STATE_KEY,
   saveProfileState,
-} from './profiles.mjs?v=8';
+} from './profiles.mjs?v=9';
 import {
   loadWordSets,
   saveWordSets,
   MAX_WORD_SET_NAME_LENGTH,
   MAX_WORD_SETS,
-} from './word-sets.mjs?v=9';
+} from './word-sets.mjs?v=10';
 import { recordCreationAttempt, MIN_CREATION_FORM_TIME_MS } from './creation-guard.mjs?v=3';
 import {
   SHARE_PARAM,
   MAX_SHARE_URL_LENGTH,
   createShareUrl,
   parseShareUrl,
-} from './share-word-set.mjs?v=2';
+} from './share-word-set.mjs?v=3';
 import { answerFeedback, createPracticeEffects } from './practice-feedback.mjs?v=2';
 
 const status = document.querySelector('#connection-status');
@@ -63,6 +64,8 @@ const correctAnswer = document.querySelector('#correct-answer');
 const correctionInstruction = document.querySelector('#correction-instruction');
 const progressLabel = document.querySelector('#progress-label');
 const prompt = document.querySelector('#prompt');
+const hintLanguage = document.querySelector('#hint-language');
+const answerLanguageInstruction = document.querySelector('#answer-language-instruction');
 const answerLabel = document.querySelector('#answer-label');
 const editorTitle = document.querySelector('#editor-title');
 const archiveToggle = document.querySelector('#archive-toggle');
@@ -146,10 +149,8 @@ async function initializeProfileState() {
       profileState = createProfileState();
       const legacyProgress = loadProgress(window.localStorage);
       const matchingSet = legacyProgress
-        ? wordSets.find(
-            (set) =>
-              JSON.stringify(wordsForDirection(set.words, set.direction)) ===
-              JSON.stringify(legacyProgress.words),
+        ? wordSets.find((set) =>
+            sameWordContent(wordsForDirection(set.words, set.direction), legacyProgress.words),
           )
         : null;
       if (matchingSet) {
@@ -283,6 +284,86 @@ function directionModeForSet(set) {
   );
 }
 
+function sameWordContent(left, right) {
+  return (
+    left.length === right.length &&
+    left.every(
+      (word, index) =>
+        word.id === right[index]?.id &&
+        word.prompt === right[index]?.prompt &&
+        word.answer === right[index]?.answer,
+    )
+  );
+}
+
+function languageMetadata(word, set, sourceDirection = word.sourceDirection) {
+  if (!['forward', 'reverse'].includes(sourceDirection)) {
+    return {
+      ...word,
+      hintLanguageLabel: 'Språk ikke angitt',
+      answerLanguageInstruction: 'Svar på oversettelsen',
+    };
+  }
+  const hintIsFirstColumn = sourceDirection === 'forward';
+  const hintLanguage = hintIsFirstColumn ? set.promptLanguage : set.answerLanguage;
+  const answerLanguage = hintIsFirstColumn ? set.answerLanguage : set.promptLanguage;
+  return {
+    ...word,
+    sourceDirection,
+    hintLanguageLabel: hintLanguage
+      ? `Hint på ${hintLanguage}`
+      : `Hint fra ${hintIsFirstColumn ? 'første' : 'andre'} kolonne`,
+    answerLanguageInstruction: answerLanguage
+      ? `Skriv på ${answerLanguage}`
+      : `Svar fra ${hintIsFirstColumn ? 'andre' : 'første'} kolonne`,
+  };
+}
+
+function createPracticeWords(set, directionMode) {
+  return wordsForExercise(set.words, directionMode).map((word) => languageMetadata(word, set));
+}
+
+function recoverLegacyDirection(card, set, exerciseConfig) {
+  if (['forward', 'reverse'].includes(card.sourceDirection)) return card.sourceDirection;
+  if (exerciseConfig?.directionMode === 'forward') return 'forward';
+  if (exerciseConfig?.directionMode === 'reverse') return 'reverse';
+
+  const matches = new Set();
+  for (const sourceWord of set.words) {
+    const possibleIds = [
+      [sourceWord.id, ['forward', 'reverse']],
+      [`${sourceWord.id}:forward`, ['forward']],
+      [`${sourceWord.id}:reverse`, ['reverse']],
+    ];
+    for (const [id, directions] of possibleIds) {
+      if (card.id !== id) continue;
+      if (
+        directions.includes('forward') &&
+        card.prompt === sourceWord.prompt &&
+        card.answer === sourceWord.answer
+      ) {
+        matches.add('forward');
+      }
+      if (
+        directions.includes('reverse') &&
+        card.prompt === sourceWord.answer &&
+        card.answer === sourceWord.prompt
+      ) {
+        matches.add('reverse');
+      }
+    }
+  }
+  return matches.size === 1 ? [...matches][0] : null;
+}
+
+function restorePracticeLanguageMetadata(progress, set) {
+  return progress.words.map((word) => {
+    if (word.hintLanguageLabel && word.answerLanguageInstruction) return word;
+    const direction = recoverLegacyDirection(word, set, progress.session.exerciseConfig);
+    return languageMetadata(word, set, direction);
+  });
+}
+
 async function persistProgress() {
   const progress = { version: PROGRESS_VERSION, session, words };
   const saved = await persistProfileState(
@@ -343,7 +424,7 @@ function openExerciseSetup(set) {
 }
 
 async function startWordSet(set, exerciseConfig, profileId) {
-  const practiceWords = wordsForExercise(set.words, exerciseConfig.directionMode);
+  const practiceWords = createPracticeWords(set, exerciseConfig.directionMode);
   await startSession(
     practiceWords,
     createSession(practiceWords, Math.random, set.settings, exerciseConfig),
@@ -355,7 +436,7 @@ async function startWordSet(set, exerciseConfig, profileId) {
 async function continueWordSet(set) {
   const progress = wordSetProgress(set.id);
   if (!progress) return;
-  await startSession(progress.words, progress.session, set.id);
+  await startSession(restorePracticeLanguageMetadata(progress, set), progress.session, set.id);
 }
 
 function wordSetProgress(setId) {
@@ -385,6 +466,8 @@ function renderPractice(message = '', { announceCorrection = false, points = 0, 
   document.querySelector('#practice-rewards').textContent =
     `${session.points ?? 0} poeng · ${session.streak ?? 0} riktige på rad`;
   prompt.textContent = word.prompt;
+  hintLanguage.textContent = word.hintLanguageLabel ?? 'Språk ikke angitt';
+  answerLanguageInstruction.textContent = word.answerLanguageInstruction ?? 'Svar på oversettelsen';
   answerLabel.textContent = isCorrection ? 'Skriv riktig svar' : 'Stavingen din';
   correctionFeedback.hidden = !isCorrection;
   correctAnswer.textContent = isCorrection ? word.answer : '';
@@ -403,11 +486,14 @@ function renderPractice(message = '', { announceCorrection = false, points = 0, 
     }
   }
   feedback.classList.toggle('error', false);
-  if (isCorrection) {
-    answerInput.setAttribute('aria-describedby', 'correction-feedback');
-  } else {
-    answerInput.removeAttribute('aria-describedby');
-  }
+  answerInput.setAttribute(
+    'aria-describedby',
+    [
+      'hint-language',
+      'answer-language-instruction',
+      ...(isCorrection ? ['correction-feedback'] : []),
+    ].join(' '),
+  );
   answerInput.value = '';
   showView(practiceView);
   correctionAnnouncement.textContent = isCorrection
@@ -726,6 +812,8 @@ function openEditor(set = null) {
   editorSetId = set?.id ?? null;
   editorTitle.textContent = set ? 'Rediger ordsett' : 'Nytt ordsett';
   wordSetNameInput.value = set?.name ?? '';
+  document.querySelector('#prompt-language').value = set?.promptLanguage ?? '';
+  document.querySelector('#answer-language').value = set?.answerLanguage ?? '';
   wordSetInput.value =
     set?.words.map(({ prompt: clue, answer }) => `${clue}\t${answer}`).join('\n') ?? '';
   document.querySelector('#quiz-direction').value = set?.direction ?? 'prompt-to-answer';
@@ -826,6 +914,20 @@ async function saveEditor(startAfterSave = false) {
     wordSetNameInput.focus();
     return;
   }
+  const promptLanguage = document.querySelector('#prompt-language').value.trim();
+  const answerLanguage = document.querySelector('#answer-language').value.trim();
+  if (
+    promptLanguage.length > MAX_LANGUAGE_NAME_LENGTH ||
+    answerLanguage.length > MAX_LANGUAGE_NAME_LENGTH
+  ) {
+    showSetupError(`Språknavn kan ikke være lengre enn ${MAX_LANGUAGE_NAME_LENGTH} tegn.`);
+    const field =
+      promptLanguage.length > MAX_LANGUAGE_NAME_LENGTH
+        ? document.querySelector('#prompt-language')
+        : document.querySelector('#answer-language');
+    field.focus();
+    return;
+  }
   if (editorRows.length === 0) {
     showSetupError('Legg til minst ett hint og ett svar.');
     wordSetInput.focus();
@@ -869,6 +971,8 @@ async function saveEditor(startAfterSave = false) {
       prompt: clue.trim(),
       answer: answer.trim(),
     })),
+    ...(promptLanguage ? { promptLanguage } : {}),
+    ...(answerLanguage ? { answerLanguage } : {}),
     direction: document.querySelector('#quiz-direction').value,
     settings: settingsFromForm(),
     archived: previous?.archived ?? false,
@@ -1154,7 +1258,11 @@ document.querySelector('#completion-restart-button').addEventListener('click', (
     directionMode: set ? directionModeForSet(set) : 'forward',
     orderMode: 'shuffled',
   };
-  const restartWords = wordsForExercise(set?.words ?? words, exerciseConfig.directionMode);
+  const restartWords = set
+    ? createPracticeWords(set, exerciseConfig.directionMode)
+    : wordsForExercise(words, exerciseConfig.directionMode).map((word) =>
+        languageMetadata(word, {}),
+      );
   startSession(
     restartWords,
     createSession(restartWords, Math.random, session.settings, exerciseConfig),

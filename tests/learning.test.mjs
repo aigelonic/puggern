@@ -43,22 +43,26 @@ test('accepts paste separators, previews malformed rows, and enforces set limits
 test('creates practice entries in the selected direction', () => {
   const words = parseWordSet('hund\tdog');
   assert.deepEqual(wordsForDirection(words, 'answer-to-prompt'), [
-    { id: '0', prompt: 'dog', answer: 'hund' },
+    { id: '0', prompt: 'dog', answer: 'hund', sourceDirection: 'reverse' },
   ]);
   assert.deepEqual(wordsForDirection(words, 'both'), [
-    { id: '0:forward', prompt: 'hund', answer: 'dog' },
-    { id: '0:reverse', prompt: 'dog', answer: 'hund' },
+    { id: '0:forward', prompt: 'hund', answer: 'dog', sourceDirection: 'forward' },
+    { id: '0:reverse', prompt: 'dog', answer: 'hund', sourceDirection: 'reverse' },
   ]);
   assert.throws(() => wordsForDirection(words, 'unknown'), /quizretning/);
 });
 
 test('creates forward, reverse, and mixed questions once per word', () => {
   const words = parseWordSet('hund\tdog\nkatt\tcat\nfugl\tbird');
-  assert.deepEqual(wordsForExercise(words, 'forward'), words);
+  assert.deepEqual(wordsForExercise(words, 'forward'), [
+    { ...words[0], sourceDirection: 'forward' },
+    { ...words[1], sourceDirection: 'forward' },
+    { ...words[2], sourceDirection: 'forward' },
+  ]);
   assert.deepEqual(wordsForExercise(words, 'reverse'), [
-    { id: '0', prompt: 'dog', answer: 'hund' },
-    { id: '1', prompt: 'cat', answer: 'katt' },
-    { id: '2', prompt: 'bird', answer: 'fugl' },
+    { id: '0', prompt: 'dog', answer: 'hund', sourceDirection: 'reverse' },
+    { id: '1', prompt: 'cat', answer: 'katt', sourceDirection: 'reverse' },
+    { id: '2', prompt: 'bird', answer: 'fugl', sourceDirection: 'reverse' },
   ]);
 
   const mixed = wordsForExercise(words, 'mixed', () => 0);
@@ -73,13 +77,30 @@ test('creates forward, reverse, and mixed questions once per word', () => {
   );
   assert.deepEqual(
     wordsForExercise(words.slice(0, 1), 'mixed', () => 0),
-    [{ id: '0', prompt: 'hund', answer: 'dog' }],
+    [{ id: '0', prompt: 'hund', answer: 'dog', sourceDirection: 'forward' }],
   );
   assert.deepEqual(
     wordsForExercise(words.slice(0, 1), 'mixed', () => 0.99),
-    [{ id: '0', prompt: 'dog', answer: 'hund' }],
+    [{ id: '0', prompt: 'dog', answer: 'hund', sourceDirection: 'reverse' }],
   );
   assert.throws(() => wordsForExercise(words, 'unknown'), /øvingsretning/);
+});
+
+test('records each mixed card direction without changing randomization or relying on its text', () => {
+  const same = [{ id: 'same', prompt: 'same', answer: 'same' }];
+  let calls = 0;
+  const forward = wordsForExercise(same, 'mixed', () => {
+    calls += 1;
+    return 0;
+  });
+  assert.equal(calls, 1);
+  assert.deepEqual(forward, [
+    { id: 'same', prompt: 'same', answer: 'same', sourceDirection: 'forward' },
+  ]);
+  assert.deepEqual(
+    wordsForExercise(same, 'mixed', () => 0.99),
+    [{ id: 'same', prompt: 'same', answer: 'same', sourceDirection: 'reverse' }],
+  );
 });
 
 test('creates a stable session queue in shuffled or original order', () => {
