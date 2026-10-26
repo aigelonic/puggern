@@ -1,6 +1,11 @@
-import { accuracy, HISTORY_PAGE_SIZE, newestFirst, variantTrend } from './history.mjs?v=2';
+import { accuracy, HISTORY_PAGE_SIZE, newestFirst, variantTrend } from './history.mjs?v=3';
 
-const directions = { forward: 'Hint til svar', reverse: 'Svar til hint', mixed: 'Blandet retning' };
+const directions = {
+  forward: 'Hint til svar',
+  reverse: 'Svar til hint',
+  mixed: 'Blandet retning',
+  unknown: 'Ukjent retning',
+};
 const orders = { original: 'Opprinnelig rekkefølge', shuffled: 'Tilfeldig rekkefølge' };
 const date = (result) => new Date(result.completedAt).toLocaleString('nb-NO');
 const percent = (value) => `${Math.round(value)} %`;
@@ -9,7 +14,8 @@ const decimal = (value) =>
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
   });
-const modes = (result) => `${directions[result.directionMode]} · ${orders[result.orderMode]}`;
+const modes = (result) =>
+  `${directions[result.directionMode] ?? directions.unknown} · ${orders[result.orderMode]}`;
 const settings = (result) =>
   `Store og små bokstaver: ${result.caseSensitive ? 'skilles' : 'skilles ikke'}. Aksenter: ${result.accentSensitive ? 'skilles' : 'skilles ikke'}.`;
 
@@ -26,6 +32,7 @@ export function createHistoryView({ dialog, getProfile, getHistory }) {
   let visibleCount = HISTORY_PAGE_SIZE;
   let profileId = null;
   let selectedKey = null;
+  const itemCache = new Map();
 
   function renderTrend(history) {
     const trend = variantTrend(history, selectedKey);
@@ -121,9 +128,15 @@ export function createHistoryView({ dialog, getProfile, getHistory }) {
     });
     dialog.querySelector('#history-variant-controls').hidden = history.length === 0;
     renderTrend(history);
-    list.replaceChildren();
-    history.slice(0, visibleCount).forEach((result) => {
+    const focusedItem = document.activeElement.closest?.('#history-list > li');
+    const focusedKey = focusedItem?.dataset.historyKey;
+    const visibleItems = history.slice(0, visibleCount).map((result) => {
+      const key = `${profile.id}:${result.id}`;
+      const signature = JSON.stringify(result);
+      const previous = itemCache.get(key);
+      if (previous?.signature === signature) return { key, item: previous.item };
       const item = element('li');
+      item.dataset.historyKey = key;
       item.append(
         element('h3', result.setName),
         element('p', date(result)),
@@ -143,8 +156,20 @@ export function createHistoryView({ dialog, getProfile, getHistory }) {
         element('p', settings(result)),
       );
       item.append(details);
-      list.append(item);
+      if (previous) details.open = previous.item.querySelector('details').open;
+      itemCache.set(key, { item, signature });
+      return { key, item };
     });
+    visibleItems.forEach(({ item }, index) => {
+      if (list.children[index] !== item) list.insertBefore(item, list.children[index] ?? null);
+    });
+    while (list.children.length > visibleItems.length) list.lastElementChild.remove();
+    if (focusedKey) {
+      const focused = visibleItems.find(({ key }) => key === focusedKey);
+      if (focused && !focused.item.contains(document.activeElement)) {
+        focused.item.querySelector('summary').focus();
+      }
+    }
     more.hidden = history.length <= visibleCount;
   }
   selector.addEventListener('change', () => {

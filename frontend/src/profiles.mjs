@@ -1,5 +1,5 @@
 import { isValidProgress, normalizeProgress } from './learning.mjs?v=9';
-import { isValidResult, isValidRun, MAX_HISTORY, newestFirst } from './history.mjs?v=2';
+import { isValidResult, isValidRun, MAX_HISTORY, newestFirst } from './history.mjs?v=3';
 
 export const PROFILE_STATE_KEY = 'puggern.profile-state';
 export const PROFILE_STATE_VERSION = 1;
@@ -71,6 +71,30 @@ function isValidProfileState(state) {
   );
 }
 
+function isValidRunPoints(runPoints, profileIds) {
+  return (
+    runPoints === undefined ||
+    (runPoints &&
+      typeof runPoints === 'object' &&
+      !Array.isArray(runPoints) &&
+      Object.entries(runPoints).every(
+        ([profileId, runs]) =>
+          profileIds.has(profileId) &&
+          runs &&
+          typeof runs === 'object' &&
+          !Array.isArray(runs) &&
+          Object.entries(runs).every(
+            ([runId, points]) =>
+              typeof runId === 'string' &&
+              runId.length > 0 &&
+              runId.length <= 128 &&
+              Number.isSafeInteger(points) &&
+              points > 0,
+          ),
+      ))
+  );
+}
+
 export function loadProfileState(storage, warn = () => {}) {
   const stored = storage.getItem(PROFILE_STATE_KEY);
   if (!stored) return null;
@@ -96,6 +120,13 @@ export function loadProfileState(storage, warn = () => {}) {
         ]),
       ),
     };
+    if (
+      state.runPoints !== undefined &&
+      !isValidRunPoints(state.runPoints, new Set(state.profiles.map(({ id }) => id)))
+    ) {
+      warn();
+      delete normalized.runPoints;
+    }
     if (state.history !== undefined) {
       normalized.history = {};
       if (!state.history || typeof state.history !== 'object' || Array.isArray(state.history)) {
@@ -131,6 +162,9 @@ export function loadProfileState(storage, warn = () => {}) {
 }
 
 export function saveProfileState(storage, state) {
+  if (!isValidRunPoints(state.runPoints, new Set(state.profiles.map(({ id }) => id)))) {
+    throw new Error('Øvingspoengsummene er ugyldige.');
+  }
   if (state.history !== undefined) {
     if (
       !state.history ||
@@ -178,15 +212,30 @@ export function applyRunUpdates(state, updates) {
     const saved = savedProgress?.session;
     const sameRun = saved?.run?.id === progress.session.run.id;
     if (sameRun && (saved.points ?? 0) > (progress.session.points ?? 0)) continue;
+    const runId = progress.session.run.id;
+    const recordedPoints = next.runPoints?.[profileId]?.[runId] ?? 0;
+    const savedPoints = sameRun ? (saved.points ?? 0) : 0;
+    const legacyBaseline =
+      update.resumeLegacy && !savedProgress?.session.run ? (progress.session.points ?? 0) : 0;
+    const creditedBefore = Math.max(recordedPoints, savedPoints, legacyBaseline);
+    const runPoints = Math.max(creditedBefore, progress.session.points ?? 0);
     const rewards = {
-      points: sameRun
-        ? Math.max(0, (progress.session.points ?? 0) - (saved.points ?? 0))
-        : earned.points,
+      points: Math.min(earned.points, Math.max(0, runPoints - creditedBefore)),
       bestStreak: earned.bestStreak,
       completedSets: sameRun && saved.queue.length === 0 ? 0 : earned.completedSets,
     };
+    const profileRunPoints = { ...(next.runPoints?.[profileId] ?? {}) };
+    if (result) delete profileRunPoints[runId];
+    else if (runPoints > 0) profileRunPoints[runId] = runPoints;
+    const nextRunPoints = { ...(next.runPoints ?? {}) };
+    if (Object.keys(profileRunPoints).length) nextRunPoints[profileId] = profileRunPoints;
+    else delete nextRunPoints[profileId];
+    const stateWithoutRunPoints = { ...next };
+    delete stateWithoutRunPoints.runPoints;
     next = {
-      ...next,
+      ...(Object.keys(nextRunPoints).length
+        ? { ...stateWithoutRunPoints, runPoints: nextRunPoints }
+        : stateWithoutRunPoints),
       profiles: next.profiles.map((item) =>
         item.id === profileId ? { ...item, rewards: addRewards(item.rewards, rewards) } : item,
       ),

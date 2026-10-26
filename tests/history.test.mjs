@@ -138,6 +138,24 @@ test('isolates legacy resumed runs from current and other run comparisons', asyn
   assert.notEqual(legacy.comparisonKey, anotherLegacy.comparisonKey);
 });
 
+test('recovers legacy direction from saved cards and records unknown directions explicitly', async () => {
+  const session = createSession(words);
+  delete session.exerciseConfig;
+  const reverseWords = words.map(({ id, prompt, answer }) => ({
+    id,
+    prompt: answer,
+    answer: prompt,
+    sourceDirection: 'reverse',
+  }));
+  const reverse = await createRun({ ...set, words: reverseWords }, session, 'legacy-reverse');
+  assert.equal(reverse.directionMode, 'reverse');
+
+  const unknownWords = words.map(({ id, prompt, answer }) => ({ id, prompt, answer }));
+  const unknown = await createRun({ ...set, words: unknownWords }, session, 'legacy-unknown');
+  assert.equal(unknown.directionMode, 'unknown');
+  assert.equal(isValidRun(unknown), true);
+});
+
 test('sorts ties deterministically, selects latest ten, and compares unrounded accuracy within one variant', async () => {
   const base = await result();
   const history = Array.from({ length: 12 }, (_, index) => ({
@@ -285,6 +303,56 @@ test('credits only unsaved point delta for same run and rejects stale regression
   state = applyRunUpdates(state, [pending]);
   assert.equal(state.profiles[0].rewards.points, 40);
   assert.equal(state.profiles[0].rewards.completedSets, 1);
+});
+
+test('does not re-credit resumed answers after a replacement run overwrites progress', async () => {
+  let state = createProfileState('p1');
+  const firstRun = await makeSession('run-r', {
+    points: 10,
+    bestStreak: 1,
+    learned: ['0'],
+    queue: ['1', '2', '3'],
+  });
+  const firstAnswer = {
+    profileId: 'p1',
+    setId: set.id,
+    progress: { version: 1, words, session: firstRun },
+    earned: { points: 10, bestStreak: 1, completedSets: 0 },
+    result: null,
+  };
+  state = applyRunUpdates(state, [firstAnswer]);
+  assert.equal(state.profiles[0].rewards.points, 10);
+
+  const replacement = await makeSession('run-s', {
+    learned: [],
+    queue: ['0', '1', '2', '3'],
+  });
+  state = applyRunUpdates(state, [
+    {
+      ...firstAnswer,
+      progress: { version: 1, words, session: replacement },
+      earned: createRewards(),
+    },
+  ]);
+
+  const resumedAnswer = {
+    ...firstAnswer,
+    progress: {
+      version: 1,
+      words,
+      session: await makeSession('run-r', {
+        points: 20,
+        bestStreak: 2,
+        learned: ['0', '1'],
+        queue: ['2', '3'],
+      }),
+    },
+  };
+  state = applyRunUpdates(state, [resumedAnswer]);
+  assert.equal(state.profiles[0].rewards.points, 20);
+  assert.equal(state.runPoints.p1['run-r'], 20);
+  assert.equal(state.progress.p1[set.id].session.run.id, 'run-r');
+  assert.deepEqual(applyRunUpdates(state, [resumedAnswer]), state);
 });
 
 test('concurrent legacy resumes adopt the identity already saved under the lock, rather than creating another run', async () => {

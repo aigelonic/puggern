@@ -483,7 +483,7 @@ test('unsolicited controllerchange offers a guarded reload, never reloads either
     return {
       keys: await caches.keys(),
       version: await (await cache.match(new URL('./src/app-version.mjs', location.href))).text(),
-      profilesAvailable: (await fetch('./src/profiles.mjs?v=10')).ok,
+      profilesAvailable: (await fetch('./src/profiles.mjs?v=11')).ok,
     };
   });
   expect(retained.keys).toEqual(

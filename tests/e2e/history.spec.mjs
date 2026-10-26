@@ -183,6 +183,51 @@ test('legacy unfinished resume acquires one persistent run ID; completed legacy 
   await expect(page.locator('#history-empty')).toBeVisible();
 });
 
+test('blocks legacy answers until retry persists or adopts the shared run identity', async ({
+  page,
+  context,
+}) => {
+  await seed(page);
+  await start(page);
+  await answer(page, 'dog');
+  await page.evaluate(() => {
+    const saved = JSON.parse(localStorage.getItem('puggern.profile-state'));
+    delete saved.progress.p1['set-1'].session.run;
+    localStorage.setItem('puggern.profile-state', JSON.stringify(saved));
+  });
+  await page.reload();
+  await page.evaluate(() => {
+    const original = Storage.prototype.setItem;
+    window.blockLegacyWrites = true;
+    Storage.prototype.setItem = function (key, value) {
+      if (key === 'puggern.profile-state' && window.blockLegacyWrites) {
+        throw new DOMException('Full', 'QuotaExceededError');
+      }
+      return original.call(this, key, value);
+    };
+  });
+  await page.getByRole('button', { name: 'Fortsett øvingen' }).click();
+  await expect(page.locator('#answer')).toHaveAttribute('readonly', '');
+  await expect(page.locator('#answer-form button[type="submit"]')).toBeDisabled();
+  await expect(page.locator('#history-retry')).toBeVisible();
+
+  const other = await context.newPage();
+  await other.goto('/');
+  await other.getByRole('button', { name: 'Fortsett øvingen' }).click();
+  await expect(other.locator('#answer')).toBeFocused();
+  const sharedId = (await state(other)).progress.p1['set-1'].session.run.id;
+
+  await page.evaluate(() => {
+    window.blockLegacyWrites = false;
+  });
+  await page.getByRole('button', { name: 'Prøv å lagre igjen' }).click();
+  await expect(page.locator('#answer-form button[type="submit"]')).toBeEnabled();
+  expect((await state(page)).progress.p1['set-1'].session.run.id).toBe(sharedId);
+  await Promise.all([answer(page, 'cat'), answer(other, 'cat')]);
+  expect((await state(page)).history.p1).toHaveLength(1);
+  await other.close();
+});
+
 test('legacy resume after editing the set is isolated from a new run of edited content', async ({
   page,
 }) => {
@@ -218,6 +263,36 @@ test('legacy resume after editing the set is isolated from a new run of edited c
   expect(editedResult.comparisonKey).not.toBe(legacyResult.comparisonKey);
   await openHistory(page);
   await expect(page.locator('#history-variant option')).toHaveCount(2);
+});
+
+test('preserves history focus and expansion during cross-tab refreshes', async ({
+  page,
+  context,
+}) => {
+  await seed(page);
+  await start(page);
+  await finish(page);
+  const firstRunId = (await state(page)).history.p1[0].id;
+  const other = await context.newPage();
+  await other.goto('/');
+
+  await openHistory(page);
+  const firstItem = page.locator(`[data-history-key="p1:${firstRunId}"]`);
+  const firstSummary = firstItem.locator('summary');
+  await firstSummary.focus();
+  await page.keyboard.press('Enter');
+  await expect(firstItem.locator('details')).toHaveAttribute('open', '');
+
+  await other.getByRole('button', { name: 'Øv på samme sett igjen' }).click();
+  await expect(other.locator('#answer')).toBeFocused();
+  await answer(other, 'dog');
+  await expect(firstSummary).toBeFocused();
+  await expect(firstItem.locator('details')).toHaveAttribute('open', '');
+  await answer(other, 'cat');
+  await expect.poll(async () => (await state(page)).history.p1.length).toBe(2);
+  await expect(firstSummary).toBeFocused();
+  await expect(firstItem.locator('details')).toHaveAttribute('open', '');
+  await other.close();
 });
 
 test('failed completion writes preserve storage and retry exactly once with original ID/time and rewards', async ({

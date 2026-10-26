@@ -23,9 +23,9 @@ import {
   PROFILE_STATE_KEY,
   PROFILE_STATE_VERSION,
   saveProfileState,
-} from './profiles.mjs?v=10';
-import { completedResult, createRun, personalBestMessage } from './history.mjs?v=2';
-import { createHistoryView } from './history-view.mjs?v=1';
+} from './profiles.mjs?v=11';
+import { completedResult, createRun, personalBestMessage } from './history.mjs?v=3';
+import { createHistoryView } from './history-view.mjs?v=2';
 import {
   loadWordSets,
   saveWordSets,
@@ -557,16 +557,22 @@ async function persistProgress() {
   unsavedProgress = !saved;
   const warning = document.querySelector('#progress-warning');
   warning.hidden = saved;
-  document.querySelector('#history-save-warning').hidden = ![...pendingRuns.values()].some(
-    ({ result }) => result,
+  const pending = [...pendingRuns.values()];
+  const pendingLegacy = pending.some(({ resumeLegacy }) => resumeLegacy);
+  document.querySelector('#history-save-warning').hidden = !pending.some(
+    ({ result, resumeLegacy }) => result || resumeLegacy,
   );
   if (!saved) {
     setAppError('');
-    warning.textContent =
-      'Fremgangen kunne ikke lagres på denne enheten. Du kan fortsette å øve, men fremgangen kan gå tapt når du laster siden på nytt.' +
-      ([...pendingRuns.values()].some(({ result }) => result)
-        ? ' Øvingsresultatet er ikke lagret. Prøv å lagre igjen før du laster siden på nytt.'
-        : '');
+    warning.textContent = pendingLegacy
+      ? 'Øvingsidentiteten kunne ikke lagres på denne enheten. Svar er blokkert til identiteten er lagret.'
+      : 'Fremgangen kunne ikke lagres på denne enheten. Du kan fortsette å øve, men fremgangen kan gå tapt når du laster siden på nytt.' +
+        (pending.some(({ result }) => result)
+          ? ' Øvingsresultatet er ikke lagret. Prøv å lagre igjen før du laster siden på nytt.'
+          : '');
+    document.querySelector('#history-save-message').textContent = pendingLegacy
+      ? 'Øvingsidentiteten er ikke lagret. Lagre eller hent den delte identiteten før du svarer.'
+      : 'Øvingsresultatet er ikke lagret. Du kan prøve igjen. Hvis du laster siden på nytt, kan resultatet og ulagret fremgang gå tapt.';
   }
   renderWordSets();
   return saved;
@@ -580,7 +586,7 @@ function queueRunUpdate(earned = createRewards(), result = null, resumeLegacy = 
     progress: { version: PROGRESS_VERSION, session, words },
     earned: addRewards(previous?.earned, earned),
     result: previous?.result ?? result,
-    resumeLegacy,
+    resumeLegacy: resumeLegacy || previous?.resumeLegacy === true,
   });
 }
 
@@ -681,6 +687,9 @@ function renderPractice(message = '', { announceCorrection = false, points = 0, 
   lastRenderedPracticeCardId = word.id;
   const learnedCount = session.learned.length;
   const isCorrection = session.correction;
+  const legacyIdentityPending = pendingRuns.get(session.run?.id)?.resumeLegacy === true;
+  answerButton.disabled = legacyIdentityPending;
+  answerInput.readOnly = legacyIdentityPending;
   progressLabel.textContent = `${learnedCount} av ${words.length} lært · ${session.queue.length} oppgaver igjen`;
   const progressBar = document.querySelector('#practice-progress');
   progressBar.max = words.length;
@@ -1325,6 +1334,7 @@ document.querySelector('#history-retry').addEventListener(
     button.disabled = true;
     try {
       if (await persistProgress()) {
+        if (!practiceView.hidden && session?.queue.length) renderPractice();
         const target = !completeView.hidden
           ? document.querySelector('#completion-heading')
           : !practiceView.hidden
@@ -1431,7 +1441,12 @@ answerForm.addEventListener(
   'submit',
   trackOperation(async (event) => {
     event.preventDefault();
-    if (answerButton.disabled || !session?.queue.length) return;
+    if (
+      answerButton.disabled ||
+      !session?.queue.length ||
+      pendingRuns.get(session.run?.id)?.resumeLegacy
+    )
+      return;
     answerButton.disabled = true;
     answerInput.readOnly = true;
     effects.cancel();

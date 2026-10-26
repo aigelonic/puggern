@@ -38,7 +38,7 @@ function validIdentity(run) {
     text(run.setName, 80) &&
     typeof run.comparisonKey === 'string' &&
     /^[a-f0-9]{64}$/.test(run.comparisonKey) &&
-    ['forward', 'reverse', 'mixed'].includes(run.directionMode) &&
+    ['forward', 'reverse', 'mixed', 'unknown'].includes(run.directionMode) &&
     ['original', 'shuffled'].includes(run.orderMode) &&
     typeof run.caseSensitive === 'boolean' &&
     typeof run.accentSensitive === 'boolean'
@@ -70,7 +70,18 @@ export function isValidResult(result) {
 }
 
 export async function createRun(set, session, id = crypto.randomUUID(), { isolate = false } = {}) {
-  const config = session.exerciseConfig ?? { directionMode: 'forward', orderMode: 'shuffled' };
+  const savedDirections = set.words.map(({ sourceDirection }) => sourceDirection);
+  const legacyDirection =
+    savedDirections.length &&
+    savedDirections.every((direction) => ['forward', 'reverse'].includes(direction))
+      ? new Set(savedDirections).size === 1
+        ? savedDirections[0]
+        : 'mixed'
+      : 'unknown';
+  const config = {
+    directionMode: session.exerciseConfig?.directionMode ?? legacyDirection,
+    orderMode: session.exerciseConfig?.orderMode ?? 'shuffled',
+  };
   const settings = {
     caseSensitive: session.settings.caseSensitive ?? false,
     accentSensitive: session.settings.accentSensitive ?? false,
