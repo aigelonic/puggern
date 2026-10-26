@@ -44,7 +44,7 @@ test('waits for consent, keeps A coherent, then activates complete B offline wit
   });
   expect(
     fixture.state.requests.filter(({ cacheControl }) => cacheControl === 'no-cache'),
-  ).toHaveLength(30);
+  ).toHaveLength(34);
   expect(await workerMessage(page, 'controller', 'PUGGERN_IDENTITY')).toMatchObject({ shell: 'A' });
   await page.reload();
   await expect(page.locator('#identity')).toHaveText('1.0.0:A');
@@ -156,7 +156,7 @@ test('a window opened after enumeration stays loaded and old shell caches surviv
   expect(await late.evaluate(() => window.loadedShell)).toEqual({ version: '1.0.0', shell: 'A' });
   await expect(late.locator('#identity')).toHaveText('1.0.0:A');
   await context.setOffline(true);
-  expect(await late.evaluate(async () => (await fetch('./src/profiles.mjs?v=9')).ok)).toBe(true);
+  expect(await late.evaluate(async () => (await fetch('./src/profiles.mjs?v=10')).ok)).toBe(true);
   expect(
     await late.evaluate(async () => {
       const cache = await caches.open('puggern-app-shell-1.0.0-A');
@@ -195,7 +195,7 @@ test('migrates a legacy bad-MIME shell only after consent and keeps saved data o
   expect(
     await page.evaluate(async () => {
       const cache = await caches.open('puggern-app-shell-2.0.0-B');
-      return (await cache.match('./src/profiles.mjs?v=9')).headers.get('content-type');
+      return (await cache.match('./src/profiles.mjs?v=10')).headers.get('content-type');
     }),
   ).toBe('text/javascript');
 });

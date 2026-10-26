@@ -8,7 +8,7 @@
     <meta name="robots" content="noindex, nofollow, noarchive" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" type="image/png" sizes="192x192" href="./icons/pug-192.png" />
-    <link rel="stylesheet" href="./styles.css?v=12" />
+    <link rel="stylesheet" href="./styles.css?v=13" />
     <title>Puggern</title>
   </head>
   <body>
@@ -40,6 +40,16 @@
       <p id="progress-warning" class="feedback error" role="alert" hidden></p>
 
       <p id="app-error" class="feedback error" role="alert" hidden></p>
+      <p id="history-warning" class="feedback error" role="alert" hidden></p>
+      <div id="history-save-warning" hidden>
+        <p class="feedback error">
+          Øvingsresultatet er ikke lagret. Du kan prøve igjen. Hvis du laster siden på nytt, kan
+          resultatet og ulagret fremgang gå tapt.
+        </p>
+        <button id="history-retry" class="button secondary" type="button">
+          Prøv å lagre igjen
+        </button>
+      </div>
 
       <section id="setup-view" class="view setup-view">
         <p class="eyebrow">Litt øving gjør susen</p>
@@ -55,6 +65,9 @@
             </button>
           </div>
           <p id="profile-rewards" class="field-help"></p>
+          <button id="history-button" class="button secondary" type="button">
+            Øvingshistorikk
+          </button>
           <form id="profile-form" hidden>
             <div class="anti-bot-field" aria-hidden="true">
               <label for="profile-website">Nettside</label>
@@ -347,6 +360,7 @@
             <dd id="completion-extra-practice-count">0</dd>
           </div>
         </dl>
+        <p id="completion-record-message" role="status"></p>
         <h2>Ord det kan være lurt å øve mer på</h2>
         <ul id="hardest-words"></ul>
         <div class="actions">
@@ -361,6 +375,65 @@
           </button>
         </div>
       </section>
+      <dialog id="history-dialog" aria-labelledby="history-heading">
+        <h2 id="history-heading" tabindex="-1">Øvingshistorikk</h2>
+        <p id="history-profile"></p>
+        <p class="field-help">
+          Bare fullførte øvinger fra etter at historikkfunksjonen ble installert, tas med. Eldre
+          øvinger er ikke inkludert. De siste 500 resultatene per profil beholdes. Rekorder gjelder
+          bare lagret historikk, ikke alle øvinger du noen gang har gjort.
+        </p>
+        <p class="field-help">
+          Historikken lagres bare i denne nettleseren, uten konto eller synkronisering. Lokale
+          profiler er ikke tilgangsbeskyttelse eller kryptering. Andre som bruker samme nettleser,
+          kan se dataene. Sletter du nettleserdataene, forsvinner historikken.
+        </p>
+        <p id="history-empty">Fullførte øvinger vil vises her, bare i denne nettleseren.</p>
+        <div id="history-variant-controls" hidden>
+          <label for="history-variant">Øvingsvariant for sammenligning</label>
+          <select id="history-variant"></select>
+          <p class="field-help">
+            Bare samme ordinnhold, retning, rekkefølge og svarinnstillinger sammenlignes.
+          </p>
+        </div>
+        <p
+          id="history-status"
+          class="visually-hidden"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        ></p>
+        <section id="history-trend" aria-labelledby="history-trend-heading" hidden>
+          <h3 id="history-trend-heading">Riktig på første forsøk over tid</h3>
+          <p id="history-comparison"></p>
+          <p id="history-records"></p>
+          <p id="history-chart-description" class="field-help">
+            De siste 10 sammenlignbare øvingene, eldst til nyest. Avstanden viser forsøksrekkefølge,
+            ikke tiden mellom øvingene. Skalaen er alltid 0–100 %. Datoer og verdier står i
+            tabellen.
+          </p>
+          <svg id="history-chart" viewBox="0 0 560 185" aria-hidden="true"></svg>
+          <table id="history-chart-table">
+            <caption>
+              Førsteforsøksnøyaktighet for de siste sammenlignbare øvingene
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Forsøk</th>
+                <th scope="col">Fullført</th>
+                <th scope="col">Riktig på første forsøk</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </section>
+        <h3>Fullførte øvinger · nyeste først</h3>
+        <ol id="history-list"></ol>
+        <button id="history-more" class="button secondary" type="button" hidden>Vis flere</button>
+        <form method="dialog">
+          <button class="button secondary" type="submit">Tilbake til profilen</button>
+        </form>
+      </dialog>
       <footer class="app-footer" aria-label="Appversjon og oppdateringer">
         <span id="app-version"></span>
         <a id="release-notes" hidden target="_blank" rel="noopener noreferrer">Utgivelsesnotater</a>
@@ -392,6 +465,6 @@
         <button class="button primary" value="update">Forkast inntasting og oppdater</button>
       </form>
     </dialog>
-    <script type="module" src="./src/main.mjs?v=15"></script>
+    <script type="module" src="./src/main.mjs?v=16"></script>
   </body>
 </html>

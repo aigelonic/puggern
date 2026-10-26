@@ -100,7 +100,7 @@ function worker() {
 test('prepares the complete fresh shell without activating and reports its local identity', async () => {
   const state = worker();
   await state.dispatch('install');
-  assert.equal(state.entries.size, 15);
+  assert.equal(state.entries.size, 17);
   assert.ok(state.requests.every((request) => request.cache === 'reload'));
   assert.equal(state.skipped, 0);
   assert.deepEqual(await state.message('PUGGERN_IDENTITY'), {
@@ -108,7 +108,7 @@ test('prepares the complete fresh shell without activating and reports its local
     requestId: 'request-1',
     ok: true,
     version: '0.0.0',
-    shell: '16',
+    shell: '17',
   });
   assert.equal(state.skipped, 0);
 });
@@ -132,10 +132,10 @@ test('retained cache identities are immutable, with identical rollback content s
   await state.dispatch('install');
   state.existed = true;
   await state.dispatch('install');
-  assert.equal(state.writes, 15);
+  assert.equal(state.writes, 17);
   state.content = 'unexpected new content';
   await assert.rejects(state.dispatch('install'), /new shell revision/);
-  assert.equal(state.writes, 15);
+  assert.equal(state.writes, 17);
   assert.deepEqual(state.deleted, []);
   assert.equal(await state.entries.get('https://app.test/app/index.html').text(), 'shell A');
 });
@@ -144,7 +144,7 @@ test('cache write failures remove only the incomplete candidate cache', async ()
   const state = worker();
   state.failWrite = true;
   await assert.rejects(state.dispatch('install'), /Cache write failed/);
-  assert.deepEqual(state.deleted, ['puggern-app-shell-0.0.0-16']);
+  assert.deepEqual(state.deleted, ['puggern-app-shell-0.0.0-17']);
   assert.equal(state.skipped, 0);
 });
 
@@ -167,7 +167,7 @@ test('controlled reload checks app windows without requesting activation', async
     requestId: 'request-1',
     ok: true,
     version: '0.0.0',
-    shell: '16',
+    shell: '17',
   });
   assert.equal(state.skipped, 0);
   state.clients.push({ id: 'other', type: 'window', url: 'https://app.test/app/other' });

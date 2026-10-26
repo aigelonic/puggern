@@ -13,6 +13,8 @@ const shellPaths = [
   './icons/pug-192.png',
   './icons/pug-512.png',
   './src/main.mjs?v=14',
+  './src/history.mjs?v=2',
+  './src/history-view.mjs?v=1',
   './src/practice-feedback.mjs?v=2',
   './src/learning.mjs?v=8',
   './src/profiles.mjs?v=8',

@@ -1,4 +1,5 @@
 import { isValidProgress, normalizeProgress } from './learning.mjs?v=9';
+import { isValidResult, isValidRun, MAX_HISTORY, newestFirst } from './history.mjs?v=2';
 
 export const PROFILE_STATE_KEY = 'puggern.profile-state';
 export const PROFILE_STATE_VERSION = 1;
@@ -70,29 +71,143 @@ function isValidProfileState(state) {
   );
 }
 
-export function loadProfileState(storage) {
+export function loadProfileState(storage, warn = () => {}) {
   const stored = storage.getItem(PROFILE_STATE_KEY);
   if (!stored) return null;
 
   try {
     const state = JSON.parse(stored);
     if (!isValidProfileState(state)) return null;
-    return {
+    const normalized = {
       ...state,
       progress: Object.fromEntries(
         Object.entries(state.progress).map(([profileId, sets]) => [
           profileId,
           Object.fromEntries(
-            Object.entries(sets).map(([setId, progress]) => [setId, normalizeProgress(progress)]),
+            Object.entries(sets).map(([setId, progress]) => {
+              const next = normalizeProgress(progress);
+              if (next.session.run !== undefined && !isValidRun(next.session.run)) {
+                delete next.session.run;
+                warn();
+              }
+              return [setId, next];
+            }),
           ),
         ]),
       ),
     };
+    if (state.history !== undefined) {
+      normalized.history = {};
+      if (!state.history || typeof state.history !== 'object' || Array.isArray(state.history)) {
+        warn();
+      } else {
+        const profileIds = new Set(state.profiles.map(({ id }) => id));
+        if (Object.keys(state.history).some((id) => !profileIds.has(id))) warn();
+        for (const profile of state.profiles) {
+          const entries = state.history[profile.id];
+          if (entries === undefined) continue;
+          if (!Array.isArray(entries)) {
+            warn();
+            continue;
+          }
+          const ids = new Set();
+          const valid = entries.slice(0, MAX_HISTORY).filter((result) => {
+            if (!isValidResult(result) || ids.has(result.id)) {
+              warn();
+              return false;
+            }
+            ids.add(result.id);
+            return true;
+          });
+          if (entries.length > MAX_HISTORY) warn();
+          normalized.history[profile.id] = valid;
+        }
+      }
+    }
+    return normalized;
   } catch {
     return null;
   }
 }
 
 export function saveProfileState(storage, state) {
+  if (state.history !== undefined) {
+    if (
+      !state.history ||
+      typeof state.history !== 'object' ||
+      Array.isArray(state.history) ||
+      !Object.entries(state.history).every(
+        ([id, results]) =>
+          state.profiles.some((profile) => profile.id === id) &&
+          Array.isArray(results) &&
+          results.length <= MAX_HISTORY &&
+          results.every(isValidResult) &&
+          new Set(results.map((result) => result.id)).size === results.length,
+      )
+    ) {
+      throw new Error('Øvingshistorikken er ugyldig.');
+    }
+  }
+  if (
+    Object.values(state.progress).some((sets) =>
+      Object.values(sets).some(
+        ({ session }) => session.run !== undefined && !isValidRun(session.run),
+      ),
+    )
+  ) {
+    throw new Error('Øvingsidentiteten er ugyldig.');
+  }
   storage.setItem(PROFILE_STATE_KEY, JSON.stringify(state));
+}
+
+// Apply progress, history and rewards together to the latest state under the caller's lock.
+export function applyRunUpdates(state, updates) {
+  let next = state;
+  for (const update of updates) {
+    const { profileId, setId, result } = update;
+    let { progress, earned } = update;
+    const profile = next.profiles.find(({ id }) => id === profileId);
+    if (!profile) throw new Error('Profilen som startet øvingen finnes ikke lenger.');
+    const savedProgress = next.progress[profileId]?.[setId];
+    if (update.resumeLegacy && savedProgress?.session.run) {
+      progress = savedProgress;
+      earned = createRewards();
+    }
+    const history = next.history?.[profileId] ?? [];
+    if (history.some(({ id }) => id === progress.session.run.id)) continue;
+    const saved = savedProgress?.session;
+    const sameRun = saved?.run?.id === progress.session.run.id;
+    if (sameRun && (saved.points ?? 0) > (progress.session.points ?? 0)) continue;
+    const rewards = {
+      points: sameRun
+        ? Math.max(0, (progress.session.points ?? 0) - (saved.points ?? 0))
+        : earned.points,
+      bestStreak: earned.bestStreak,
+      completedSets: sameRun && saved.queue.length === 0 ? 0 : earned.completedSets,
+    };
+    next = {
+      ...next,
+      profiles: next.profiles.map((item) =>
+        item.id === profileId ? { ...item, rewards: addRewards(item.rewards, rewards) } : item,
+      ),
+      progress: {
+        ...next.progress,
+        [profileId]: {
+          ...Object.fromEntries(
+            Object.entries(next.progress[profileId] ?? {}).filter(([id]) => id !== setId),
+          ),
+          [setId]: progress,
+        },
+      },
+      ...(result
+        ? {
+            history: {
+              ...next.history,
+              [profileId]: newestFirst([...history, result]).slice(0, MAX_HISTORY),
+            },
+          }
+        : {}),
+    };
+  }
+  return next;
 }

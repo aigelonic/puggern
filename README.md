@@ -66,12 +66,65 @@ toggle above the views to turn them on or off at any time. Sound starts off on
 each page load and is not stored with a child's profile. Answer effects and
 sounds are replaced rather than queued, and stop when leaving practice.
 
-Storage retains each profile's current session per word set, not a history of
-completed attempts. Session points and combos survive reloads. Total points, best
+Storage retains each profile's current session per word set. Session points and combos survive reloads. Total points, best
 combo, and the number of completed sets are saved in the profile and retained when
 starting a new session or deleting a set. Existing profiles and sessions without
 rewards start their reward counters at zero. Daily streaks, stars, badges,
 unlockables, and leaderboards are not part of this MVP.
+
+## Øvingshistorikk
+
+Choose **Øvingshistorikk** in the profile area to revisit that profile's completed
+runs, newest first (20 at a time, with **Vis flere**). Expand **Vis øvingsdetaljer**
+for practiced entries, entries needing extra practice, and saved answer settings.
+Results retain the set name and settings captured at the start, even after a set
+is edited, renamed, archived, or deleted. History is read-only; viewing it never
+awards rewards or restarts practice.
+
+Collection is forward-only: old completed summaries and aggregate rewards are
+not converted into history. New runs receive a stable ID when started; unfinished
+legacy sessions receive one when resumed. Resuming keeps the same run, while
+explicitly starting again creates a new run. Only the actual completion transition
+records a result, not opening or reloading a completion screen.
+
+First-try accuracy is the number of learned entries without mistakes divided by
+the practiced entry count, displayed as a whole percentage. Total errors sums all
+incorrect answers; entries needing extra practice counts entries with any errors.
+Correction-copy answers do not independently improve accuracy or award extra
+points. Points and best consecutive-correct streak come unchanged from the
+learning engine; higher points are not presented as better mastery.
+
+The variant selector compares only runs of the same set ID, ordered source
+hint/answer content, direction mode, order mode, and effective case/accent settings.
+A SHA-256 content fingerprint excludes names, timestamps, and mixed mode's random
+direction realization. Renaming or archiving alone keeps the variant; changed
+content/order/settings and copied sets do not. The chart shows the latest 10
+comparable attempts, oldest to newest on a fixed 0–100% scale, spaced by attempt
+sequence rather than elapsed time. Its table provides equivalent dates and values.
+Previous-run differences use unrounded accuracy and display one decimal percentage
+point; ties are not records. A first result establishes a baseline.
+
+Only the latest 500 completed results per profile are retained, sorted by UTC
+completion timestamp then run ID (both descending); dates display in local time.
+Personal best accuracy and streak refer to this retained history, not lifetime
+records. Pruning never reduces profile reward totals. Optional history/run metadata
+extends the existing version-1 state without resetting profiles or progress.
+Malformed history entries are ignored with a warning, separately from valid data.
+Unsupported profile-state versions are not overwritten by this client.
+
+Progress, result, and pending rewards are saved in one localStorage write, merging
+the latest state and deduplicating run IDs under Web Locks where available.
+Without Web Locks the existing best-effort fallback remains: localStorage is not
+transactional, so simultaneous writes from tabs can overwrite each other.
+If saving fails, previously saved data is retained, practice remains usable, and
+**Prøv å lagre igjen** retries the in-memory result with its original ID/time.
+Reloading before a successful retry can lose unsaved results and progress.
+
+All history stays in this browser/origin, including offline use after caching.
+There are no accounts, backend storage, telemetry, cloud sync, or cross-device
+history. Local profiles are convenience separation, not authentication or
+encryption; anyone using the same browser/origin may access the data. Clearing
+site storage removes it. Shared word-set links do not include history.
 
 ## Sharing between devices
 
