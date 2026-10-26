@@ -9,7 +9,7 @@ import {
   submitAnswer,
   wordsForExercise,
   wordsForDirection,
-} from './learning.mjs?v=7';
+} from './learning.mjs?v=8';
 import {
   addRewards,
   createProfileState,
@@ -20,13 +20,13 @@ import {
   MAX_PROFILES,
   PROFILE_STATE_KEY,
   saveProfileState,
-} from './profiles.mjs?v=7';
+} from './profiles.mjs?v=8';
 import {
   loadWordSets,
   saveWordSets,
   MAX_WORD_SET_NAME_LENGTH,
   MAX_WORD_SETS,
-} from './word-sets.mjs?v=8';
+} from './word-sets.mjs?v=9';
 import { recordCreationAttempt, MIN_CREATION_FORM_TIME_MS } from './creation-guard.mjs?v=3';
 import { APP_VERSION, isValidAppVersion } from './app-version.mjs';
 import { createAppUpdates } from './app-updates.mjs';
@@ -35,8 +35,8 @@ import {
   MAX_SHARE_URL_LENGTH,
   createShareUrl,
   parseShareUrl,
-} from './share-word-set.mjs?v=1';
-import { answerFeedback, createPracticeEffects } from './practice-feedback.mjs?v=1';
+} from './share-word-set.mjs?v=2';
+import { answerFeedback, createPracticeEffects } from './practice-feedback.mjs?v=2';
 
 const status = document.querySelector('#connection-status');
 const appError = document.querySelector('#app-error');
@@ -262,11 +262,25 @@ async function withProfileStateLock(operation) {
   return operation();
 }
 
+function repairStoredProfileState() {
+  try {
+    const stored = JSON.stringify(JSON.parse(window.localStorage.getItem(PROFILE_STATE_KEY)));
+    if (stored !== JSON.stringify(profileState)) {
+      saveProfileState(window.localStorage, profileState);
+    }
+  } catch (error) {
+    setAppError(`Kunne ikke lagre profiler og øving: ${error.message}`);
+  }
+}
+
 async function initializeProfileState() {
   try {
     await withProfileStateLock(() => {
       profileState = loadProfileState(window.localStorage);
-      if (profileState) return;
+      if (profileState) {
+        repairStoredProfileState();
+        return;
+      }
 
       profileState = createProfileState();
       const legacyProgress = loadProgress(window.localStorage);
@@ -510,12 +524,10 @@ function renderPractice(message = '', { announceCorrection = false, points = 0, 
   document.querySelector('#practice-rewards').textContent =
     `${session.points ?? 0} poeng · ${session.streak ?? 0} riktige på rad`;
   prompt.textContent = word.prompt;
-  answerLabel.textContent = isCorrection ? 'Skriv ordet én gang' : 'Stavingen din';
+  answerLabel.textContent = isCorrection ? 'Skriv riktig svar' : 'Stavingen din';
   correctionFeedback.hidden = !isCorrection;
   correctAnswer.textContent = isCorrection ? word.answer : '';
-  correctionInstruction.textContent = isCorrection
-    ? 'Skriv ordet én gang, så kommer det tilbake senere.'
-    : '';
+  correctionInstruction.textContent = isCorrection ? 'Skriv riktig svar for å gå videre.' : '';
   feedback.textContent = isCorrection ? '' : message;
   if (!isCorrection && message) {
     const marker = document.createElement('span');
@@ -539,7 +551,7 @@ function renderPractice(message = '', { announceCorrection = false, points = 0, 
   showView(practiceView);
   correctionAnnouncement.textContent = isCorrection
     ? announceCorrection
-      ? `Riktig stavemåte er ${word.answer}. Skriv ordet én gang, så kommer det tilbake senere.`
+      ? `Riktig stavemåte er ${word.answer}. Skriv riktig svar for å gå videre.`
       : 'Rettelsen vises ved svarfeltet.'
     : '';
   answerInput.focus();

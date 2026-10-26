@@ -294,7 +294,7 @@ test('focuses the saved-set heading when returning to a full set list', async ({
   await expect(page.locator('#saved-sets-title')).toBeFocused();
 });
 
-test('resumes corrections offline and counts independent answers, not correction copies', async ({
+test('resumes corrections offline and finishes with one correct answer', async ({
   page,
   context,
 }) => {
@@ -309,13 +309,8 @@ test('resumes corrections offline and counts independent answers, not correction
   await context.setOffline(true);
   await page.reload();
   await page.getByRole('button', { name: 'Fortsett øvingen' }).click();
-  await expect(page.getByLabel('Skriv ordet én gang')).toBeFocused();
+  await expect(page.getByLabel('Skriv riktig svar')).toBeFocused();
   await answer(page, answers[missedPrompt]);
-  await expect(page.locator('#progress-label')).toHaveText('0 av 1 lært · 2 oppgaver igjen');
-  await expect(page.locator('#complete-view')).toBeHidden();
-  for (let index = 0; index < 2; index += 1) {
-    await answer(page, answers[await page.locator('#prompt').textContent()]);
-  }
   await expectCompletion(page, 1, 0);
   await expect(page.locator('#hardest-words')).toHaveText(
     `${missedPrompt} → ${answers[missedPrompt]} · 1 feilsvar`,
@@ -394,12 +389,11 @@ test('restores continue when storage recovers during an unfinished session', asy
   });
   await answer(page, 'wrong');
   await expect(page.getByRole('alert')).toContainText('Fremgangen kunne ikke lagres');
-  await answer(page, 'dog');
+  await answer(page, 'still wrong');
   await expect(page.locator('#progress-warning')).toBeHidden();
   await page.locator('#back-button').click();
   await page.getByRole('button', { name: 'Fortsett øvingen' }).click();
-  await expect(page.locator('#progress-label')).toHaveText('0 av 1 lært · 2 oppgaver igjen');
-  await answer(page, 'dog');
+  await expect(page.locator('#progress-label')).toHaveText('0 av 1 lært · 1 oppgaver igjen');
   await answer(page, 'dog');
   await expectCompletion(page, 1, 0);
 });
@@ -422,7 +416,7 @@ test('restarts a summary for its original profile after another tab switches pro
   await otherPage.getByRole('dialog').getByRole('button', { name: 'Start øving' }).click();
   await expect(otherPage.getByLabel('Stavingen din')).toBeFocused();
   await answer(otherPage, 'wrong');
-  await expect(otherPage.getByLabel('Skriv ordet én gang')).toBeFocused();
+  await expect(otherPage.getByLabel('Skriv riktig svar')).toBeFocused();
   await expect(page.getByLabel('Profil').locator('option:checked')).toHaveText('Ny profil');
   await page.getByRole('button', { name: 'Øv på samme sett igjen' }).click();
   await expect(page.getByLabel('Stavingen din')).toBeFocused();
@@ -491,13 +485,11 @@ test('resumes an unfinished in-memory session after saving fails', async ({ page
   await expect(page.getByRole('alert')).toContainText('Fremgangen kunne ikke lagres');
   await page.locator('#back-button').click();
   await page.getByRole('button', { name: 'Fortsett øvingen' }).click();
-  await expect(page.getByLabel('Skriv ordet én gang')).toBeFocused();
+  await expect(page.getByLabel('Skriv riktig svar')).toBeFocused();
   await expect(page.locator('#progress-label')).toHaveText('0 av 1 lært · 1 oppgaver igjen');
 });
 
-test('saves points and combos across reloads, rewards repeats but not correction copies', async ({
-  page,
-}) => {
+test('saves points and combos across reloads and rewards each word once', async ({ page }) => {
   await startSet(page, 'hund;dog\nkatt;cat\nfugl;bird');
   const answers = { hund: 'dog', katt: 'cat', fugl: 'bird' };
   const progress = page.getByRole('progressbar');
@@ -512,13 +504,12 @@ test('saves points and combos across reloads, rewards repeats but not correction
   await answer(page, 'wrong');
   await expect(page.locator('#practice-rewards')).toHaveText('10 poeng · 0 riktige på rad');
   await answer(page, answers[await page.locator('#prompt').textContent()]);
-  await expect(page.locator('#practice-rewards')).toHaveText('10 poeng · 0 riktige på rad');
-  for (let index = 0; index < 3; index += 1) {
-    await answer(page, answers[await page.locator('#prompt').textContent()]);
-  }
+  await expect(page.locator('#practice-rewards')).toHaveText('20 poeng · 1 riktige på rad');
+  await expect(page.locator('#progress-label')).toHaveText('2 av 3 lært · 1 oppgaver igjen');
+  await answer(page, answers[await page.locator('#prompt').textContent()]);
   await expectCompletion(page, 3, 2);
   await expect(page.locator('#completion-rewards')).toHaveText(
-    '40 poeng · Beste rekke: 3 riktige på rad',
+    '30 poeng · Beste rekke: 2 riktige på rad',
   );
   await expect(page.locator('.celebration')).toBeVisible();
   await page.reload();
@@ -530,7 +521,7 @@ test('saves points and combos across reloads, rewards repeats but not correction
   }
   await page.getByRole('button', { name: 'Til ordsettene' }).click();
   await expect(page.locator('#profile-rewards')).toHaveText(
-    '70 poeng totalt · Beste rekke: 3 · 2 sett fullført',
+    '60 poeng totalt · Beste rekke: 3 · 2 sett fullført',
   );
   await page.getByRole('button', { name: 'Legg til profil' }).click();
   await page.getByLabel('Navn', { exact: true }).fill('Ny profil');
@@ -540,7 +531,7 @@ test('saves points and combos across reloads, rewards repeats but not correction
   );
   await page.getByLabel('Profil', { exact: true }).selectOption({ label: 'Min profil' });
   await expect(page.locator('#profile-rewards')).toHaveText(
-    '70 poeng totalt · Beste rekke: 3 · 2 sett fullført',
+    '60 poeng totalt · Beste rekke: 3 · 2 sett fullført',
   );
 });
 

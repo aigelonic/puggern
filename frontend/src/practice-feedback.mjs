@@ -3,9 +3,6 @@ export function answerFeedback(previous, outcome, word) {
   const kind = outcome.result;
   if (kind === 'complete') return { kind, message: 'Hurra! Du fullførte øvingen!' };
   if (kind === 'incorrect') return { kind, message: 'Ikke helt ennå – prøv igjen!' };
-  if (kind === 'retry-scheduled') {
-    return { kind, message: 'Takk! Dette ordet kommer tilbake litt senere.' };
-  }
   const points = (outcome.session.points ?? 0) - (previous.points ?? 0);
   const newlyLearned =
     !previous.learned.includes(word.id) && outcome.session.learned.includes(word.id);

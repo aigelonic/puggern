@@ -12,15 +12,15 @@ const shellPaths = [
   './manifest.webmanifest',
   './icons/pug-192.png',
   './icons/pug-512.png',
-  './src/main.mjs?v=13',
-  './src/practice-feedback.mjs?v=1',
-  './src/learning.mjs?v=7',
-  './src/profiles.mjs?v=7',
-  './src/word-sets.mjs?v=8',
+  './src/main.mjs?v=14',
+  './src/practice-feedback.mjs?v=2',
+  './src/learning.mjs?v=8',
+  './src/profiles.mjs?v=8',
+  './src/word-sets.mjs?v=9',
   './src/creation-guard.mjs?v=3',
   './src/app-version.mjs',
   './src/app-updates.mjs',
-  './src/share-word-set.mjs?v=1',
+  './src/share-word-set.mjs?v=2',
 ];
 
 export async function startWorkerFixture() {
@@ -83,7 +83,7 @@ export async function startWorkerFixture() {
       response.end(`<!doctype html><html lang="en"><head><meta charset="utf-8">
         <title>Shell ${state.shell}</title><link rel="stylesheet" href="./styles.css?v=11">
         </head><body><h1 id="identity">${state.version}:${state.shell}</h1>
-        <script type="module" src="./src/main.mjs?v=13"></script></body></html>`);
+        <script type="module" src="./src/main.mjs?v=14"></script></body></html>`);
       return;
     }
     if (path === '/app/styles.css') {
