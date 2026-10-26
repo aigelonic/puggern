@@ -19,6 +19,14 @@ function fixture({ version = '0.0.0', initial = false, messages = [] } = {}) {
     ['release-please-config.json', JSON.stringify(config)],
     ['.release-please-manifest.json', JSON.stringify({ '.': version }) + '\n'],
     ['version.txt', `${version}\n`],
+    [
+      'frontend/src/app-version.mjs',
+      `export const APP_VERSION = '${version}'; // x-release-please-version\n`,
+    ],
+    [
+      'frontend/service-worker.js',
+      `const APP_VERSION = '${version}'; // x-release-please-version\nconst SHELL_REVISION = '13';\n`,
+    ],
   ]);
   const commits = [];
   let sequence = 0;
@@ -132,9 +140,12 @@ test('first release generates consistent files, tag, release name and notes with
   assert.deepEqual([...pull.generated.keys()].sort(), [
     '.release-please-manifest.json',
     'CHANGELOG.md',
+    'frontend/service-worker.js',
+    'frontend/src/app-version.mjs',
     'version.txt',
   ]);
   assert.equal(pull.generated.get('version.txt'), '0.1.0\n');
+  assertVersionCopies(pull, '0.1.0');
   assert.deepEqual(JSON.parse(pull.generated.get('.release-please-manifest.json')), {
     '.': '0.1.0',
   });
@@ -182,6 +193,7 @@ for (const [version, message, expected] of [
     const state = fixture({ version, messages: [message] });
     const [pull] = await (await state.plan()).createPullRequests();
     assert.equal(pull.generated.get('version.txt'), `${expected}\n`);
+    assertVersionCopies(pull, expected);
     assert.deepEqual(JSON.parse(pull.generated.get('.release-please-manifest.json')), {
       '.': expected,
     });
@@ -191,6 +203,17 @@ for (const [version, message, expected] of [
     assert.equal(release.name, `v${expected}`);
     assert.ok(pull.generated.get('CHANGELOG.md').includes(release.notes.trim()));
   });
+}
+
+function assertVersionCopies(pull, version) {
+  assert.equal(
+    pull.generated.get('frontend/src/app-version.mjs'),
+    `export const APP_VERSION = '${version}'; // x-release-please-version\n`,
+  );
+  assert.equal(
+    pull.generated.get('frontend/service-worker.js'),
+    `const APP_VERSION = '${version}'; // x-release-please-version\nconst SHELL_REVISION = '13';\n`,
+  );
 }
 
 test('maintenance alone does not open a release PR or publish', async () => {

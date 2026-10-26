@@ -10,6 +10,75 @@
   box-sizing: border-box;
 }
 
+.app-footer {
+  margin-top: 3rem;
+  padding: 1rem 0 max(1rem, env(safe-area-inset-bottom));
+  border-top: 1px solid #aeb8a9;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  font:
+    0.9rem/1.5 'Trebuchet MS',
+    sans-serif;
+}
+
+.app-footer a {
+  color: #245d43;
+}
+
+.app-footer button,
+.app-footer a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+#update-status,
+#update-banner {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+#update-banner {
+  padding: 0.75rem 0;
+}
+
+#update-banner .actions,
+#update-confirmation .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+#update-confirmation {
+  width: min(36rem, calc(100% - 2rem));
+  max-height: calc(100dvh - 2rem);
+  overflow: auto;
+  padding: 1.5rem;
+  border: 1px solid #587064;
+  border-radius: 6px;
+  background: #fffefa;
+  color: #263a32;
+}
+
+#update-confirmation::backdrop {
+  background: #263a3266;
+}
+
+.app-footer button,
+#update-confirmation button {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid #347457;
+  outline-offset: 3px;
+}
+
 [hidden] {
   display: none !important;
 }

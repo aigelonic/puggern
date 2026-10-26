@@ -12,6 +12,8 @@ test('serves the complete startup module graph as JavaScript', async ({ page, re
   });
   await page.goto('/');
   expect([...modules].map((url) => new URL(url).pathname).sort()).toEqual([
+    '/src/app-updates.mjs',
+    '/src/app-version.mjs',
     '/src/creation-guard.mjs',
     '/src/learning.mjs',
     '/src/main.mjs',

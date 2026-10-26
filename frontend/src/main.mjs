@@ -27,6 +27,8 @@ import {
   MAX_WORD_SETS,
 } from './word-sets.mjs?v=7';
 import { recordCreationAttempt, MIN_CREATION_FORM_TIME_MS } from './creation-guard.mjs?v=3';
+import { APP_VERSION, isValidAppVersion } from './app-version.mjs';
+import { createAppUpdates } from './app-updates.mjs';
 
 const status = document.querySelector('#connection-status');
 const appError = document.querySelector('#app-error');
@@ -71,6 +73,143 @@ let currentSetId = null;
 let currentProfileId = null;
 let unsavedProgress = false;
 const pendingRewards = new Map();
+const operations = new Set();
+let updateTransition = false;
+let editorBaseline = '';
+let pendingUpdateFocus = null;
+let updateDialogOpener = null;
+const startSession = trackOperation(startSessionOperation);
+const saveEditor = trackOperation(saveEditorOperation);
+
+function trackOperation(operation) {
+  return (...args) => {
+    args[0]?.preventDefault?.();
+    if (updateTransition) return Promise.resolve(false);
+    const pending = Promise.resolve(operation(...args));
+    operations.add(pending);
+    pending.finally(() => operations.delete(pending)).catch(() => {});
+    return pending;
+  };
+}
+
+function editorSnapshot() {
+  return JSON.stringify(
+    [...wordSetForm.querySelectorAll('input, textarea, select')]
+      .filter((input) => input.name !== 'website')
+      .map((input) => [input.id, input.type === 'checkbox' ? input.checked : input.value]),
+  );
+}
+
+function confirmUpdateInput(categories) {
+  const dialog = document.querySelector('#update-confirmation');
+  const previousFocus = updateDialogOpener || document.activeElement;
+  const cancelButton = document.querySelector('#cancel-update-button');
+  const discardButton = dialog.querySelector('button[value="update"]');
+  document.querySelector('#update-input-warning').textContent =
+    `Dette blir ikke lagret: ${categories.join(', ')}. Vil du forkaste denne inntastingen og oppdatere?`;
+  return new Promise((resolve) => {
+    const containFocus = (event) => {
+      if (event.key !== 'Tab') return;
+      if (event.shiftKey && document.activeElement === cancelButton) {
+        event.preventDefault();
+        discardButton.focus();
+      } else if (!event.shiftKey && document.activeElement === discardButton) {
+        event.preventDefault();
+        cancelButton.focus();
+      }
+    };
+    dialog.addEventListener(
+      'close',
+      () => {
+        dialog.removeEventListener('keydown', containFocus);
+        pendingUpdateFocus = previousFocus;
+        updateDialogOpener = null;
+        resolve(dialog.returnValue === 'update');
+      },
+      { once: true },
+    );
+    dialog.addEventListener('keydown', containFocus);
+    dialog.returnValue = 'cancel';
+    dialog.showModal();
+    cancelButton.focus();
+  });
+}
+
+async function prepareUpdate() {
+  await Promise.allSettled([...operations]);
+  const saved = session
+    ? await persistProgress()
+    : await persistProfileState((state) => state, 'lagre fremgangen før oppdatering');
+  if (!saved || unsavedProgress || pendingRewards.size) return false;
+  const categories = [];
+  if (!wordSetForm.hidden && editorSnapshot() !== editorBaseline)
+    categories.push('endringer i ordsettet');
+  if (!profileForm.hidden && (profileNameInput.value || profileAvatarInput.value))
+    categories.push('ny profil');
+  if (!practiceView.hidden && answerInput.value) categories.push('svaret som ikke er sendt inn');
+  return categories.length ? confirmUpdateInput(categories) : true;
+}
+
+const versionLabel = document.querySelector('#app-version');
+versionLabel.textContent = APP_VERSION === '0.0.0' ? 'Utviklingsversjon' : `Versjon ${APP_VERSION}`;
+const releaseLink = document.querySelector('#release-notes');
+if (APP_VERSION !== '0.0.0' && isValidAppVersion(APP_VERSION)) {
+  releaseLink.href = `https://github.com/aigelonic/puggern/releases/tag/v${APP_VERSION}`;
+  releaseLink.hidden = false;
+}
+const updates = createAppUpdates({
+  version: APP_VERSION,
+  prepare: prepareUpdate,
+  onState(state) {
+    document.querySelector('#update-status').textContent = state.message;
+    document.querySelector('#update-banner').hidden = !state.banner;
+    document.querySelector('#update-ready').hidden = !state.candidate;
+    document.querySelector('#apply-update').disabled = state.busy;
+    document.querySelector('#check-updates').disabled = state.busy;
+    document.querySelector('#defer-update').disabled = state.busy;
+  },
+});
+void updates.start();
+document.querySelector('#check-updates').addEventListener('click', () => {
+  void updates.check({ manual: true });
+});
+document.querySelector('#defer-update').addEventListener('click', () => {
+  updates.dismiss();
+  document.querySelector('#update-ready').focus();
+});
+document.querySelector('#update-ready').addEventListener('click', () => {
+  updates.reopen();
+  document.querySelector('#apply-update').focus();
+});
+document.querySelector('#apply-update').addEventListener('click', async () => {
+  if (updateTransition) return;
+  updateDialogOpener = document.activeElement;
+  updateTransition = true;
+  try {
+    await updates.apply();
+  } finally {
+    updateTransition = false;
+    if (pendingUpdateFocus) {
+      const target =
+        pendingUpdateFocus.isConnected && !pendingUpdateFocus.disabled
+          ? pendingUpdateFocus
+          : document.querySelector('#check-updates');
+      pendingUpdateFocus = null;
+      target.focus();
+    }
+  }
+});
+for (const eventType of ['click', 'submit', 'input', 'change', 'keydown']) {
+  document.addEventListener(
+    eventType,
+    (event) => {
+      if (!updateTransition || !event.target.closest('.view')) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    },
+    true,
+  );
+}
 
 function setAppError(message, source = 'app') {
   appError.textContent = message;
@@ -250,7 +389,7 @@ async function persistProgress() {
   return saved;
 }
 
-async function startSession(
+async function startSessionOperation(
   nextWords,
   nextSession,
   setId,
@@ -472,6 +611,7 @@ function openEditor(set = null) {
   wordSetForm.querySelector('[name="website"]').value = '';
   renderPreview();
   wordSetForm.hidden = false;
+  editorBaseline = editorSnapshot();
   wordSetNameInput.focus();
 }
 
@@ -548,7 +688,7 @@ function renderPreview() {
   });
 }
 
-async function saveEditor(startAfterSave = false) {
+async function saveEditorOperation(startAfterSave = false) {
   const previous = wordSets.find((set) => set.id === editorSetId);
   const name = wordSetNameInput.value.trim();
   if (!name) {
@@ -709,12 +849,15 @@ if (savedProgress?.session.queue.length === 0 && wordSets.some((set) => set.id =
   currentProfileId = profileState.activeProfileId;
   finishSession();
 }
-profileSelect.addEventListener('change', async () => {
-  const activeProfileId = profileSelect.value;
-  if (await persistProfileState((state) => ({ ...state, activeProfileId }), 'bytte profil'))
-    renderWordSets();
-  else renderProfiles();
-});
+profileSelect.addEventListener(
+  'change',
+  trackOperation(async () => {
+    const activeProfileId = profileSelect.value;
+    if (await persistProfileState((state) => ({ ...state, activeProfileId }), 'bytte profil'))
+      renderWordSets();
+    else renderProfiles();
+  }),
+);
 newProfileButton.addEventListener('click', () => {
   profileForm.dataset.openedAt = String(Date.now());
   profileForm.querySelector('[name="website"]').value = '';
@@ -729,59 +872,62 @@ document.querySelector('#cancel-profile-button').addEventListener('click', () =>
   if (appError.dataset.source === 'profile') setAppError('');
   newProfileButton.focus();
 });
-profileForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const name = profileNameInput.value.trim();
-  const avatar = profileAvatarInput.value.trim();
-  if (!name) {
-    setAppError('Skriv inn et profilnavn.', 'profile');
-    profileNameInput.focus();
-    return;
-  }
-  if (name.length > MAX_PROFILE_NAME_LENGTH || avatar.length > MAX_PROFILE_AVATAR_LENGTH) {
-    setAppError('Profilnavnet eller emojien er for lang.', 'profile');
-    return;
-  }
-  try {
-    const guardError = await checkCreationForm(profileForm);
-    if (guardError) {
-      showCreationError(profileForm, guardError);
+profileForm.addEventListener(
+  'submit',
+  trackOperation(async (event) => {
+    event.preventDefault();
+    const name = profileNameInput.value.trim();
+    const avatar = profileAvatarInput.value.trim();
+    if (!name) {
+      setAppError('Skriv inn et profilnavn.', 'profile');
+      profileNameInput.focus();
       return;
     }
-  } catch (error) {
-    showCreationError(
-      profileForm,
-      `Kunne ikke kontrollere opprettingsbegrensningen: ${error.message}`,
-    );
-    return;
-  }
-  const profile = { id: crypto.randomUUID(), name, avatar, rewards: createRewards() };
-  if (
-    await persistProfileState(
-      (state) => {
-        if (state.profiles.length >= MAX_PROFILES) {
-          throw new Error(`Du kan ha maksimalt ${MAX_PROFILES} profiler.`);
-        }
-        return {
-          ...state,
-          activeProfileId: profile.id,
-          profiles: [...state.profiles, profile],
-          progress: { ...state.progress, [profile.id]: {} },
-        };
-      },
-      'lagre profilen',
-      'profile',
-    )
-  ) {
-    renderProfiles();
-    renderWordSets();
-    profileForm.hidden = true;
-    profileNameInput.value = '';
-    profileAvatarInput.value = '';
-    profileSelect.focus();
-    showCreationError(profileForm, '');
-  }
-});
+    if (name.length > MAX_PROFILE_NAME_LENGTH || avatar.length > MAX_PROFILE_AVATAR_LENGTH) {
+      setAppError('Profilnavnet eller emojien er for lang.', 'profile');
+      return;
+    }
+    try {
+      const guardError = await checkCreationForm(profileForm);
+      if (guardError) {
+        showCreationError(profileForm, guardError);
+        return;
+      }
+    } catch (error) {
+      showCreationError(
+        profileForm,
+        `Kunne ikke kontrollere opprettingsbegrensningen: ${error.message}`,
+      );
+      return;
+    }
+    const profile = { id: crypto.randomUUID(), name, avatar, rewards: createRewards() };
+    if (
+      await persistProfileState(
+        (state) => {
+          if (state.profiles.length >= MAX_PROFILES) {
+            throw new Error(`Du kan ha maksimalt ${MAX_PROFILES} profiler.`);
+          }
+          return {
+            ...state,
+            activeProfileId: profile.id,
+            profiles: [...state.profiles, profile],
+            progress: { ...state.progress, [profile.id]: {} },
+          };
+        },
+        'lagre profilen',
+        'profile',
+      )
+    ) {
+      renderProfiles();
+      renderWordSets();
+      profileForm.hidden = true;
+      profileNameInput.value = '';
+      profileAvatarInput.value = '';
+      profileSelect.focus();
+      showCreationError(profileForm, '');
+    }
+  }),
+);
 
 newSetButton.addEventListener('click', () => openEditor());
 document.querySelector('#cancel-edit-button').addEventListener('click', () => {
@@ -802,42 +948,48 @@ document
   .querySelector('#save-and-start-button')
   .addEventListener('click', async () => await saveEditor(true));
 
-answerForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  if (answerButton.disabled) return;
-  answerButton.disabled = true;
-  answerInput.readOnly = true;
-  try {
-    const outcome = submitAnswer(session, answerInput.value, words, session.settings);
-    const earned = {
-      points: (outcome.session.points ?? 0) - (session.points ?? 0),
-      bestStreak: outcome.session.bestStreak ?? 0,
-      completedSets: outcome.result === 'complete' && session.queue.length > 0 ? 1 : 0,
-    };
-    pendingRewards.set(currentProfileId, addRewards(pendingRewards.get(currentProfileId), earned));
-    session = outcome.session;
-    await persistProgress();
+answerForm.addEventListener(
+  'submit',
+  trackOperation(async (event) => {
+    event.preventDefault();
+    if (answerButton.disabled) return;
+    answerButton.disabled = true;
+    answerInput.readOnly = true;
+    try {
+      const outcome = submitAnswer(session, answerInput.value, words, session.settings);
+      const earned = {
+        points: (outcome.session.points ?? 0) - (session.points ?? 0),
+        bestStreak: outcome.session.bestStreak ?? 0,
+        completedSets: outcome.result === 'complete' && session.queue.length > 0 ? 1 : 0,
+      };
+      pendingRewards.set(
+        currentProfileId,
+        addRewards(pendingRewards.get(currentProfileId), earned),
+      );
+      session = outcome.session;
+      await persistProgress();
 
-    if (outcome.result === 'incorrect') {
-      renderPractice('', {
-        announceCorrection: document.activeElement === answerInput,
-      });
-      return;
+      if (outcome.result === 'incorrect') {
+        renderPractice('', {
+          announceCorrection: document.activeElement === answerInput,
+        });
+        return;
+      }
+      if (outcome.result === 'retry-scheduled') {
+        renderPractice('Takk! Dette ordet kommer tilbake litt senere.');
+        return;
+      }
+      if (outcome.result === 'complete') {
+        finishSession();
+        return;
+      }
+      renderPractice('Riktig! Fortsett slik.');
+    } finally {
+      answerButton.disabled = false;
+      answerInput.readOnly = false;
     }
-    if (outcome.result === 'retry-scheduled') {
-      renderPractice('Takk! Dette ordet kommer tilbake litt senere.');
-      return;
-    }
-    if (outcome.result === 'complete') {
-      finishSession();
-      return;
-    }
-    renderPractice('Riktig! Fortsett slik.');
-  } finally {
-    answerButton.disabled = false;
-    answerInput.readOnly = false;
-  }
-});
+  }),
+);
 
 document.querySelector('#back-button').addEventListener('click', () => {
   showView(setupView);
@@ -861,11 +1013,3 @@ document.querySelector('#completion-new-set-button').addEventListener('click', (
   renderWordSets();
   openEditor();
 });
-
-if ('serviceWorker' in navigator) {
-  const registerServiceWorker = () => {
-    navigator.serviceWorker.register('./service-worker.js').catch(() => {});
-  };
-  if (document.readyState === 'complete') registerServiceWorker();
-  else window.addEventListener('load', registerServiceWorker, { once: true });
-}

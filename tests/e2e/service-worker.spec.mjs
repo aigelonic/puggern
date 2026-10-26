@@ -1,160 +1,276 @@
-import { createServer } from 'node:http';
 import { expect, test } from '@playwright/test';
-import { createProfileState } from '../../frontend/src/profiles.mjs';
+import {
+  installWorker,
+  startWorkerFixture,
+  updateWorker,
+  workerMessage,
+} from './fixtures/service-worker.mjs';
 
-test('replaces an installed v8 shell with bad module MIME types and works offline', async ({
+let fixture;
+
+test.beforeEach(async () => {
+  fixture = await startWorkerFixture();
+});
+
+test.afterEach(async ({ context }) => {
+  await context.setOffline(false);
+  await fixture.close();
+});
+
+test('waits for consent, keeps A coherent, then activates complete B offline without reloading', async ({
   page,
   context,
-  baseURL,
 }) => {
-  let legacy = true;
-  const baseOrigin = new URL(baseURL).origin;
-  const server = createServer(async (request, response) => {
-    try {
-      const upstreamUrl = new URL(request.url, baseOrigin);
-      if (upstreamUrl.origin !== baseOrigin) {
-        response.writeHead(400);
-        response.end();
-        return;
-      }
-      const upstream = await fetch(upstreamUrl);
-      let body = Buffer.from(await upstream.arrayBuffer());
-      const pathname = upstreamUrl.pathname;
-      const textAsset =
-        pathname === '/' ||
-        pathname === '/index.html' ||
-        pathname === '/styles.css' ||
-        pathname === '/service-worker.js' ||
-        pathname.endsWith('.mjs');
-      if (legacy && textAsset) {
-        body = Buffer.from(
-          body
-            .toString()
-            .replaceAll('puggern-app-shell-v11', 'puggern-app-shell-v8')
-            .replaceAll('styles.css?v=9', 'styles.css?v=7')
-            .replaceAll('main.mjs?v=10', 'main.mjs?v=8')
-            .replaceAll('word-sets.mjs?v=7', 'word-sets.mjs?v=5')
-            .replaceAll('creation-guard.mjs?v=3', 'creation-guard.mjs?v=2')
-            .replaceAll('.mjs?v=6', '.mjs?v=5')
-            .replaceAll('#46574e', '#64766d'),
-        );
-      }
-      for (const [name, value] of upstream.headers) {
-        if (
-          !['content-length', 'content-encoding', 'transfer-encoding', 'connection'].includes(name)
-        ) {
-          response.setHeader(name, value);
-        }
-      }
-      if (legacy && pathname.endsWith('.mjs') && pathname !== '/src/main.mjs') {
-        response.setHeader('content-type', 'application/octet-stream');
-        response.setHeader('cache-control', 'max-age=3600');
-      } else if (legacy && pathname === '/styles.css') {
-        response.setHeader('cache-control', 'max-age=3600');
-      }
-      if (textAsset && !pathname.endsWith('.mjs') && !(legacy && pathname === '/styles.css')) {
-        response.setHeader('cache-control', 'no-store');
-        response.removeHeader('last-modified');
-        response.removeHeader('etag');
-      }
-      response.writeHead(upstream.status);
-      response.end(body);
-    } catch {
-      response.writeHead(502);
-      response.end();
-    }
+  await installWorker(page, fixture.origin);
+  expect(await page.evaluate(() => window.loadCount)).toBe(1);
+  expect(await workerMessage(page, 'active', 'PUGGERN_IDENTITY')).toMatchObject({
+    ok: true,
+    version: '1.0.0',
+    shell: 'A',
   });
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const origin = `http://127.0.0.1:${server.address().port}`;
-  const pageErrors = [];
-  page.on('pageerror', (error) => pageErrors.push(error.message));
-  try {
-    await page.goto(origin);
-    // An existing worker can have cached successful HTTP responses with unusable MIME types.
-    await page.evaluate(async (state) => {
-      localStorage.setItem('puggern.profile-state', JSON.stringify(state));
-      await navigator.serviceWorker.register('./service-worker.js');
-      await navigator.serviceWorker.ready;
-      if (!navigator.serviceWorker.controller) {
-        await new Promise((resolve) =>
-          navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true }),
-        );
-      }
-    }, createProfileState('existing-profile'));
-    expect(
-      await page.evaluate(async () => {
-        const cache = await caches.open('puggern-app-shell-v8');
-        return (await cache.match('./src/profiles.mjs?v=5')).headers.get('content-type');
-      }),
-    ).toBe('application/octet-stream');
-    expect(
-      await page.evaluate(async () => {
-        const cache = await caches.open('puggern-app-shell-v8');
-        return (await cache.match('./styles.css?v=7')).text();
-      }),
-    ).toContain('#64766d');
+  await page.evaluate(async () => {
+    localStorage.setItem('saved-profile', JSON.stringify({ name: 'Ada', progress: 3, rewards: 2 }));
+    await caches.open('unrelated-cache');
+  });
+  fixture.state.version = '2.0.0';
+  fixture.state.shell = 'B';
+  expect(await updateWorker(page)).toBe('installed');
+  expect(await workerMessage(page, 'waiting', 'PUGGERN_IDENTITY', 'candidate-B')).toEqual({
+    type: 'PUGGERN_RESULT',
+    requestId: 'candidate-B',
+    ok: true,
+    version: '2.0.0',
+    shell: 'B',
+  });
+  expect(
+    fixture.state.requests.filter(({ cacheControl }) => cacheControl === 'no-cache'),
+  ).toHaveLength(26);
+  expect(await workerMessage(page, 'controller', 'PUGGERN_IDENTITY')).toMatchObject({ shell: 'A' });
+  await page.reload();
+  await expect(page.locator('#identity')).toHaveText('1.0.0:A');
+  expect(await page.evaluate(() => window.loadedShell)).toEqual({ version: '1.0.0', shell: 'A' });
+  const beforeActivation = await page.evaluate(() => window.loadCount);
+  await context.setOffline(true);
+  expect(await workerMessage(page, 'waiting', 'PUGGERN_ACTIVATE')).toMatchObject({
+    ok: true,
+    shell: 'B',
+  });
+  await expect
+    .poll(async () => (await workerMessage(page, 'controller', 'PUGGERN_IDENTITY')).shell)
+    .toBe('B');
+  expect(await page.evaluate(() => window.loadCount)).toBe(beforeActivation);
+  await expect(page.locator('#identity')).toHaveText('1.0.0:A');
+  await page.reload();
+  await expect(page.locator('#identity')).toHaveText('2.0.0:B');
+  expect(await page.evaluate(() => window.loadedShell)).toEqual({ version: '2.0.0', shell: 'B' });
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('saved-profile')))).toEqual({
+    name: 'Ada',
+    progress: 3,
+    rewards: 2,
+  });
+  expect(await page.evaluate(() => caches.keys())).toEqual(
+    expect.arrayContaining([
+      'unrelated-cache',
+      'puggern-app-shell-1.0.0-A',
+      'puggern-app-shell-2.0.0-B',
+    ]),
+  );
+});
 
-    legacy = false;
-    const consoleErrors = [];
-    page.on('console', (message) => {
-      if (message.type() === 'error') consoleErrors.push(message.text());
-    });
-    await page.evaluate(async () => {
-      const changed = new Promise((resolve) =>
-        navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true }),
-      );
-      const registration = await navigator.serviceWorker.getRegistration();
-      await registration.update();
-      await changed;
-    });
-    await expect.poll(() => page.evaluate(() => caches.keys())).toEqual(['puggern-app-shell-v11']);
-    const cachedModules = await page.evaluate(async () => {
-      const cache = await caches.open('puggern-app-shell-v11');
-      const requests = (await cache.keys()).filter((request) =>
-        new URL(request.url).pathname.endsWith('.mjs'),
-      );
-      return Promise.all(
-        requests.map(async (request) => (await cache.match(request)).headers.get('content-type')),
-      );
-    });
-    expect(cachedModules).toHaveLength(5);
-    for (const type of cachedModules) expect(type).toMatch(/^(?:application|text)\/javascript\b/);
+for (const failure of ['mime', 'missing', 'http']) {
+  test(`failed ${failure} preparation leaves A usable and permits retry`, async ({
+    page,
+    context,
+  }) => {
+    await installWorker(page, fixture.origin);
+    fixture.state.version = '2.0.0';
+    fixture.state.shell = 'B';
+    fixture.state.failure = failure;
+    expect(await updateWorker(page)).toBe('redundant');
     expect(
-      await page.evaluate(async () => {
-        const cache = await caches.open('puggern-app-shell-v11');
-        return (await cache.match('./index.html')).text();
-      }),
-    ).toContain('./src/main.mjs?v=10');
-    expect(
-      await page.evaluate(async () => {
-        const cache = await caches.open('puggern-app-shell-v11');
-        return (await cache.match('./styles.css?v=9')).text();
-      }),
-    ).toContain('#46574e');
-
-    await page.reload();
-    await page.getByRole('button', { name: 'Legg til profil' }).click();
-    await expect(page.locator('#profile-name')).toBeFocused();
-    await page.locator('#profile-name').fill('Ada');
-    await page.waitForTimeout(300);
-    await page.getByRole('button', { name: 'Lagre profil' }).click();
-    await expect(page.locator('#profile-select option:checked')).toHaveText('Ada');
+      await page.evaluate(async () => (await navigator.serviceWorker.getRegistration()).waiting),
+    ).toBeNull();
+    expect(await page.evaluate(() => caches.keys())).not.toContain('puggern-app-shell-2.0.0-B');
     await context.setOffline(true);
     await page.reload();
-    await expect(page.locator('#profile-select option:checked')).toHaveText('Ada');
-    await expect(page.locator('#profile-select option')).toHaveCount(2);
-    await expect(page.locator('#profile-help')).toHaveCSS('color', 'rgb(70, 87, 78)');
-    await page.getByRole('button', { name: 'Legg til profil' }).click();
-    await expect(page.locator('#profile-name')).toBeFocused();
-    await page.locator('#cancel-profile-button').click();
-    await expect(page.locator('#profile-form')).toBeHidden();
-    expect(pageErrors).toEqual([]);
-    expect(consoleErrors).toEqual([]);
-  } finally {
+    await expect(page.locator('#identity')).toHaveText('1.0.0:A');
     await context.setOffline(false);
-    await new Promise((resolve, reject) => {
-      server.close((error) => (error ? reject(error) : resolve()));
-      server.closeAllConnections();
-    });
-  }
+    fixture.state.failure = null;
+    expect(await updateWorker(page)).toBe('installed');
+    expect(await workerMessage(page, 'waiting', 'PUGGERN_IDENTITY')).toMatchObject({ shell: 'B' });
+  });
+}
+
+test('blocks controlled and uncontrolled app windows but excludes out-of-scope windows', async ({
+  page,
+  context,
+}) => {
+  await installWorker(page, fixture.origin);
+  const other = await context.newPage();
+  await other.goto(`${fixture.origin}/app/`);
+  fixture.state.version = '2.0.0';
+  fixture.state.shell = 'B';
+  expect(await updateWorker(page)).toBe('installed');
+  expect(await workerMessage(page, 'waiting', 'PUGGERN_ACTIVATE')).toMatchObject({
+    ok: false,
+    error: 'other-windows',
+  });
+  await other.close();
+  const uncontrolled = await context.newPage();
+  const session = await context.newCDPSession(uncontrolled);
+  await session.send('Network.enable');
+  await session.send('Network.setBypassServiceWorker', { bypass: true });
+  await uncontrolled.goto(`${fixture.origin}/app/`);
+  expect(await uncontrolled.evaluate(() => navigator.serviceWorker.controller)).toBeNull();
+  expect(await workerMessage(page, 'waiting', 'PUGGERN_ACTIVATE')).toMatchObject({
+    error: 'other-windows',
+  });
+  await uncontrolled.goto(`${fixture.origin}/outside/`);
+  expect(await workerMessage(uncontrolled, 'waiting', 'PUGGERN_IDENTITY')).toMatchObject({
+    ok: false,
+    error: 'invalid-client',
+  });
+  expect(await workerMessage(page, 'waiting', 'PUGGERN_ACTIVATE')).toMatchObject({ ok: true });
+});
+
+test('a window opened after enumeration stays loaded and old shell caches survive activation', async ({
+  page,
+  context,
+}) => {
+  await installWorker(page, fixture.origin);
+  fixture.state.version = '2.0.0';
+  fixture.state.shell = 'B';
+  fixture.state.gate = true;
+  expect(await updateWorker(page)).toBe('installed');
+  const activation = workerMessage(page, 'waiting', 'PUGGERN_ACTIVATE');
+  await expect.poll(() => fixture.state.gated).toBe(true);
+  const late = await context.newPage();
+  await late.goto(`${fixture.origin}/app/`);
+  await expect(late.locator('#identity')).toHaveText('1.0.0:A');
+  fixture.release();
+  expect(await activation).toMatchObject({ ok: true });
+  await expect
+    .poll(async () => (await workerMessage(late, 'controller', 'PUGGERN_IDENTITY')).shell)
+    .toBe('B');
+  expect(await late.evaluate(() => window.loadCount)).toBe(1);
+  expect(await late.evaluate(() => window.loadedShell)).toEqual({ version: '1.0.0', shell: 'A' });
+  await expect(late.locator('#identity')).toHaveText('1.0.0:A');
+  await context.setOffline(true);
+  expect(await late.evaluate(async () => (await fetch('./src/profiles.mjs?v=6')).ok)).toBe(true);
+  expect(
+    await late.evaluate(async () => {
+      const cache = await caches.open('puggern-app-shell-1.0.0-A');
+      return (await cache.match('./src/app-version.mjs')).text();
+    }),
+  ).toContain('1.0.0');
+});
+
+test('migrates a legacy bad-MIME shell only after consent and keeps saved data offline', async ({
+  page,
+  context,
+}) => {
+  fixture.state.legacy = true;
+  await installWorker(page, fixture.origin);
+  await page.evaluate(() => localStorage.setItem('saved-profile', 'Ada'));
+  expect(
+    await page.evaluate(async () => {
+      const cache = await caches.open('puggern-app-shell-v8');
+      return (await cache.match('./src/profiles.mjs?v=6')).headers.get('content-type');
+    }),
+  ).toBe('application/octet-stream');
+  fixture.state.legacy = false;
+  fixture.state.version = '2.0.0';
+  fixture.state.shell = 'B';
+  expect(await updateWorker(page)).toBe('installed');
+  expect(await workerMessage(page, 'waiting', 'PUGGERN_IDENTITY')).toMatchObject({ shell: 'B' });
+  await expect(page.locator('#identity')).toHaveText('1.0.0:A');
+  expect(await workerMessage(page, 'waiting', 'PUGGERN_ACTIVATE')).toMatchObject({ ok: true });
+  await expect
+    .poll(async () => (await workerMessage(page, 'controller', 'PUGGERN_IDENTITY')).shell)
+    .toBe('B');
+  await context.setOffline(true);
+  await page.reload();
+  await expect(page.locator('#identity')).toHaveText('2.0.0:B');
+  expect(await page.evaluate(() => localStorage.getItem('saved-profile'))).toBe('Ada');
+  expect(
+    await page.evaluate(async () => {
+      const cache = await caches.open('puggern-app-shell-2.0.0-B');
+      return (await cache.match('./src/profiles.mjs?v=6')).headers.get('content-type');
+    }),
+  ).toBe('text/javascript');
+});
+
+test('same-version shell changes and rollback versions are waiting candidates', async ({
+  page,
+}) => {
+  await installWorker(page, fixture.origin);
+  fixture.state.shell = 'B';
+  expect(await updateWorker(page)).toBe('installed');
+  expect(await workerMessage(page, 'waiting', 'PUGGERN_IDENTITY')).toMatchObject({
+    version: '1.0.0',
+    shell: 'B',
+  });
+  fixture.state.version = '0.9.0';
+  fixture.state.shell = 'C';
+  expect(await updateWorker(page)).toBe('installed');
+  expect(await workerMessage(page, 'waiting', 'PUGGERN_IDENTITY')).toMatchObject({
+    version: '0.9.0',
+    shell: 'C',
+  });
+  expect(await workerMessage(page, 'controller', 'PUGGERN_IDENTITY')).toMatchObject({
+    version: '1.0.0',
+    shell: 'A',
+  });
+});
+
+test('unknown requests keep ordinary 404s and cannot borrow another cache entry', async ({
+  page,
+}) => {
+  await installWorker(page, fixture.origin);
+  await page.evaluate(async () => {
+    const unrelated = await caches.open('unrelated-cache');
+    await unrelated.put('./missing.mjs', new Response('poisoned'));
+  });
+  expect(
+    await page.evaluate(async () => {
+      const response = await fetch('./missing.mjs');
+      return { status: response.status, body: await response.text() };
+    }),
+  ).toEqual({ status: 404, body: 'not found' });
+});
+
+test('natural activation after old clients close safely cleans legacy shells, not unrelated caches', async ({
+  page,
+  context,
+}) => {
+  await installWorker(page, fixture.origin);
+  await page.evaluate(async () => {
+    await caches.open('puggern-app-shell-v8');
+    await caches.open('unrelated-cache');
+    await caches.open('puggern-app-shell-not-ours');
+  });
+  fixture.state.version = '2.0.0';
+  fixture.state.shell = 'B';
+  expect(await updateWorker(page)).toBe('installed');
+  const observer = await context.newPage();
+  await observer.goto(`${fixture.origin}/outside/`);
+  await page.close();
+  await expect
+    .poll(async () =>
+      observer.evaluate(async () => {
+        const registration = await navigator.serviceWorker.getRegistration('/app/');
+        return Boolean(registration.active && !registration.waiting);
+      }),
+    )
+    .toBe(true);
+  await expect
+    .poll(() => observer.evaluate(() => caches.keys()))
+    .not.toContain('puggern-app-shell-v8');
+  expect(await observer.evaluate(() => caches.keys())).toEqual(
+    expect.arrayContaining([
+      'unrelated-cache',
+      'puggern-app-shell-not-ours',
+      'puggern-app-shell-2.0.0-B',
+    ]),
+  );
 });
