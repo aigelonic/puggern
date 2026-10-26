@@ -15,6 +15,14 @@ function normalizedText(value, maxLength, label) {
   return text;
 }
 
+function normalizedLineText(value, maxLength, label) {
+  const text = normalizedText(value, maxLength, label);
+  if (/[\r\n]/.test(text)) {
+    throw new Error(`${label} kan ikke inneholde linjeskift.`);
+  }
+  return text;
+}
+
 function normalizeSet(set) {
   if (!set || typeof set !== 'object' || Array.isArray(set)) {
     throw new Error('Lenken mangler et gyldig ordsett.');
@@ -25,8 +33,8 @@ function normalizeSet(set) {
   }
   const words = set.words.map((word, index) => ({
     id: String(index),
-    prompt: normalizedText(word?.prompt, MAX_WORD_LENGTH, `Hint på linje ${index + 1}`),
-    answer: normalizedText(word?.answer, MAX_WORD_LENGTH, `Svar på linje ${index + 1}`),
+    prompt: normalizedLineText(word?.prompt, MAX_WORD_LENGTH, `Hint på linje ${index + 1}`),
+    answer: normalizedLineText(word?.answer, MAX_WORD_LENGTH, `Svar på linje ${index + 1}`),
   }));
   if (!['prompt-to-answer', 'answer-to-prompt', 'both'].includes(set.direction)) {
     throw new Error('Ordsettet har en ugyldig quizretning.');
