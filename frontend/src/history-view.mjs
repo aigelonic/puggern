@@ -130,6 +130,7 @@ export function createHistoryView({ dialog, getProfile, getHistory }) {
     renderTrend(history);
     const focusedItem = document.activeElement.closest?.('#history-list > li');
     const focusedKey = focusedItem?.dataset.historyKey;
+    const focusedPosition = focusedItem ? [...list.children].indexOf(focusedItem) : -1;
     const focusedIndex = history.findIndex((result) => `${profile.id}:${result.id}` === focusedKey);
     if (focusedIndex >= visibleCount) visibleCount = focusedIndex + 1;
     const visibleItems = history.slice(0, visibleCount).map((result) => {
@@ -170,6 +171,11 @@ export function createHistoryView({ dialog, getProfile, getHistory }) {
       const focused = visibleItems.find(({ key }) => key === focusedKey);
       if (focused && !focused.item.contains(document.activeElement)) {
         focused.item.querySelector('summary').focus();
+      } else if (!focused) {
+        const fallbackIndex = Math.min(focusedPosition, visibleItems.length - 1);
+        (
+          visibleItems[fallbackIndex]?.item.querySelector('summary') ?? dialog.querySelector('h2')
+        ).focus();
       }
     }
     more.hidden = history.length <= visibleCount;

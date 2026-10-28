@@ -307,6 +307,46 @@ test('preserves history focus and expansion during cross-tab refreshes', async (
   await other.close();
 });
 
+test('moves focus to the nearest surviving entry when history retention prunes the focused run', async ({
+  page,
+  context,
+}) => {
+  await seed(page);
+  await start(page);
+  await finish(page);
+  await page.evaluate(() => {
+    const saved = JSON.parse(localStorage.getItem('puggern.profile-state'));
+    const first = saved.history.p1[0];
+    saved.history.p1 = Array.from({ length: 500 }, (_, index) => ({
+      ...first,
+      id: index === 0 ? first.id : `older-${index}`,
+      completedAt: new Date(Date.parse(first.completedAt) - index * 60_000).toISOString(),
+    }));
+    localStorage.setItem('puggern.profile-state', JSON.stringify(saved));
+  });
+  await page.reload();
+  const other = await context.newPage();
+  await other.goto('/');
+
+  await openHistory(page);
+  for (let index = 0; index < 24; index += 1) {
+    await page.getByRole('button', { name: 'Vis flere', exact: true }).click();
+  }
+  await expect(page.locator('#history-list > li')).toHaveCount(500);
+  const oldest = page.locator('[data-history-key="p1:older-499"]');
+  await oldest.locator('summary').focus();
+  await page.keyboard.press('Enter');
+  await expect(oldest.locator('details')).toHaveAttribute('open', '');
+
+  await other.getByRole('button', { name: 'Øv på samme sett igjen' }).click();
+  await answer(other, 'dog');
+  await answer(other, 'cat');
+  await expect.poll(async () => (await state(page)).history.p1.length).toBe(500);
+  const fallback = page.locator('[data-history-key="p1:older-498"] summary');
+  await expect(fallback).toBeFocused();
+  await other.close();
+});
+
 test('failed completion writes preserve storage and retry exactly once with original ID/time and rewards', async ({
   page,
 }) => {
