@@ -335,6 +335,10 @@ test('does not re-credit resumed answers after a replacement run overwrites prog
     },
   ]);
 
+  state = applyRunUpdates(state, [firstAnswer]);
+  assert.equal(state.profiles[0].rewards.points, 10);
+  assert.equal(state.runPoints.p1['run-r'], 10);
+
   const resumedAnswer = {
     ...firstAnswer,
     progress: {
