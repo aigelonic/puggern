@@ -272,26 +272,38 @@ test('preserves history focus and expansion during cross-tab refreshes', async (
   await seed(page);
   await start(page);
   await finish(page);
-  const firstRunId = (await state(page)).history.p1[0].id;
+  await page.evaluate(() => {
+    const saved = JSON.parse(localStorage.getItem('puggern.profile-state'));
+    const first = saved.history.p1[0];
+    saved.history.p1 = Array.from({ length: 20 }, (_, index) => ({
+      ...first,
+      id: index === 0 ? first.id : `older-${index}`,
+      completedAt: new Date(Date.parse(first.completedAt) - index * 60_000).toISOString(),
+    }));
+    localStorage.setItem('puggern.profile-state', JSON.stringify(saved));
+  });
+  await page.reload();
+  const focusedRunId = 'older-19';
   const other = await context.newPage();
   await other.goto('/');
 
   await openHistory(page);
-  const firstItem = page.locator(`[data-history-key="p1:${firstRunId}"]`);
-  const firstSummary = firstItem.locator('summary');
-  await firstSummary.focus();
+  const focusedItem = page.locator(`[data-history-key="p1:${focusedRunId}"]`);
+  const focusedSummary = focusedItem.locator('summary');
+  await focusedSummary.focus();
   await page.keyboard.press('Enter');
-  await expect(firstItem.locator('details')).toHaveAttribute('open', '');
+  await expect(focusedItem.locator('details')).toHaveAttribute('open', '');
 
   await other.getByRole('button', { name: 'Øv på samme sett igjen' }).click();
   await expect(other.locator('#answer')).toBeFocused();
   await answer(other, 'dog');
-  await expect(firstSummary).toBeFocused();
-  await expect(firstItem.locator('details')).toHaveAttribute('open', '');
+  await expect(focusedSummary).toBeFocused();
+  await expect(focusedItem.locator('details')).toHaveAttribute('open', '');
   await answer(other, 'cat');
-  await expect.poll(async () => (await state(page)).history.p1.length).toBe(2);
-  await expect(firstSummary).toBeFocused();
-  await expect(firstItem.locator('details')).toHaveAttribute('open', '');
+  await expect.poll(async () => (await state(page)).history.p1.length).toBe(21);
+  await expect.poll(async () => page.locator('#history-list > li').count()).toBe(21);
+  await expect(focusedSummary).toBeFocused();
+  await expect(focusedItem.locator('details')).toHaveAttribute('open', '');
   await other.close();
 });
 

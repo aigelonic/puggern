@@ -130,6 +130,8 @@ export function createHistoryView({ dialog, getProfile, getHistory }) {
     renderTrend(history);
     const focusedItem = document.activeElement.closest?.('#history-list > li');
     const focusedKey = focusedItem?.dataset.historyKey;
+    const focusedIndex = history.findIndex((result) => `${profile.id}:${result.id}` === focusedKey);
+    if (focusedIndex >= visibleCount) visibleCount = focusedIndex + 1;
     const visibleItems = history.slice(0, visibleCount).map((result) => {
       const key = `${profile.id}:${result.id}`;
       const signature = JSON.stringify(result);
