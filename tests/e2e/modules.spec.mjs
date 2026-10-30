@@ -15,6 +15,8 @@ test('serves the complete startup module graph as JavaScript', async ({ page, re
     '/src/app-updates.mjs',
     '/src/app-version.mjs',
     '/src/creation-guard.mjs',
+    '/src/history-view.mjs',
+    '/src/history.mjs',
     '/src/learning.mjs',
     '/src/main.mjs',
     '/src/practice-feedback.mjs',

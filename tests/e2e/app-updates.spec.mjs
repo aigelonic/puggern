@@ -415,6 +415,12 @@ test('accepts prepared B offline and retains actual profiles, sets, progress and
     bestStreak: 2,
     completedSets: 1,
   });
+  const results = completed.profiles.history[completed.profiles.activeProfileId];
+  expect(results).toHaveLength(1);
+  expect(results[0].id).toBe(activeProgress(before).session.run.id);
+  await page.reload();
+  await expect(page.locator('#completion-heading')).toBeVisible();
+  expect(await savedData(page)).toEqual(completed);
 });
 
 test('two real app windows block apply; closing the other permits a safe UI retry', async ({
@@ -477,7 +483,7 @@ test('unsolicited controllerchange offers a guarded reload, never reloads either
     return {
       keys: await caches.keys(),
       version: await (await cache.match(new URL('./src/app-version.mjs', location.href))).text(),
-      profilesAvailable: (await fetch('./src/profiles.mjs?v=9')).ok,
+      profilesAvailable: (await fetch('./src/profiles.mjs?v=11')).ok,
     };
   });
   expect(retained.keys).toEqual(

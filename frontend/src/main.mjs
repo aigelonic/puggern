@@ -13,6 +13,7 @@ import {
 } from './learning.mjs?v=9';
 import {
   addRewards,
+  applyRunUpdates,
   createProfileState,
   createRewards,
   loadProfileState,
@@ -20,8 +21,11 @@ import {
   MAX_PROFILE_NAME_LENGTH,
   MAX_PROFILES,
   PROFILE_STATE_KEY,
+  PROFILE_STATE_VERSION,
   saveProfileState,
-} from './profiles.mjs?v=9';
+} from './profiles.mjs?v=11';
+import { completedResult, createRun, personalBestMessage } from './history.mjs?v=3';
+import { createHistoryView } from './history-view.mjs?v=2';
 import {
   loadWordSets,
   saveWordSets,
@@ -98,7 +102,7 @@ const effects = createPracticeEffects({
 });
 let viewRevision = 0;
 let wordSets = loadWordSets(window.localStorage);
-let profileState = loadProfileState(window.localStorage);
+let profileState = readProfileState();
 let showArchived = false;
 let editorSetId = null;
 let editorRows = [];
@@ -115,7 +119,14 @@ let shareLinkTrigger = null;
 let importTrigger = null;
 let importDraft = null;
 let importSaving = false;
-const pendingRewards = new Map();
+const pendingRuns = new Map();
+let completionRecordMessage = '';
+const historyDialog = document.querySelector('#history-dialog');
+const historyView = createHistoryView({
+  dialog: historyDialog,
+  getProfile: () => profileState.profiles.find(({ id }) => id === profileState.activeProfileId),
+  getHistory: () => profileState.history?.[profileState.activeProfileId] ?? [],
+});
 const operations = new Set();
 let updateTransition = false;
 let editorBaseline = '';
@@ -183,7 +194,7 @@ async function prepareUpdate() {
   const saved = session
     ? await persistProgress()
     : await persistProfileState((state) => state, 'lagre fremgangen før oppdatering');
-  if (!saved || unsavedProgress || pendingRewards.size) return false;
+  if (!saved || unsavedProgress || pendingRuns.size) return false;
   const categories = [];
   if (!wordSetForm.hidden && editorSnapshot() !== editorBaseline)
     categories.push('endringer i ordsettet');
@@ -254,6 +265,27 @@ for (const eventType of ['click', 'submit', 'input', 'change', 'keydown']) {
   );
 }
 
+function readProfileState() {
+  return loadProfileState(window.localStorage, () => {
+    const warning = document.querySelector('#history-warning');
+    warning.textContent =
+      'Noe ugyldig øvingshistorikk eller øvingsidentitet ble ignorert. Andre profiler, belønninger og fremgang er beholdt.';
+    warning.hidden = false;
+  });
+}
+
+function assertSupportedProfileState() {
+  let stored;
+  try {
+    stored = JSON.parse(window.localStorage.getItem(PROFILE_STATE_KEY));
+  } catch {
+    return;
+  }
+  if (stored?.version !== undefined && stored.version !== PROFILE_STATE_VERSION) {
+    throw new Error('Den lagrede profilversjonen støttes ikke. Dataene blir ikke overskrevet.');
+  }
+}
+
 function setAppError(message, source = 'app') {
   appError.textContent = message;
   appError.hidden = !message;
@@ -281,7 +313,8 @@ function repairStoredProfileState() {
 async function initializeProfileState() {
   try {
     await withProfileStateLock(() => {
-      profileState = loadProfileState(window.localStorage);
+      assertSupportedProfileState();
+      profileState = readProfileState();
       if (profileState) {
         repairStoredProfileState();
         return;
@@ -305,6 +338,7 @@ async function initializeProfileState() {
       }
     });
   } catch (error) {
+    profileState ??= createProfileState();
     setAppError(`Kunne ikke laste profiler og øving: ${error.message}`);
   }
 }
@@ -314,18 +348,30 @@ await initializeProfileState();
 async function persistProfileState(updateState, action, errorSource = 'app') {
   try {
     await withProfileStateLock(() => {
-      const latestState = loadProfileState(window.localStorage) ?? profileState;
+      assertSupportedProfileState();
+      const latestState = readProfileState() ?? profileState;
       const updatedState = updateState(latestState);
-      const nextState = {
-        ...updatedState,
-        profiles: updatedState.profiles.map((profile) => {
-          const earned = pendingRewards.get(profile.id);
-          return earned ? { ...profile, rewards: addRewards(profile.rewards, earned) } : profile;
-        }),
-      };
+      const nextState = applyRunUpdates(updatedState, pendingRuns.values());
       saveProfileState(window.localStorage, nextState);
       profileState = nextState;
-      pendingRewards.clear();
+      for (const { profileId, setId, progress, result, resumeLegacy } of pendingRuns.values()) {
+        if (resumeLegacy && session?.run?.id === progress.session.run.id) {
+          const savedProgress = nextState.progress[profileId]?.[setId];
+          if (savedProgress) {
+            session = savedProgress.session;
+            words = savedProgress.words;
+          }
+        }
+        if (result?.id !== session?.run?.id) continue;
+        const history = nextState.history?.[profileId] ?? [];
+        const savedResult = history.find(({ id }) => id === result.id);
+        if (savedResult) completionRecordMessage = personalBestMessage(savedResult, history);
+      }
+      document.querySelector('#completion-record-message').textContent = completionRecordMessage;
+      pendingRuns.clear();
+      unsavedProgress = false;
+      document.querySelector('#progress-warning').hidden = true;
+      document.querySelector('#history-save-warning').hidden = true;
     });
     setAppError('');
     renderProfiles();
@@ -357,6 +403,7 @@ function renderProfiles() {
   const rewards = profile.rewards ?? createRewards();
   document.querySelector('#profile-rewards').textContent =
     `${rewards.points} poeng totalt · Beste rekke: ${rewards.bestStreak} · ${rewards.completedSets} sett fullført`;
+  if (historyDialog.open) historyView.render();
 }
 
 function updateConnectionStatus() {
@@ -506,34 +553,41 @@ function restorePracticeLanguageMetadata(progress, set) {
 }
 
 async function persistProgress() {
-  const progress = { version: PROGRESS_VERSION, session, words };
-  const saved = await persistProfileState(
-    (state) => ({
-      ...state,
-      progress: {
-        ...state.progress,
-        [currentProfileId]: {
-          ...Object.fromEntries(
-            Object.entries(state.progress[currentProfileId] ?? {}).filter(
-              ([setId]) => setId !== currentSetId,
-            ),
-          ),
-          [currentSetId]: progress,
-        },
-      },
-    }),
-    'lagre øvingsfremgangen',
-  );
+  const saved = await persistProfileState((state) => state, 'lagre øvingsfremgangen');
   unsavedProgress = !saved;
   const warning = document.querySelector('#progress-warning');
   warning.hidden = saved;
+  const pending = [...pendingRuns.values()];
+  const pendingLegacy = pending.some(({ resumeLegacy }) => resumeLegacy);
+  document.querySelector('#history-save-warning').hidden = !pending.some(
+    ({ result, resumeLegacy }) => result || resumeLegacy,
+  );
   if (!saved) {
     setAppError('');
-    warning.textContent =
-      'Fremgangen kunne ikke lagres på denne enheten. Du kan fortsette å øve, men fremgangen kan gå tapt når du laster siden på nytt.';
+    warning.textContent = pendingLegacy
+      ? 'Øvingsidentiteten kunne ikke lagres på denne enheten. Svar er blokkert til identiteten er lagret.'
+      : 'Fremgangen kunne ikke lagres på denne enheten. Du kan fortsette å øve, men fremgangen kan gå tapt når du laster siden på nytt.' +
+        (pending.some(({ result }) => result)
+          ? ' Øvingsresultatet er ikke lagret. Prøv å lagre igjen før du laster siden på nytt.'
+          : '');
+    document.querySelector('#history-save-message').textContent = pendingLegacy
+      ? 'Øvingsidentiteten er ikke lagret. Lagre eller hent den delte identiteten før du svarer.'
+      : 'Øvingsresultatet er ikke lagret. Du kan prøve igjen. Hvis du laster siden på nytt, kan resultatet og ulagret fremgang gå tapt.';
   }
   renderWordSets();
   return saved;
+}
+
+function queueRunUpdate(earned = createRewards(), result = null, resumeLegacy = false) {
+  const previous = pendingRuns.get(session.run.id);
+  pendingRuns.set(session.run.id, {
+    profileId: currentProfileId,
+    setId: currentSetId,
+    progress: { version: PROGRESS_VERSION, session, words },
+    earned: addRewards(previous?.earned, earned),
+    result: previous?.result ?? result,
+    resumeLegacy: resumeLegacy || previous?.resumeLegacy === true,
+  });
 }
 
 async function startSessionOperation(
@@ -541,15 +595,38 @@ async function startSessionOperation(
   nextSession,
   setId,
   profileId = profileState.activeProfileId,
+  resume = false,
 ) {
   effects.cancel();
   viewRevision += 1;
+  const resumeLegacy = resume && !nextSession.run;
+  if (nextSession.queue.length && !nextSession.run) {
+    const set = wordSets.find(({ id }) => id === setId);
+    const runId = crypto.randomUUID();
+    nextSession = {
+      ...nextSession,
+      run: await createRun(
+        set
+          ? { ...set, words: resumeLegacy ? nextWords : set.words }
+          : {
+              id: setId,
+              name: 'Ordsett',
+              words: nextWords,
+            },
+        nextSession,
+        runId,
+        { isolate: resumeLegacy },
+      ),
+    };
+  }
   words = nextWords;
   session = nextSession;
   currentSetId = setId;
   currentProfileId = profileId;
   lastRenderedPracticeCardId = null;
   languageContextAnnouncement.textContent = '';
+  completionRecordMessage = '';
+  if (session.run && session.queue.length) queueRunUpdate(createRewards(), null, resumeLegacy);
   await persistProgress();
   renderPractice();
 }
@@ -579,7 +656,13 @@ async function startWordSet(set, exerciseConfig, profileId) {
 async function continueWordSet(set) {
   const progress = wordSetProgress(set.id);
   if (!progress) return;
-  await startSession(restorePracticeLanguageMetadata(progress, set), progress.session, set.id);
+  await startSession(
+    restorePracticeLanguageMetadata(progress, set),
+    progress.session,
+    set.id,
+    profileState.activeProfileId,
+    true,
+  );
 }
 
 function wordSetProgress(setId) {
@@ -604,6 +687,9 @@ function renderPractice(message = '', { announceCorrection = false, points = 0, 
   lastRenderedPracticeCardId = word.id;
   const learnedCount = session.learned.length;
   const isCorrection = session.correction;
+  const legacyIdentityPending = pendingRuns.get(session.run?.id)?.resumeLegacy === true;
+  answerButton.disabled = legacyIdentityPending;
+  answerInput.readOnly = legacyIdentityPending;
   progressLabel.textContent = `${learnedCount} av ${words.length} lært · ${session.queue.length} oppgaver igjen`;
   const progressBar = document.querySelector('#practice-progress');
   progressBar.max = words.length;
@@ -653,6 +739,7 @@ function renderPractice(message = '', { announceCorrection = false, points = 0, 
 }
 
 function finishSession() {
+  document.querySelector('#completion-record-message').textContent = completionRecordMessage;
   document.querySelector('#completion-rewards').textContent =
     `${session.points ?? 0} poeng · Beste rekke: ${session.bestStreak ?? 0} riktige på rad`;
   const firstTryCount = session.learned.filter((id) => !session.mistakes[id]).length;
@@ -1206,7 +1293,7 @@ function deleteWordSet(set) {
 
 window.addEventListener('storage', (event) => {
   if (event.key !== PROFILE_STATE_KEY) return;
-  const latestState = loadProfileState(window.localStorage);
+  const latestState = readProfileState();
   if (!latestState) return;
   profileState = latestState;
   renderProfiles();
@@ -1236,6 +1323,28 @@ profileSelect.addEventListener(
     if (await persistProfileState((state) => ({ ...state, activeProfileId }), 'bytte profil'))
       renderWordSets();
     else renderProfiles();
+  }),
+);
+document.querySelector('#history-button').addEventListener('click', () => historyView.open());
+historyDialog.addEventListener('close', () => document.querySelector('#history-button').focus());
+document.querySelector('#history-retry').addEventListener(
+  'click',
+  trackOperation(async () => {
+    const button = document.querySelector('#history-retry');
+    button.disabled = true;
+    try {
+      if (await persistProgress()) {
+        if (!practiceView.hidden && session?.queue.length) renderPractice();
+        const target = !completeView.hidden
+          ? document.querySelector('#completion-heading')
+          : !practiceView.hidden
+            ? answerInput
+            : document.querySelector('#history-button');
+        target.focus();
+      }
+    } finally {
+      button.disabled = false;
+    }
   }),
 );
 newProfileButton.addEventListener('click', () => {
@@ -1332,7 +1441,12 @@ answerForm.addEventListener(
   'submit',
   trackOperation(async (event) => {
     event.preventDefault();
-    if (answerButton.disabled) return;
+    if (
+      answerButton.disabled ||
+      !session?.queue.length ||
+      pendingRuns.get(session.run?.id)?.resumeLegacy
+    )
+      return;
     answerButton.disabled = true;
     answerInput.readOnly = true;
     effects.cancel();
@@ -1347,11 +1461,11 @@ answerForm.addEventListener(
         bestStreak: outcome.session.bestStreak ?? 0,
         completedSets: outcome.result === 'complete' && session.queue.length > 0 ? 1 : 0,
       };
-      pendingRewards.set(
-        currentProfileId,
-        addRewards(pendingRewards.get(currentProfileId), earned),
-      );
+      const justCompleted = outcome.result === 'complete' && session.queue.length > 0;
       session = outcome.session;
+      const result = justCompleted ? completedResult(session) : null;
+      if (result) completionRecordMessage = '';
+      queueRunUpdate(earned, result);
       await persistProgress();
       if (submissionRevision !== viewRevision) return;
 

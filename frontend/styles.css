@@ -6,6 +6,70 @@
   font-synthesis: none;
 }
 
+#history-dialog {
+  width: min(calc(100% - 2rem), 700px);
+  max-height: 90vh;
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
+
+#history-variant {
+  width: 100%;
+  min-width: 0;
+}
+
+#history-list {
+  padding-left: 1.5rem;
+}
+
+#history-list > li {
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #587064;
+}
+
+#history-dialog summary {
+  cursor: pointer;
+  padding: 0.5rem 0;
+}
+
+#history-chart {
+  width: 100%;
+  height: auto;
+  font:
+    13px 'Trebuchet MS',
+    sans-serif;
+  fill: #263a32;
+}
+
+.chart-grid {
+  stroke: #a0ada5;
+}
+
+.chart-line {
+  stroke: #263a32;
+  stroke-width: 2;
+}
+
+.chart-point {
+  fill: #263a32;
+}
+
+#history-chart-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font:
+    0.9rem 'Trebuchet MS',
+    sans-serif;
+}
+
+#history-chart-table th,
+#history-chart-table td {
+  text-align: left;
+  padding: 0.5rem 0.25rem;
+  border-bottom: 1px solid #a0ada5;
+}
+
 * {
   box-sizing: border-box;
 }
