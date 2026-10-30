@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { runInNewContext } from 'node:vm';
+import { APP_VERSION } from '../frontend/src/app-version.mjs';
 
 const source = await readFile(new URL('../frontend/service-worker.js', import.meta.url), 'utf8');
 
@@ -107,7 +108,7 @@ test('prepares the complete fresh shell without activating and reports its local
     type: 'PUGGERN_RESULT',
     requestId: 'request-1',
     ok: true,
-    version: '0.0.0',
+    version: APP_VERSION,
     shell: '18',
   });
   assert.equal(state.skipped, 0);
@@ -144,7 +145,7 @@ test('cache write failures remove only the incomplete candidate cache', async ()
   const state = worker();
   state.failWrite = true;
   await assert.rejects(state.dispatch('install'), /Cache write failed/);
-  assert.deepEqual(state.deleted, ['puggern-app-shell-0.0.0-18']);
+  assert.deepEqual(state.deleted, [`puggern-app-shell-${APP_VERSION}-18`]);
   assert.equal(state.skipped, 0);
 });
 
@@ -166,7 +167,7 @@ test('controlled reload checks app windows without requesting activation', async
     type: 'PUGGERN_RESULT',
     requestId: 'request-1',
     ok: true,
-    version: '0.0.0',
+    version: APP_VERSION,
     shell: '18',
   });
   assert.equal(state.skipped, 0);
