@@ -13,6 +13,7 @@ import {
   PROGRESS_KEY,
   PROGRESS_VERSION,
   POINTS_PER_CORRECT_ANSWER,
+  MAX_WORD_LENGTH,
   saveProgress,
   submitAnswer,
   wordsForDirection,
@@ -405,6 +406,71 @@ test('clears correction when normalization removes the current ID or all pending
   });
   assert.deepEqual(empty.session.queue, []);
   assert.equal(empty.session.correction, false);
+});
+
+test('restores only a bounded correction attempt for the active queue head', () => {
+  const words = parseWordSet('A;one\nB;two');
+  const session = {
+    queue: ['0', '1'],
+    correction: true,
+    learned: [],
+    mistakes: {},
+    settings: {},
+  };
+  const base = { version: PROGRESS_VERSION, words, session };
+  const valid = normalizeProgress({
+    ...base,
+    session: { ...session, correctionAttempt: { wordId: '0', response: 'won' } },
+  });
+  assert.deepEqual(valid.session.correctionAttempt, { wordId: '0', response: 'won' });
+
+  const invalidAttempts = [
+    null,
+    'attempt',
+    { wordId: 0, response: 'won' },
+    { wordId: '0', response: 1 },
+    { wordId: '0', response: 'x'.repeat(MAX_WORD_LENGTH + 1) },
+    { wordId: '1', response: 'won' },
+    { wordId: '0', response: 'won', extra: true },
+  ];
+  for (const correctionAttempt of invalidAttempts) {
+    const restored = normalizeProgress({
+      ...base,
+      session: { ...session, correctionAttempt },
+    });
+    assert.ok(restored);
+    assert.equal('correctionAttempt' in restored.session, false);
+  }
+
+  const inactive = normalizeProgress({
+    ...base,
+    session: {
+      ...session,
+      correction: false,
+      correctionAttempt: { wordId: '0', response: 'won' },
+    },
+  });
+  assert.ok(inactive);
+  assert.equal('correctionAttempt' in inactive.session, false);
+});
+
+test('discards invalid optional correction attempts before saving otherwise valid progress', () => {
+  const values = new Map();
+  const storage = {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+  };
+  const words = parseWordSet('A;one');
+  const session = createSession(words);
+  session.correction = true;
+  session.correctionAttempt = { wordId: 'other', response: 'wrong' };
+
+  saveProgress(storage, session, words);
+
+  const saved = JSON.parse(values.get(PROGRESS_KEY));
+  assert.equal(saved.session.correction, true);
+  assert.equal('correctionAttempt' in saved.session, false);
+  assert.ok(loadProgress(storage));
 });
 
 test('resumes legacy sessions with zero rewards and rejects malformed saved reward counters', () => {

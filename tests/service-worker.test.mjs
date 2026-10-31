@@ -101,7 +101,7 @@ function worker() {
 test('prepares the complete fresh shell without activating and reports its local identity', async () => {
   const state = worker();
   await state.dispatch('install');
-  assert.equal(state.entries.size, 17);
+  assert.equal(state.entries.size, 18);
   assert.ok(state.requests.every((request) => request.cache === 'reload'));
   assert.equal(state.skipped, 0);
   assert.deepEqual(await state.message('PUGGERN_IDENTITY'), {
@@ -133,10 +133,10 @@ test('retained cache identities are immutable, with identical rollback content s
   await state.dispatch('install');
   state.existed = true;
   await state.dispatch('install');
-  assert.equal(state.writes, 17);
+  assert.equal(state.writes, 18);
   state.content = 'unexpected new content';
   await assert.rejects(state.dispatch('install'), /new shell revision/);
-  assert.equal(state.writes, 17);
+  assert.equal(state.writes, 18);
   assert.deepEqual(state.deleted, []);
   assert.equal(await state.entries.get('https://app.test/app/index.html').text(), 'shell A');
 });

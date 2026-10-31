@@ -309,7 +309,7 @@ test('resumes corrections offline and finishes with one correct answer', async (
   await context.setOffline(true);
   await page.reload();
   await page.getByRole('button', { name: 'Fortsett øvingen' }).click();
-  await expect(page.getByLabel('Skriv riktig svar')).toBeFocused();
+  await expect(page.getByLabel('Skriv ordet én gang')).toBeFocused();
   await answer(page, answers[missedPrompt]);
   await expectCompletion(page, 1, 0);
   await expect(page.locator('#hardest-words')).toHaveText(
@@ -416,7 +416,7 @@ test('restarts a summary for its original profile after another tab switches pro
   await otherPage.getByRole('dialog').getByRole('button', { name: 'Start øving' }).click();
   await expect(otherPage.getByLabel('Stavingen din')).toBeFocused();
   await answer(otherPage, 'wrong');
-  await expect(otherPage.getByLabel('Skriv riktig svar')).toBeFocused();
+  await expect(otherPage.getByLabel('Skriv ordet én gang')).toBeFocused();
   await expect(page.getByLabel('Profil').locator('option:checked')).toHaveText('Ny profil');
   await page.getByRole('button', { name: 'Øv på samme sett igjen' }).click();
   await expect(page.getByLabel('Stavingen din')).toBeFocused();
@@ -485,7 +485,7 @@ test('resumes an unfinished in-memory session after saving fails', async ({ page
   await expect(page.getByRole('alert')).toContainText('Fremgangen kunne ikke lagres');
   await page.locator('#back-button').click();
   await page.getByRole('button', { name: 'Fortsett øvingen' }).click();
-  await expect(page.getByLabel('Skriv riktig svar')).toBeFocused();
+  await expect(page.getByLabel('Skriv ordet én gang')).toBeFocused();
   await expect(page.locator('#progress-label')).toHaveText('0 av 1 lært · 1 oppgaver igjen');
 });
 

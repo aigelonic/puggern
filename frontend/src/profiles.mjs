@@ -1,4 +1,4 @@
-import { isValidProgress, normalizeProgress } from './learning.mjs?v=9';
+import { isValidProgress, normalizeProgress } from './learning.mjs?v=10';
 import { isValidResult, isValidRun, MAX_HISTORY, newestFirst } from './history.mjs?v=3';
 
 export const PROFILE_STATE_KEY = 'puggern.profile-state';
@@ -191,7 +191,18 @@ export function saveProfileState(storage, state) {
   ) {
     throw new Error('Øvingsidentiteten er ugyldig.');
   }
-  storage.setItem(PROFILE_STATE_KEY, JSON.stringify(state));
+  const progress = Object.fromEntries(
+    Object.entries(state.progress).map(([profileId, sets]) => [
+      profileId,
+      Object.fromEntries(
+        Object.entries(sets).map(([setId, savedProgress]) => [
+          setId,
+          isValidProgress(savedProgress) ? normalizeProgress(savedProgress) : savedProgress,
+        ]),
+      ),
+    ]),
+  );
+  storage.setItem(PROFILE_STATE_KEY, JSON.stringify({ ...state, progress }));
 }
 
 // Apply progress, history and rewards together to the latest state under the caller's lock.
