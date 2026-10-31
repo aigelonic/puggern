@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0](https://github.com/aigelonic/puggern/compare/v0.1.0...v0.1.0) (2026-10-31)
+
+
+### Features
+
+* **word-sets:** simplify cards with actions menu ([#71](https://github.com/aigelonic/puggern/issues/71)) ([f047463](https://github.com/aigelonic/puggern/commit/f0474635c8ec145c30cc24c45d1628d1809da3ab))
+
 ## 0.1.0 (2026-10-30)
 
 
