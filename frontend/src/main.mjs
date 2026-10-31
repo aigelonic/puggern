@@ -733,8 +733,7 @@ function renderPractice(message = '', { announceCorrection = false, points = 0, 
   if (
     isCorrection &&
     savedAttempt?.wordId === word.id &&
-    typeof savedAttempt.response === 'string' &&
-    savedAttempt.response.length <= MAX_WORD_LENGTH
+    typeof savedAttempt.response === 'string'
   ) {
     spellingFeedback = compareSpelling(savedAttempt.response, word.answer, session.settings ?? {});
     renderSpellingSegments(correctAnswer, spellingFeedback.expectedSegments);

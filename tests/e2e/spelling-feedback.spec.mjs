@@ -171,6 +171,47 @@ test('allows an empty submission and renders HTML-like answers literally', async
   await expect(page.getByRole('heading', { name: 'Godt jobbet!' })).toBeVisible();
 });
 
+test('keeps answer matching authoritative beyond the comparison storage limit', async ({
+  page,
+}) => {
+  const words = [{ id: 'a', prompt: 'Frukt', answer: 'eple' }];
+  await seed(page, {
+    sets: [makeSet('long-accepted', 'Frukt', words)],
+    progressByProfile: { p1: { 'long-accepted': makeProgress(words) } },
+    profileIds: ['p1'],
+  });
+  await continueSet(page, 'Frukt');
+
+  await submit(page, `${' '.repeat(201)}eple`);
+
+  await expect(page.getByRole('heading', { name: 'Godt jobbet!' })).toBeVisible();
+  await expect(page.locator('#completion-first-try-count')).toHaveText('1');
+});
+
+test('shows oversized incorrect attempts plainly without storing them', async ({ page }) => {
+  const words = [{ id: 'a', prompt: 'Frukt', answer: 'eple' }];
+  await seed(page, {
+    sets: [makeSet('long-incorrect', 'Frukt', words)],
+    progressByProfile: { p1: { 'long-incorrect': makeProgress(words) } },
+    profileIds: ['p1'],
+  });
+  await continueSet(page, 'Frukt');
+  const response = 'x'.repeat(201);
+  await submit(page, response);
+
+  await expect(page.locator('#submitted-answer')).toHaveText(response);
+  await expect(page.locator('#correction-summary')).toHaveText(
+    'Sammenlign stavemåtene for å finne forskjellen.',
+  );
+  await expect(page.locator('#submitted-answer [data-difference="true"]')).toHaveCount(0);
+  const savedAttempt = await page.evaluate(
+    () =>
+      JSON.parse(localStorage.getItem('puggern.profile-state')).progress.p1['long-incorrect']
+        .session.correctionAttempt,
+  );
+  expect(savedAttempt).toBeUndefined();
+});
+
 test('restores a saved comparison offline and drops legacy or malformed attempts', async ({
   page,
   context,
