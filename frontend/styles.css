@@ -148,7 +148,7 @@ a:focus-visible {
 }
 
 body {
-  min-width: 320px;
+  min-width: 0;
   min-height: 100vh;
   margin: 0;
   background-image: radial-gradient(#d6d8c9 0.7px, transparent 0.7px);
@@ -678,6 +678,37 @@ select:focus {
   overflow-wrap: anywhere;
 }
 
+.spelling-difference {
+  border-bottom: 0.13em solid #79662d;
+  border-radius: 0.12em;
+  background: #f4eac5;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.correction-attempt {
+  margin-top: 0.4rem !important;
+  color: #52665d;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.correction-summary {
+  margin-top: 0.4rem !important;
+  color: #263a32;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.correction-legend {
+  margin-top: 0.25rem !important;
+  color: #52665d;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
 .correction-instruction {
   margin-top: 0.25rem !important;
   color: #52665d;
@@ -896,6 +927,18 @@ select:focus {
   }
 }
 
+@media (max-width: 220px) {
+  .app-header {
+    flex-wrap: wrap;
+  }
+
+  #connection-status {
+    flex: 1 1 100%;
+    max-width: none;
+    text-align: left;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -918,5 +961,10 @@ select:focus {
     border-color: CanvasText;
     background: Canvas;
     color: CanvasText;
+  }
+
+  .spelling-difference {
+    border-color: CanvasText;
+    background: Canvas;
   }
 }

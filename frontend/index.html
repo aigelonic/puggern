@@ -8,7 +8,7 @@
     <meta name="robots" content="noindex, nofollow, noarchive" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" type="image/png" sizes="192x192" href="./icons/pug-192.png" />
-    <link rel="stylesheet" href="./styles.css?v=13" />
+    <link rel="stylesheet" href="./styles.css?v=14" />
     <title>Puggern</title>
   </head>
   <body>
@@ -323,6 +323,14 @@
             </p>
             <p id="correction-label" class="correction-label">Riktig stavemåte</p>
             <p id="correct-answer" class="correct-answer"></p>
+            <p id="correction-attempt" class="correction-attempt" hidden>
+              <span class="correction-label">Du skrev:</span>
+              <span id="submitted-answer"></span>
+            </p>
+            <p id="correction-summary" class="correction-summary" hidden></p>
+            <p id="correction-legend" class="correction-legend" hidden>
+              Markerte deler viser forskjellen.
+            </p>
             <p id="correction-instruction" class="correction-instruction"></p>
           </div>
           <input
@@ -331,7 +339,7 @@
             type="text"
             autocomplete="off"
             autocapitalize="off"
-            required
+            maxlength="200"
           />
           <p id="feedback" class="feedback" role="status" aria-live="polite"></p>
           <button class="button primary" type="submit">
@@ -465,6 +473,6 @@
         <button class="button primary" value="update">Forkast inntasting og oppdater</button>
       </form>
     </dialog>
-    <script type="module" src="./src/main.mjs?v=17"></script>
+    <script type="module" src="./src/main.mjs?v=18"></script>
   </body>
 </html>

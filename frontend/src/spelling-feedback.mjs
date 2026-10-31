@@ -1,11 +1,15 @@
-import { normalizeAnswer } from './learning.mjs?v=10';
+import { MAX_WORD_LENGTH, normalizeAnswer } from './learning.mjs?v=10';
 
 const GRAPHEME_SEGMENTER_OPTIONS = { granularity: 'grapheme' };
 
 function graphemes(text) {
   if (typeof Intl.Segmenter !== 'function') return null;
-  const segmenter = new Intl.Segmenter(undefined, GRAPHEME_SEGMENTER_OPTIONS);
-  return Array.from(segmenter.segment(text), ({ segment }) => segment);
+  try {
+    const segmenter = new Intl.Segmenter(undefined, GRAPHEME_SEGMENTER_OPTIONS);
+    return Array.from(segmenter.segment(text), ({ segment }) => segment);
+  } catch {
+    return null;
+  }
 }
 
 function normalizeGraphemes(text, settings) {
@@ -38,6 +42,7 @@ function fallback(response, expected) {
     responseSegments: [{ text: response.trim(), changed: false }],
     expectedSegments: [{ text: expected.trim(), changed: false }],
     operations: [],
+    summaries: ['Sammenlign stavemåtene for å finne forskjellen.'],
     summary: 'Sammenlign stavemåtene for å finne forskjellen.',
   };
 }
@@ -59,7 +64,7 @@ function markSegments(source, changedIndexes) {
 function operationText(operation, responseSource, expectedSource) {
   const displayText = (source, span) => {
     const text = source.slice(span.start, span.end).join('');
-    return text.replaceAll(' ', 'mellomrom');
+    return text.replaceAll(' ', ' mellomrom ').trim();
   };
   const position = (start, end) => (end - start > 1 ? `${start + 1}–${end}` : `${start + 1}`);
   const responseText = displayText(responseSource, operation.responseSpan);
@@ -123,6 +128,9 @@ export function compareSpelling(response, expected, settings = {}) {
   }
   const submitted = response.trim();
   const answer = expected.trim();
+  if (response.length > MAX_WORD_LENGTH || expected.length > MAX_WORD_LENGTH) {
+    return fallback(submitted, answer);
+  }
   const responseMapping = normalizeGraphemes(submitted, settings);
   const expectedMapping = normalizeGraphemes(answer, settings);
   if (!responseMapping || !expectedMapping) return fallback(submitted, answer);
@@ -152,6 +160,7 @@ export function compareSpelling(response, expected, settings = {}) {
       if (responseUnits[i].value === expectedUnits[j].value) {
         candidates.push({ type: 'equal', cost: costs[i + 1][j + 1] });
       } else {
+        // Stable ordering resolves equal costs: equality, transposition, substitution, deletion, insertion.
         if (
           i + 1 < responseUnits.length &&
           j + 1 < expectedUnits.length &&
@@ -264,15 +273,17 @@ export function compareSpelling(response, expected, settings = {}) {
   const responseMarks = groupedOperations
     .filter(({ type }) => type !== 'missing')
     .flatMap(({ responseSpan }) =>
-      Array.from({ length: responseSpan.end - responseSpan.start }, (_, offset) =>
-        responseSpan.start + offset,
+      Array.from(
+        { length: responseSpan.end - responseSpan.start },
+        (_, offset) => responseSpan.start + offset,
       ),
     );
   const expectedMarks = groupedOperations
     .filter(({ type }) => type !== 'extra')
     .flatMap(({ expectedSpan }) =>
-      Array.from({ length: expectedSpan.end - expectedSpan.start }, (_, offset) =>
-        expectedSpan.start + offset,
+      Array.from(
+        { length: expectedSpan.end - expectedSpan.start },
+        (_, offset) => expectedSpan.start + offset,
       ),
     );
   const summary = groupedOperations.map((operation) =>
@@ -286,6 +297,7 @@ export function compareSpelling(response, expected, settings = {}) {
     responseSegments: markSegments(responseMapping.source, responseMarks),
     expectedSegments: markSegments(expectedMapping.source, expectedMarks),
     operations: groupedOperations,
+    summaries: summary,
     summary: summary.join(' '),
   };
 }
