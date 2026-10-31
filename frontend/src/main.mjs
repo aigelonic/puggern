@@ -749,9 +749,7 @@ function renderPractice(message = '', { announceCorrection = false, points = 0, 
   } else if (isCorrection) {
     correctAnswer.textContent = word.answer.trim();
   }
-  correctionInstruction.textContent = isCorrection
-    ? 'Skriv ordet én gang, så kommer det tilbake senere.'
-    : '';
+  correctionInstruction.textContent = isCorrection ? 'Skriv ordet én gang for å gå videre.' : '';
   feedback.textContent = isCorrection ? '' : message;
   if (!isCorrection && message) {
     const marker = document.createElement('span');

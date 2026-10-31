@@ -34,7 +34,7 @@ test('shows prominent correction feedback and practices a missed word until it i
   await expect(page.locator('#correct-answer [data-difference="true"]')).toHaveText('epl');
   await expect(page.locator('#submitted-answer [data-difference="true"]')).toHaveText('pær');
   await expect(page.locator('#correction-instruction')).toHaveText(
-    'Skriv ordet én gang, så kommer det tilbake senere.',
+    'Skriv ordet én gang for å gå videre.',
   );
   await expect(page.locator('#correction-announcement')).toHaveText(
     'Riktig stavemåte er eple. Bytt «pær» med «epl» på plass 1–3.',
@@ -45,7 +45,7 @@ test('shows prominent correction feedback and practices a missed word until it i
     'hint-language answer-language-instruction correction-feedback',
   );
   await expect(page.locator('#answer')).toHaveAccessibleDescription(
-    'Hint fra første kolonne Svar fra andre kolonne Ikke helt ennå – prøv igjen! Riktig stavemåte eple Du skrev: pære Bytt «pær» med «epl» på plass 1–3. Markerte deler viser forskjellen. Skriv ordet én gang, så kommer det tilbake senere.',
+    'Hint fra første kolonne Svar fra andre kolonne Ikke helt ennå – prøv igjen! Riktig stavemåte eple Du skrev: pære Bytt «pær» med «epl» på plass 1–3. Markerte deler viser forskjellen. Skriv ordet én gang for å gå videre.',
   );
   await expect(page.locator('#answer')).toBeFocused();
   await expect(correction).toBeInViewport();
@@ -411,7 +411,7 @@ test('reloads and resumes a saved session during its correction step', async ({ 
   await expect(page.locator('#correction-feedback')).toBeVisible();
   await expect(page.locator('#correct-answer')).toHaveText('eple');
   await expect(page.locator('#correction-instruction')).toHaveText(
-    'Skriv ordet én gang, så kommer det tilbake senere.',
+    'Skriv ordet én gang for å gå videre.',
   );
   await expect(page.locator('#correction-announcement')).toHaveText(
     'Rettelsen vises ved svarfeltet.',
@@ -422,7 +422,7 @@ test('reloads and resumes a saved session during its correction step', async ({ 
     'hint-language answer-language-instruction correction-feedback',
   );
   await expect(page.locator('#answer')).toHaveAccessibleDescription(
-    'Hint fra første kolonne Svar fra andre kolonne Ikke helt ennå – prøv igjen! Riktig stavemåte eple Du skrev: pære Bytt «pær» med «epl» på plass 1–3. Markerte deler viser forskjellen. Skriv ordet én gang, så kommer det tilbake senere.',
+    'Hint fra første kolonne Svar fra andre kolonne Ikke helt ennå – prøv igjen! Riktig stavemåte eple Du skrev: pære Bytt «pær» med «epl» på plass 1–3. Markerte deler viser forskjellen. Skriv ordet én gang for å gå videre.',
   );
   await expect(page.locator('#answer')).toBeFocused();
 
@@ -433,7 +433,7 @@ test('reloads and resumes a saved session during its correction step', async ({ 
     'Rettelsen vises ved svarfeltet.',
   );
   await expect(page.locator('#answer')).toHaveAccessibleDescription(
-    'Hint fra første kolonne Svar fra andre kolonne Ikke helt ennå – prøv igjen! Riktig stavemåte eple Du skrev: pære Bytt «pær» med «epl» på plass 1–3. Markerte deler viser forskjellen. Skriv ordet én gang, så kommer det tilbake senere.',
+    'Hint fra første kolonne Svar fra andre kolonne Ikke helt ennå – prøv igjen! Riktig stavemåte eple Du skrev: pære Bytt «pær» med «epl» på plass 1–3. Markerte deler viser forskjellen. Skriv ordet én gang for å gå videre.',
   );
 
   await page.getByLabel('Skriv ordet én gang').fill('eple');

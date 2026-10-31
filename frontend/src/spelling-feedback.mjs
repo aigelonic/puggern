@@ -131,6 +131,9 @@ export function compareSpelling(response, expected, settings = {}) {
   if (response.length > MAX_WORD_LENGTH || expected.length > MAX_WORD_LENGTH) {
     return fallback(submitted, answer);
   }
+  if (/[^\S ]/u.test(submitted) || /[^\S ]/u.test(answer)) {
+    return fallback(submitted, answer);
+  }
   const responseMapping = normalizeGraphemes(submitted, settings);
   const expectedMapping = normalizeGraphemes(answer, settings);
   if (!responseMapping || !expectedMapping) return fallback(submitted, answer);

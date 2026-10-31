@@ -676,6 +676,7 @@ select:focus {
   font-weight: 700;
   line-height: 1.35;
   overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .spelling-difference {
@@ -692,6 +693,7 @@ select:focus {
   font-size: 0.95rem;
   line-height: 1.4;
   overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .correction-summary {

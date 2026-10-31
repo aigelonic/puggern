@@ -116,7 +116,7 @@ test('rapid submissions replace effects; repeated mistakes and navigation leave 
   await answer(page, 'still wrong');
   await expect(page.locator('[data-effect="incorrect"]')).toHaveCount(1);
   await expect(page.locator('#correction-instruction')).toHaveText(
-    'Skriv ordet én gang, så kommer det tilbake senere.',
+    'Skriv ordet én gang for å gå videre.',
   );
   await answer(page, 'dog');
   await expect(page.locator('[data-effect="correct"]')).toHaveCount(1);

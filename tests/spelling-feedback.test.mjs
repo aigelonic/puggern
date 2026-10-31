@@ -105,6 +105,10 @@ test('handles empty, unrelated, punctuation, and multiword answers', () => {
 
   const multiword = compareSpelling('rød bil', 'rød b il');
   assert.equal(multiword.summary, 'Legg til «mellomrom» etter plass 5.');
+
+  const nonBreakingSpace = compareSpelling('rød\u00a0bil', 'rød bil');
+  assert.equal(nonBreakingSpace.canCompare, false);
+  assert.equal(nonBreakingSpace.summary, 'Sammenlign stavemåtene for å finne forskjellen.');
 });
 
 test('respects case, accent, and trimmed-whitespace matching settings', () => {

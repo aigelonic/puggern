@@ -147,6 +147,31 @@ test('renders missing, extra, and swapped letters in the relevant rows', async (
   await expect(page.getByRole('heading', { name: 'Godt jobbet!' })).toBeVisible();
 });
 
+test('preserves visible repeated spaces in both comparison rows', async ({ page }) => {
+  const words = [{ id: 'a', prompt: 'Farger', answer: 'rød bil' }];
+  await seed(page, {
+    sets: [makeSet('spaces', 'Mellomrom', words)],
+    progressByProfile: { p1: { spaces: makeProgress(words) } },
+    profileIds: ['p1'],
+  });
+  await continueSet(page, 'Mellomrom');
+
+  await submit(page, 'rød  bil');
+
+  const markedSpace = page.locator('#submitted-answer [data-difference="true"]');
+  await expect(markedSpace).toHaveText(' ');
+  const rowStyles = await page.evaluate(() =>
+    ['#correct-answer', '#submitted-answer'].map(
+      (selector) => getComputedStyle(document.querySelector(selector)).whiteSpace,
+    ),
+  );
+  expect(rowStyles).toEqual(['pre-wrap', 'pre-wrap']);
+  const markedSpaceWidth = await markedSpace.evaluate(
+    (element) => element.getBoundingClientRect().width,
+  );
+  expect(markedSpaceWidth).toBeGreaterThan(0);
+});
+
 test('allows an empty submission and renders HTML-like answers literally', async ({ page }) => {
   const htmlAnswer = '<img src=x onerror=alert(1)>';
   const words = [{ id: 'a', prompt: 'Bokstaver', answer: htmlAnswer }];
