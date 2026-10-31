@@ -1,4 +1,6 @@
 import { expect, test } from '@playwright/test';
+import { createProfileState } from '../../frontend/src/profiles.mjs';
+import { openProfilePanel } from './helpers.mjs';
 
 async function savedData(page) {
   return page.evaluate(() => ({
@@ -10,6 +12,11 @@ async function savedData(page) {
 let errors;
 
 test.beforeEach(async ({ page }) => {
+  await page.addInitScript((state) => {
+    if (localStorage.getItem('puggern.profile-state') === null) {
+      localStorage.setItem('puggern.profile-state', JSON.stringify(state));
+    }
+  }, createProfileState('profile-fixture'));
   errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => {
@@ -23,6 +30,7 @@ test.afterEach(() => {
 
 test('keeps profile help text readable over the patterned page background', async ({ page }) => {
   await page.goto('/');
+  await openProfilePanel(page);
   const ratios = await page.locator('#profile-help').evaluate((element) => {
     const channel = (value) => {
       const normalized = value / 255;
@@ -72,8 +80,9 @@ for (const returning of [false, true]) {
       const form = page.locator('#profile-form');
       const name = page.locator('#profile-name');
       const emoji = page.locator('#profile-avatar');
-      const add = page.getByRole('button', { name: 'Legg til profil' });
+      const add = page.getByRole('button', { name: 'Legg til profil', exact: true });
       await expect(form).toBeHidden();
+      await openProfilePanel(page);
       await add.focus();
       await page.keyboard.press('Enter');
       await expect(form).toBeVisible();
@@ -87,6 +96,7 @@ for (const returning of [false, true]) {
       await expect(emoji).toHaveValue('');
       expect(await savedData(page)).toEqual(before);
 
+      await openProfilePanel(page);
       await add.click();
       await expect(form).toBeVisible();
       await expect(name).toBeFocused();
@@ -95,7 +105,7 @@ for (const returning of [false, true]) {
       await page.waitForTimeout(300);
       await page.getByRole('button', { name: 'Lagre profil' }).click();
       await expect(form).toBeHidden();
-      await expect(page.locator('#profile-select')).toBeFocused();
+      await expect(page.locator('#profile-chip')).toBeFocused();
       await expect(page.locator('#profile-select option')).toHaveCount(2);
       await expect(page.locator('#profile-select option:checked')).toHaveText(
         avatar ? `${avatar} Ada` : 'Ada',
@@ -117,6 +127,7 @@ for (const returning of [false, true]) {
         avatar ? `${avatar} Ada` : 'Ada',
       );
       expect(await savedData(page)).toEqual(after);
+      await openProfilePanel(page);
       await add.click();
       await expect(name).toBeFocused();
       await expect(name).toHaveValue('');
@@ -129,7 +140,8 @@ test('shows validation and storage errors without adding a profile', async ({ pa
   await page.goto('/');
   await expect(page.locator('#profile-select option')).toHaveCount(1);
   const before = await savedData(page);
-  await page.getByRole('button', { name: 'Legg til profil' }).click();
+  await openProfilePanel(page);
+  await page.getByRole('button', { name: 'Legg til profil', exact: true }).click();
   await page.locator('#profile-name').fill('   ');
   await page.getByRole('button', { name: 'Lagre profil' }).click();
   await expect(page.locator('#app-error')).toHaveText('Skriv inn et profilnavn.');
@@ -137,8 +149,9 @@ test('shows validation and storage errors without adding a profile', async ({ pa
   expect(await savedData(page)).toEqual(before);
   await page.getByRole('button', { name: 'Avbryt', exact: true }).click();
   await expect(page.locator('#app-error')).toBeHidden();
-  await expect(page.getByRole('button', { name: 'Legg til profil' })).toBeFocused();
-  await page.getByRole('button', { name: 'Legg til profil' }).click();
+  await expect(page.getByRole('button', { name: 'Legg til profil', exact: true })).toBeFocused();
+  await openProfilePanel(page);
+  await page.getByRole('button', { name: 'Legg til profil', exact: true }).click();
   await expect(page.locator('#app-error')).toBeHidden();
 
   await page.evaluate(() => {
@@ -178,7 +191,8 @@ test('enforces ten profiles even when another tab fills the last slot while the 
   });
   await page.reload();
   await expect(page.locator('#profile-select option')).toHaveCount(9);
-  await page.getByRole('button', { name: 'Legg til profil' }).click();
+  await openProfilePanel(page);
+  await page.getByRole('button', { name: 'Legg til profil', exact: true }).click();
   await page.locator('#profile-name').fill('Ada');
   await page.evaluate(() => {
     const state = JSON.parse(localStorage.getItem('puggern.profile-state'));
@@ -193,5 +207,6 @@ test('enforces ten profiles even when another tab fills the last slot while the 
   expect(await savedData(page)).toEqual(before);
   await page.reload();
   await expect(page.locator('#profile-select option')).toHaveCount(10);
-  await expect(page.getByRole('button', { name: 'Legg til profil' })).toBeDisabled();
+  await openProfilePanel(page);
+  await expect(page.getByRole('button', { name: 'Legg til profil', exact: true })).toBeDisabled();
 });

@@ -86,7 +86,7 @@ async function answer(page, value) {
 
 const rewards = { points: 10, bestStreak: 1, completedSets: 0 };
 
-test('repairs a seeded duplicate queue on load and each remaining word needs one answer', async ({
+test('repairs a seeded duplicate queue without load writes and each remaining word needs one answer', async ({
   page,
 }) => {
   await seed(page, {
@@ -101,14 +101,18 @@ test('repairs a seeded duplicate queue on load and each remaining word needs one
     rewards,
   });
   const state = await storedState(page);
-  expect(state.progress.p1['repair-set'].session.queue).toEqual(['b', 'c']);
-  expect(state.progress.p2['repair-set'].session.queue).toEqual(['b', 'c']);
+  expect(state.progress.p1['repair-set'].session.queue).toEqual(['b', 'a', 'c', 'b', 'a']);
+  expect(state.progress.p2['repair-set'].session.queue).toEqual(['b', 'a', 'c', 'b', 'a']);
   expect(state.profiles.map(({ rewards }) => rewards)).toEqual([
     rewards,
     { points: 5, bestStreak: 1, completedSets: 0 },
   ]);
 
   await page.getByRole('button', { name: 'Fortsett øvingen' }).click();
+  await expect(page.locator('#answer')).toBeFocused();
+  const resumed = await storedState(page);
+  expect(resumed.progress.p1['repair-set'].session.queue).toEqual(['b', 'c']);
+  expect(resumed.progress.p2['repair-set'].session.queue).toEqual(['b', 'c']);
   await expect(page.locator('#progress-label')).toHaveText('1 av 3 lært · 2 oppgaver igjen');
   await expect(page.locator('#prompt')).toHaveText('katt');
   await answer(page, 'cat');
@@ -129,20 +133,24 @@ test('keeps correction only while its original word is still pending', async ({ 
     session: sessionWith({ queue: ['a', 'b', 'a'], correction: true, learned: ['a'] }),
     rewards,
   });
+  await page.getByRole('button', { name: 'Fortsett øvingen' }).click();
+  await expect(page.locator('#answer')).toBeFocused();
   expect((await storedState(page)).progress.p1['repair-set'].session).toMatchObject({
     queue: ['b'],
     correction: false,
   });
+  await expect(page.locator('#correct-answer')).toBeHidden();
 
   await seed(page, {
     session: sessionWith({ queue: ['b', 'a', 'b'], correction: true, mistakes: { b: 1 } }),
     rewards,
   });
+  await page.getByRole('button', { name: 'Fortsett øvingen' }).click();
+  await expect(page.locator('#answer')).toBeFocused();
   expect((await storedState(page)).progress.p1['repair-set'].session).toMatchObject({
     queue: ['b', 'a'],
     correction: true,
   });
-  await page.getByRole('button', { name: 'Fortsett øvingen' }).click();
   await expect(page.getByLabel('Skriv ordet én gang')).toBeFocused();
   await expect(page.locator('#correct-answer')).toHaveText('cat');
 });
@@ -154,7 +162,7 @@ test('a repaired empty queue gives no completion credit and restarts fresh', asy
     rewards,
   });
   const state = await storedState(page);
-  expect(state.progress.p1['repair-set'].session.queue).toEqual([]);
+  expect(state.progress.p1['repair-set'].session.queue).toEqual(['a', 'a']);
   expect(state.profiles[0].rewards).toEqual(rewards);
   await expect(page.getByRole('button', { name: 'Fortsett øvingen' })).toHaveCount(0);
   await expect(page.locator('#profile-rewards')).toHaveText(
@@ -173,16 +181,21 @@ test('a repaired empty queue gives no completion credit and restarts fresh', asy
   });
 });
 
-test('repairs legacy standalone progress while migrating it into the profile', async ({ page }) => {
+test('repairs legacy standalone progress and persists migration when practice is resumed', async ({
+  page,
+}) => {
   await seed(page, {
     session: sessionWith({ queue: ['a', 'b', 'a', 'c'], learned: ['a'], points: 10 }),
     legacy: true,
   });
+  expect(await storedState(page)).toBeNull();
+  expect(await page.evaluate(() => localStorage.getItem('puggern.progress'))).not.toBeNull();
+  await page.getByRole('button', { name: 'Fortsett øvingen' }).click();
+  await expect(page.locator('#answer')).toBeFocused();
   const state = await storedState(page);
   expect(state.progress[state.activeProfileId]['repair-set'].session.queue).toEqual(['b', 'c']);
   expect(state.profiles[0].rewards).toEqual({ points: 0, bestStreak: 0, completedSets: 0 });
   expect(await page.evaluate(() => localStorage.getItem('puggern.progress'))).toBeNull();
-  await page.getByRole('button', { name: 'Fortsett øvingen' }).click();
   await expect(page.locator('#progress-label')).toHaveText('1 av 3 lært · 2 oppgaver igjen');
 });
 

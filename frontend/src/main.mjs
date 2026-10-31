@@ -41,7 +41,7 @@ import {
   createShareUrl,
   parseShareUrl,
 } from './share-word-set.mjs?v=4';
-import { answerFeedback, createPracticeEffects } from './practice-feedback.mjs?v=2';
+import { answerFeedback, createPracticeEffects } from './practice-feedback.mjs?v=3';
 import { compareSpelling } from './spelling-feedback.mjs?v=1';
 
 const status = document.querySelector('#connection-status');
@@ -57,6 +57,9 @@ const setupError = document.querySelector('#setup-error');
 const wordSetList = document.querySelector('#word-set-list');
 const emptySets = document.querySelector('#empty-sets');
 const profileSelect = document.querySelector('#profile-select');
+const profileChip = document.querySelector('#profile-chip');
+const profilePanel = document.querySelector('#profile-panel');
+const profileAnnouncement = document.querySelector('#profile-announcement');
 const profileForm = document.querySelector('#profile-form');
 const profileNameInput = document.querySelector('#profile-name');
 const profileAvatarInput = document.querySelector('#profile-avatar');
@@ -82,6 +85,7 @@ const answerLabel = document.querySelector('#answer-label');
 const editorTitle = document.querySelector('#editor-title');
 const archiveToggle = document.querySelector('#archive-toggle');
 const newSetButton = document.querySelector('#new-set-button');
+const emptyNewSetButton = document.querySelector('#empty-create-button');
 const setLimitHelp = document.querySelector('#set-limit-help');
 const exerciseConfigDialog = document.querySelector('#exercise-config-dialog');
 const exerciseConfigForm = document.querySelector('#exercise-config-form');
@@ -110,6 +114,8 @@ let wordSets = loadWordSets(window.localStorage);
 let profileState = readProfileState();
 let showArchived = false;
 let editorSetId = null;
+let editorTrigger = null;
+let editorTriggerSetId = null;
 let editorRows = [];
 let words = [];
 let session = null;
@@ -120,6 +126,7 @@ let pendingExerciseSet = null;
 let pendingExerciseProfileId = null;
 let exerciseConfigTrigger = null;
 let unsavedProgress = false;
+let pendingLegacyMigration = null;
 let shareLinkTrigger = null;
 let importTrigger = null;
 let importDraft = null;
@@ -139,6 +146,8 @@ let pendingUpdateFocus = null;
 let updateDialogOpener = null;
 const startSession = trackOperation(startSessionOperation);
 const saveEditor = trackOperation(saveEditorOperation);
+const openExerciseSetup = trackOperation(openExerciseSetupOperation);
+const continueWordSet = trackOperation(continueWordSetOperation);
 
 function trackOperation(operation) {
   return (...args) => {
@@ -205,7 +214,7 @@ async function prepareUpdate() {
     categories.push('endringer i ordsettet');
   if (!profileForm.hidden && (profileNameInput.value || profileAvatarInput.value))
     categories.push('ny profil');
-  if (!practiceView.hidden && answerInput.value) categories.push('svaret som ikke er sendt inn');
+  if (session?.queue.length && answerInput.value) categories.push('svaret som ikke er sendt inn');
   return categories.length ? confirmUpdateInput(categories) : true;
 }
 
@@ -262,7 +271,8 @@ for (const eventType of ['click', 'submit', 'input', 'change', 'keydown']) {
   document.addEventListener(
     eventType,
     (event) => {
-      if (!updateTransition || !event.target.closest('.view')) return;
+      if (!updateTransition || !event.target.closest('.view, #profile-panel, .header-actions'))
+        return;
       event.preventDefault();
       event.stopImmediatePropagation();
     },
@@ -304,26 +314,12 @@ async function withProfileStateLock(operation) {
   return operation();
 }
 
-function repairStoredProfileState() {
-  try {
-    const stored = JSON.stringify(JSON.parse(window.localStorage.getItem(PROFILE_STATE_KEY)));
-    if (stored !== JSON.stringify(profileState)) {
-      saveProfileState(window.localStorage, profileState);
-    }
-  } catch (error) {
-    setAppError(`Kunne ikke lagre profiler og øving: ${error.message}`);
-  }
-}
-
 async function initializeProfileState() {
   try {
     await withProfileStateLock(() => {
       assertSupportedProfileState();
       profileState = readProfileState();
-      if (profileState) {
-        repairStoredProfileState();
-        return;
-      }
+      if (profileState) return;
 
       profileState = createProfileState();
       const legacyProgress = loadProgress(window.localStorage);
@@ -334,12 +330,11 @@ async function initializeProfileState() {
         : null;
       if (matchingSet) {
         profileState.progress[profileState.activeProfileId][matchingSet.id] = legacyProgress;
-      }
-      try {
-        saveProfileState(window.localStorage, profileState);
-        if (matchingSet) window.localStorage.removeItem('puggern.progress');
-      } catch (error) {
-        setAppError(`Kunne ikke lagre profiler og øving: ${error.message}`);
+        pendingLegacyMigration = {
+          profileId: profileState.activeProfileId,
+          setId: matchingSet.id,
+          rawProgress: window.localStorage.getItem('puggern.progress'),
+        };
       }
     });
   } catch (error) {
@@ -380,6 +375,21 @@ async function persistProfileState(updateState, action, errorSource = 'app') {
     });
     setAppError('');
     renderProfiles();
+    if (
+      pendingLegacyMigration &&
+      profileState.progress[pendingLegacyMigration.profileId]?.[pendingLegacyMigration.setId]
+    ) {
+      try {
+        if (
+          window.localStorage.getItem('puggern.progress') === pendingLegacyMigration.rawProgress
+        ) {
+          window.localStorage.removeItem('puggern.progress');
+        }
+        pendingLegacyMigration = null;
+      } catch (error) {
+        setAppError(`Kunne ikke rydde opp i eldre øvingsdata: ${error.message}`);
+      }
+    }
     return true;
   } catch (error) {
     setAppError(`Kunne ikke ${action}: ${error.message}`, errorSource);
@@ -405,11 +415,71 @@ function renderProfiles() {
     ? `Du kan ha maksimalt ${MAX_PROFILES} profiler.`
     : '';
   const profile = profileState.profiles.find(({ id }) => id === profileState.activeProfileId);
+  const profileLabel = profile.avatar ? `${profile.avatar} ${profile.name}` : profile.name;
+  const chipLabel = document.createElement('span');
+  chipLabel.className = 'profile-chip-label';
+  chipLabel.textContent = profileLabel;
+  const chipCaret = document.createElement('span');
+  chipCaret.setAttribute('aria-hidden', 'true');
+  chipCaret.textContent = '▾';
+  profileChip.replaceChildren(chipLabel, chipCaret);
+  profileChip.setAttribute('aria-label', `Profil: ${profileLabel}. Bytt eller legg til profil`);
+  document.querySelector('#setup-greeting').textContent =
+    profile.name === 'Min profil' && !profile.avatar
+      ? 'Klar, ferdig, stav!'
+      : `Hei, ${profileLabel}!`;
   const rewards = profile.rewards ?? createRewards();
-  document.querySelector('#profile-rewards').textContent =
-    `${rewards.points} poeng totalt · Beste rekke: ${rewards.bestStreak} · ${rewards.completedSets} sett fullført`;
+  const rewardSummary = `${rewards.points} poeng totalt · Beste rekke: ${rewards.bestStreak} · ${rewards.completedSets} sett fullført`;
+  document.querySelector('#profile-rewards').textContent = rewardSummary;
+  document.querySelector('#greeting-rewards').textContent = rewardSummary.replace(
+    ' poeng totalt',
+    ' poeng',
+  );
   if (historyDialog.open) historyView.render();
 }
+
+function closeProfilePanel({ restoreFocus = false } = {}) {
+  profilePanel.hidden = true;
+  profileChip.setAttribute('aria-expanded', 'false');
+  if (restoreFocus) profileChip.focus();
+}
+
+function announceProfileSwitch() {
+  showView(setupView);
+  const profile = profileState.profiles.find(({ id }) => id === profileState.activeProfileId);
+  profileAnnouncement.textContent = `Byttet til ${profile.name}`;
+  closeProfilePanel({ restoreFocus: true });
+}
+
+profileChip.addEventListener('click', () => {
+  if (!profilePanel.hidden) {
+    closeProfilePanel({ restoreFocus: true });
+    return;
+  }
+  profileAnnouncement.textContent = '';
+  profilePanel.hidden = false;
+  profileChip.setAttribute('aria-expanded', 'true');
+  profileSelect.focus();
+});
+document.querySelector('#profile-done-button').addEventListener('click', () => {
+  closeProfilePanel({ restoreFocus: true });
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape' || profilePanel.hidden || document.querySelector('dialog[open]'))
+    return;
+  event.preventDefault();
+  closeProfilePanel({ restoreFocus: true });
+});
+document.addEventListener('click', (event) => {
+  if (
+    profilePanel.hidden ||
+    profilePanel.contains(event.target) ||
+    profileChip.contains(event.target) ||
+    (!profileForm.hidden && (profileNameInput.value || profileAvatarInput.value))
+  )
+    return;
+  closeProfilePanel({ restoreFocus: profilePanel.contains(document.activeElement) });
+});
 
 function updateConnectionStatus() {
   status.textContent = navigator.onLine
@@ -418,6 +488,7 @@ function updateConnectionStatus() {
 }
 
 function showView(view) {
+  closeProfilePanel();
   effects.cancel();
   viewRevision += 1;
   setupView.hidden = view !== setupView;
@@ -636,7 +707,10 @@ async function startSessionOperation(
   renderPractice();
 }
 
-function openExerciseSetup(set, trigger = document.activeElement) {
+async function openExerciseSetupOperation(set, trigger = document.activeElement) {
+  if (!readProfileState()) {
+    await persistProfileState((state) => state, 'klargjøre profilen for øving');
+  }
   const savedConfig = wordSetProgress(set.id)?.session.exerciseConfig;
   const directionMode = savedConfig?.directionMode ?? directionModeForSet(set);
   document.querySelector('#exercise-direction').value = directionMode;
@@ -658,7 +732,10 @@ async function startWordSet(set, exerciseConfig, profileId) {
   );
 }
 
-async function continueWordSet(set) {
+async function continueWordSetOperation(set) {
+  if (!readProfileState()) {
+    await persistProfileState((state) => state, 'klargjøre profilen for øving');
+  }
   const progress = wordSetProgress(set.id);
   if (!progress) return;
   await startSession(
@@ -788,7 +865,7 @@ function renderPractice(message = '', { announceCorrection = false, points = 0, 
   answerInput.focus();
 }
 
-function finishSession() {
+function finishSession({ focusHeading = true } = {}) {
   document.querySelector('#completion-record-message').textContent = completionRecordMessage;
   document.querySelector('#completion-rewards').textContent =
     `${session.points ?? 0} poeng · Beste rekke: ${session.bestStreak ?? 0} riktige på rad`;
@@ -822,7 +899,7 @@ function finishSession() {
     hardestWords.append(item);
   }
   showView(completeView);
-  document.querySelector('#completion-heading').focus();
+  if (focusHeading) document.querySelector('#completion-heading').focus();
 }
 
 function makeButton(label, action, className = 'button secondary') {
@@ -1120,11 +1197,14 @@ function renderWordSets() {
     .filter((set) => set.archived === showArchived)
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
   emptySets.hidden = visibleSets.length > 0;
-  emptySets.textContent = showArchived
+  document.querySelector('#empty-sets-title').textContent = showArchived
     ? 'Ingen arkiverte ordsett.'
-    : 'Ingen ordsett ennå. Lag ditt første under.';
+    : 'Ingen ordsett ennå.';
+  document.querySelector('#empty-sets-hint').hidden = showArchived;
+  document.querySelector('#empty-sets-actions').hidden = showArchived;
   archiveToggle.textContent = showArchived ? 'Vis aktive ordsett' : 'Vis arkiv';
   newSetButton.disabled = wordSets.length >= MAX_WORD_SETS;
+  emptyNewSetButton.disabled = newSetButton.disabled;
   setLimitHelp.hidden = !newSetButton.disabled;
   newSetButton.title = newSetButton.disabled
     ? `Du kan ha maksimalt ${MAX_WORD_SETS} ordsett på denne enheten.`
@@ -1133,6 +1213,7 @@ function renderWordSets() {
   visibleSets.forEach((set) => {
     const item = document.createElement('li');
     item.className = 'word-set-item';
+    item.dataset.setId = set.id;
     const details = document.createElement('div');
     details.className = 'word-set-details';
     const name = document.createElement('h3');
@@ -1203,7 +1284,12 @@ function renderWordSets() {
         );
       }
       menuItems.append(
-        makeSetActionButton('Rediger', () => openEditor(set), actionMenu, actionTrigger),
+        makeSetActionButton(
+          'Rediger',
+          () => openEditor(set, actionTrigger),
+          actionMenu,
+          actionTrigger,
+        ),
         makeSetActionButton('Kopier', () => duplicateWordSet(set), actionMenu, actionTrigger),
         makeSetActionButton('Arkiver', () => changeArchived(set, true), actionMenu, actionTrigger),
       );
@@ -1215,7 +1301,12 @@ function renderWordSets() {
           actionMenu,
           actionTrigger,
         ),
-        makeSetActionButton('Rediger', () => openEditor(set), actionMenu, actionTrigger),
+        makeSetActionButton(
+          'Rediger',
+          () => openEditor(set, actionTrigger),
+          actionMenu,
+          actionTrigger,
+        ),
       );
     }
     menuItems.append(
@@ -1239,7 +1330,9 @@ function renderWordSets() {
   });
 }
 
-function openEditor(set = null) {
+function openEditor(set = null, trigger = document.activeElement) {
+  editorTrigger = trigger;
+  editorTriggerSetId = set?.id ?? null;
   editorSetId = set?.id ?? null;
   editorTitle.textContent = set ? 'Rediger ordsett' : 'Nytt ordsett';
   wordSetNameInput.value = set?.name ?? '';
@@ -1257,7 +1350,27 @@ function openEditor(set = null) {
   renderPreview();
   wordSetForm.hidden = false;
   editorBaseline = editorSnapshot();
-  wordSetNameInput.focus();
+  wordSetNameInput.focus({ preventScroll: true });
+  wordSetForm.scrollIntoView({
+    block: 'nearest',
+    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+  });
+}
+
+function restoreEditorFocus() {
+  const cardTrigger = editorTriggerSetId
+    ? [...wordSetList.children]
+        .find((item) => item.dataset.setId === editorTriggerSetId)
+        ?.querySelector('.set-action-trigger')
+    : null;
+  const target =
+    editorTrigger?.isConnected &&
+    !editorTrigger.disabled &&
+    !editorTrigger.closest('[hidden]') &&
+    !editorTrigger.closest('.set-action-menu-items')
+      ? editorTrigger
+      : (cardTrigger ?? document.querySelector('#saved-sets-title'));
+  target.focus();
 }
 
 function previewEntryError(entry, index) {
@@ -1420,7 +1533,8 @@ async function saveEditorOperation(startAfterSave = false) {
   wordSetForm.hidden = true;
   showSetupError('');
   showCreationError(wordSetForm, '');
-  if (startAfterSave) openExerciseSetup(set);
+  restoreEditorFocus();
+  if (startAfterSave) openExerciseSetup(set, document.activeElement);
 }
 
 function changeArchived(set, archived) {
@@ -1508,7 +1622,7 @@ if (savedProgress?.session.queue.length === 0 && wordSets.some((set) => set.id =
   session = savedProgress.session;
   currentSetId = savedSetId;
   currentProfileId = profileState.activeProfileId;
-  finishSession();
+  finishSession({ focusHeading: false });
 }
 profileSelect.addEventListener(
   'change',
@@ -1516,9 +1630,16 @@ profileSelect.addEventListener(
     effects.cancel();
     viewRevision += 1;
     const activeProfileId = profileSelect.value;
-    if (await persistProfileState((state) => ({ ...state, activeProfileId }), 'bytte profil'))
+    if (
+      await persistProfileState((state) => {
+        if (!state.profiles.some(({ id }) => id === activeProfileId))
+          throw new Error('Profilen finnes ikke lenger.');
+        return { ...state, activeProfileId };
+      }, 'bytte profil')
+    ) {
       renderWordSets();
-    else renderProfiles();
+      announceProfileSwitch();
+    } else renderProfiles();
   }),
 );
 document.querySelector('#history-button').addEventListener('click', () => historyView.open());
@@ -1608,17 +1729,19 @@ profileForm.addEventListener(
       profileForm.hidden = true;
       profileNameInput.value = '';
       profileAvatarInput.value = '';
-      profileSelect.focus();
+      announceProfileSwitch();
       showCreationError(profileForm, '');
     }
   }),
 );
 
-newSetButton.addEventListener('click', () => openEditor());
+newSetButton.addEventListener('click', () => openEditor(null, newSetButton));
+emptyNewSetButton.addEventListener('click', () => openEditor(null, emptyNewSetButton));
 document.querySelector('#cancel-edit-button').addEventListener('click', () => {
   wordSetForm.hidden = true;
   showSetupError('');
   showCreationError(wordSetForm, '');
+  restoreEditorFocus();
 });
 document.querySelector('#archive-toggle').addEventListener('click', () => {
   showArchived = !showArchived;
@@ -1764,10 +1887,16 @@ document.querySelector('#completion-sets-button').addEventListener('click', () =
 document.querySelector('#completion-new-set-button').addEventListener('click', () => {
   showView(setupView);
   renderWordSets();
-  openEditor();
+  openEditor(
+    null,
+    newSetButton.disabled ? document.querySelector('#saved-sets-title') : newSetButton,
+  );
 });
 
 importButton.addEventListener('click', () => openImportDialog());
+document.querySelector('#empty-import-button').addEventListener('click', (event) => {
+  openImportDialog(event.currentTarget);
+});
 importLinkForm.addEventListener(
   'submit',
   trackOperation(() => previewImport(importLinkInput.value)),

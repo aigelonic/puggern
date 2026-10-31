@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openProfilePanel } from './helpers.mjs';
 
 test('serves the complete startup module graph as JavaScript', async ({ page, request }) => {
   const errors = [];
@@ -30,7 +31,8 @@ test('serves the complete startup module graph as JavaScript', async ({ page, re
     expect(response.ok()).toBe(true);
     expect(response.headers()['content-type']).toMatch(/^(?:application|text)\/javascript\b/);
   }
-  await page.getByRole('button', { name: 'Legg til profil' }).click();
+  await openProfilePanel(page);
+  await page.getByRole('button', { name: 'Legg til profil', exact: true }).click();
   await expect(page.locator('#profile-name')).toBeFocused();
   expect(errors).toEqual([]);
 });

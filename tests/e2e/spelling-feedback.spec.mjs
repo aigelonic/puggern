@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { createSession } from '../../frontend/src/learning.mjs';
 import { createProfileState } from '../../frontend/src/profiles.mjs';
+import { openProfilePanel } from './helpers.mjs';
 
 const settings = { caseSensitive: false, accentSensitive: false };
 
@@ -325,6 +326,7 @@ test('isolates attempts by profile and set and wraps feedback at narrow widths',
   await continueSet(page, 'Første sett');
   await expect(page.locator('#correction-attempt')).toBeHidden();
   await page.locator('#back-button').click();
+  await openProfilePanel(page);
   await page.locator('#profile-select').selectOption('p1');
   await continueSet(page, 'Første sett');
   await expect(page.locator('#submitted-answer')).toHaveText('aple');

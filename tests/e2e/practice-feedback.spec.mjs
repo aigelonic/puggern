@@ -75,7 +75,8 @@ test('rewards answers, supports correction, celebrates once and restores quietly
   });
   await context.setOffline(true);
   await page.reload();
-  await expect(page.locator('#completion-heading')).toBeFocused();
+  await expect(page.locator('#completion-heading')).toBeVisible();
+  await expect(page.locator('body')).toBeFocused();
   await expect(page.locator('.confetti')).toHaveCount(0);
   expect(await page.evaluate(() => localStorage.getItem('puggern.profile-state'))).toBe(saved);
   await page.locator('#completion-restart-button').click();

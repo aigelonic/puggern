@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { clickSetAction } from './helpers.mjs';
+import { clickSetAction, openProfilePanel } from './helpers.mjs';
 
 async function saveAfterMinimumTime(page, name) {
   await page.waitForTimeout(300);
@@ -228,7 +228,7 @@ test('does not guess the direction of ambiguous legacy cards', async ({ page }) 
       page.evaluate(() => {
         const state = JSON.parse(localStorage.getItem('puggern.profile-state'));
         const [set] = JSON.parse(localStorage.getItem('puggern.word-sets')).sets;
-        return Boolean(state.progress[state.activeProfileId][set.id]);
+        return Boolean(state?.progress[state.activeProfileId][set.id]);
       }),
     )
     .toBe(true);
@@ -483,19 +483,23 @@ test('preserves concurrent profile and progress changes across tabs', async ({ p
   await otherPage.getByRole('button', { name: 'Sjekk svaret' }).click();
   await expect(otherPage.locator('#correct-answer')).toHaveText('hund');
   await otherPage.getByRole('button', { name: 'Ordsett' }).click();
-  await otherPage.getByRole('button', { name: 'Legg til profil' }).click();
+  await openProfilePanel(otherPage);
+  await otherPage.getByRole('button', { name: 'Legg til profil', exact: true }).click();
   await otherPage.getByLabel('Navn', { exact: true }).fill('Ada');
   await saveAfterMinimumTime(otherPage, 'Lagre profil');
-  await expect(otherPage.getByLabel('Profil').locator('option', { hasText: 'Ada' })).toHaveCount(1);
+  await expect(
+    otherPage.locator('#profile-select').locator('option', { hasText: 'Ada' }),
+  ).toHaveCount(1);
 
   await page.getByLabel('Skriv ordet én gang').fill('feil igjen');
   await page.getByRole('button', { name: 'Sjekk svaret' }).click();
   await expect(page.locator('#progress-label')).toHaveText('0 av 1 lært · 1 oppgaver igjen');
   await page.getByRole('button', { name: 'Ordsett' }).click();
   await page.reload();
-  await page.getByLabel('Profil').selectOption({ label: 'Min profil' });
+  await openProfilePanel(page);
+  await page.getByLabel('Hvem øver?', { exact: true }).selectOption({ label: 'Min profil' });
 
-  await expect(page.getByLabel('Profil').locator('option:checked')).toHaveText('Min profil');
+  await expect(page.locator('#profile-select option:checked')).toHaveText('Min profil');
   await expect(
     page
       .getByRole('listitem')
@@ -508,7 +512,9 @@ test('preserves concurrent profile and progress changes across tabs', async ({ p
       .filter({ hasText: 'Dyr' })
       .getByRole('button', { name: 'Fortsett øvingen' }),
   ).toBeVisible();
-  await expect(page.getByLabel('Profil').locator('option', { hasText: 'Ada' })).toHaveCount(1);
+  await expect(page.locator('#profile-select').locator('option', { hasText: 'Ada' })).toHaveCount(
+    1,
+  );
 });
 
 test('loads the latest saved progress when resuming and hides a stale continue action', async ({
@@ -568,16 +574,20 @@ test('keeps each profile progress separate and offers continue or restart', asyn
   await expect(page.locator('#correct-answer')).toHaveText('eple');
   await page.getByRole('button', { name: 'Ordsett' }).click();
 
-  await page.getByRole('button', { name: 'Legg til profil' }).click();
+  await openProfilePanel(page);
+  await page.getByRole('button', { name: 'Legg til profil', exact: true }).click();
   await page.getByLabel('Navn', { exact: true }).fill('Ada');
   await page.getByLabel('Valgfri emoji').fill('🐶');
   await saveAfterMinimumTime(page, 'Lagre profil');
-  await expect(page.getByLabel('Profil').locator('option', { hasText: 'Ada' })).toHaveCount(1);
+  await expect(page.locator('#profile-select').locator('option', { hasText: 'Ada' })).toHaveCount(
+    1,
+  );
   await page.reload();
 
   let set = page.getByRole('listitem').filter({ hasText: 'Frukt' });
   await expect(set.getByRole('button', { name: 'Start øving' })).toBeVisible();
-  await page.getByLabel('Profil').selectOption({ label: 'Min profil' });
+  await openProfilePanel(page);
+  await page.getByLabel('Hvem øver?', { exact: true }).selectOption({ label: 'Min profil' });
   set = page.getByRole('listitem').filter({ hasText: 'Frukt' });
   await expect(set.getByRole('button', { name: 'Fortsett øvingen' })).toBeVisible();
   await expect(set.getByRole('button', { name: 'Start på nytt' })).toHaveCount(0);
@@ -831,7 +841,7 @@ test('word-set action disclosure supports keyboard and mobile without starting p
   await page.keyboard.press('Enter');
   await menu.locator('button').last().focus();
   await page.keyboard.press('Tab');
-  await expect(page.locator('#new-set-button')).toBeFocused();
+  await expect(page.locator('#release-notes')).toBeFocused();
   await expect(set.getByRole('button', { name: 'Rediger' })).toHaveCount(0);
 
   await trigger.click();
@@ -953,6 +963,7 @@ test('throttles repeated set creation while leaving practice available', async (
 });
 
 test('rejects a filled honeypot and an immediately submitted set form', async ({ page }) => {
+  await page.clock.setFixedTime(new Date());
   await page.goto('/');
   await page.getByRole('button', { name: 'Nytt ordsett' }).click();
   await page.getByLabel('Navn på ordsettet').fill('Trygt sett');
@@ -968,6 +979,7 @@ test('rejects a filled honeypot and an immediately submitted set form', async ({
   await expect(page.getByRole('heading', { name: 'Trygt sett' })).toHaveCount(0);
 
   await page.waitForTimeout(300);
+  await page.clock.setSystemTime(new Date(Date.now() + 300));
   await page.locator('#word-set-website').fill('https://spam.invalid');
   await page.getByRole('button', { name: 'Lagre ordsett' }).click();
   await expect(page.locator('#word-set-creation-error')).toHaveText(
@@ -982,6 +994,7 @@ test('rejects a filled honeypot and an immediately submitted set form', async ({
   await page.getByLabel('Navn på ordsettet').fill('Trygt sett');
   await page.getByLabel('Hint og svar').fill('Hint\tSvar');
   await page.waitForTimeout(300);
+  await page.clock.setSystemTime(new Date(Date.now() + 600));
   await page.getByRole('button', { name: 'Lagre ordsett' }).click();
   await expect(page.getByRole('heading', { name: 'Trygt sett' })).toBeVisible();
 });
@@ -1055,7 +1068,8 @@ test('shows visible profile creation throttling feedback without blocking practi
   await page.evaluate(() => {
     localStorage.setItem('puggern.creation-attempts', JSON.stringify(Array(5).fill(Date.now())));
   });
-  await page.getByRole('button', { name: 'Legg til profil' }).click();
+  await openProfilePanel(page);
+  await page.getByRole('button', { name: 'Legg til profil', exact: true }).click();
   await page.getByLabel('Navn', { exact: true }).fill('Ada');
   await page.waitForTimeout(300);
   await page.getByRole('button', { name: 'Lagre profil' }).click();
@@ -1063,6 +1077,8 @@ test('shows visible profile creation throttling feedback without blocking practi
   const error = page.locator('#profile-creation-error');
   await expect(error).toContainText('Vent');
   await expect(error).toBeInViewport();
-  await expect(page.getByLabel('Profil').locator('option', { hasText: 'Ada' })).toHaveCount(0);
+  await expect(page.locator('#profile-select').locator('option', { hasText: 'Ada' })).toHaveCount(
+    0,
+  );
   await expect(page.getByRole('button', { name: 'Nytt ordsett' })).toBeEnabled();
 });

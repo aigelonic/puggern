@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openProfilePanel } from './helpers.mjs';
 
 const stateKey = 'puggern.profile-state';
 
@@ -419,7 +420,8 @@ test('Web Locks deduplicate two tabs finishing one run and retain distinct runs 
 
   await page.getByRole('button', { name: 'Øv på samme sett igjen' }).click();
   await other.getByRole('button', { name: 'Til ordsettene', exact: true }).click();
-  await other.getByLabel('Profil', { exact: true }).selectOption('p2');
+  await openProfilePanel(other);
+  await other.getByLabel('Hvem øver?', { exact: true }).selectOption('p2');
   await expect.poll(async () => (await state(page)).activeProfileId).toBe('p2');
   await finish(page);
   saved = await state(page);
@@ -478,13 +480,16 @@ test('history paginates, isolates variants/profiles, preserves deleted set snaps
   await expect(page.locator('#history-comparison')).toContainText('Fullfør en ny');
   await expect(page.locator('#history-status')).toContainText('Fullfør en ny, sammenlignbar øving');
   await page.keyboard.press('Escape');
-  await page.getByLabel('Profil', { exact: true }).selectOption('p2');
+  await openProfilePanel(page);
+  await page.getByLabel('Hvem øver?', { exact: true }).selectOption('p2');
   await openHistory(page);
   await expect(page.locator('#history-list > li')).toHaveCount(0);
   await expect(page.locator('#history-empty')).toBeVisible();
 });
 
-test('malformed history warns without resetting profile rewards or progress', async ({ page }) => {
+test('malformed history warns without rewriting stored history, profile rewards or progress', async ({
+  page,
+}) => {
   await seed(page);
   await start(page);
   await finish(page);
@@ -494,11 +499,14 @@ test('malformed history warns without resetting profile rewards or progress', as
     state.history.p1.push({ broken: true });
     localStorage.setItem('puggern.profile-state', JSON.stringify(state));
   });
+  const malformed = await state(page);
   await page.reload();
   await expect(page.locator('#history-warning')).toBeVisible();
   expect((await state(page)).profiles).toEqual(before.profiles);
   expect((await state(page)).progress).toEqual(before.progress);
-  expect((await state(page)).history).toEqual(before.history);
+  expect((await state(page)).history).toEqual(malformed.history);
+  await openHistory(page);
+  await expect(page.locator('#history-list > li')).toHaveCount(1);
 });
 
 test('unsupported profile versions remain intact rather than being overwritten', async ({

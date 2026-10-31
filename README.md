@@ -18,7 +18,9 @@ a tab, semicolon, or `-`. Review and edit the parsed entries before saving.
 Each set supports up to 100 entries, either quiz direction or both directions,
 and its own case/accent matching settings. Sets can be edited, copied, archived,
 restored, and deleted. Create a local profile for each child, with an optional
-emoji avatar. Practice progress is kept separately for each profile and word
+emoji avatar. The front page puts **Ordsettene dine** and practice buttons first.
+Use the profile chip at the right of the header to switch profiles or choose
+**Legg til profil**; **Ferdig** closes this non-modal panel. Practice progress is kept separately for each profile and word
 set, so an unfinished session can be continued or restarted, including after a
 page reload. Profiles, word sets, and progress are saved in browser storage on
 this device; they are not synced to other devices. Profiles store a name,
@@ -62,7 +64,7 @@ a completed summary. Answer cues last 600 milliseconds; confetti is removed with
 including when the preference changes during practice.
 
 Optional, locally generated sound effects work offline. Use the “Lydeffekter”
-toggle above the views to turn them on or off at any time. Sound starts off on
+icon button in the header (🔇 / 🔊) to turn them on or off at any time. Sound starts off on
 each page load and is not stored with a child's profile. Answer effects and
 sounds are replaced rather than queued, and stop when leaving practice.
 
@@ -74,7 +76,8 @@ unlockables, and leaderboards are not part of this MVP.
 
 ## Øvingshistorikk
 
-Choose **Øvingshistorikk** in the profile area to revisit that profile's completed
+Choose **Øvingshistorikk** in the compact greeting strip above the word sets,
+outside the profile switcher, to revisit that profile's completed
 runs, newest first (20 at a time, with **Vis flere**). Expand **Vis øvingsdetaljer**
 for practiced entries, entries needing extra practice, and saved answer settings.
 Results retain the set name and settings captured at the start, even after a set
@@ -164,6 +167,33 @@ npm test
 `npm run test:unit` runs the no-dependency core tests. `npm run test:e2e` runs
 the browser workflows against a temporary static server. GitHub Actions runs
 both suites for pull requests and pushes to `main`.
+
+For reproducible home-page screenshots, `tests/e2e/fixtures/home.mjs` exports
+`seedHome(page, options)`: synthetic 🦊 Ola with one unfinished, one completed,
+and one new set. Start `python3 -m http.server 4173 --directory frontend`,
+then capture Chromium in a separate terminal:
+
+```sh
+node --input-type=module -e "
+import { chromium } from 'playwright';
+import { seedHome } from './tests/e2e/fixtures/home.mjs';
+const browser = await chromium.launch();
+const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+await seedHome(page);
+await page.goto('http://127.0.0.1:4173');
+await page.locator('#saved-sets-title').waitFor();
+await page.evaluate(() => document.fonts.ready);
+await page.mouse.move(0, 0);
+await page.screenshot({ path: '/tmp/puggern-home.png' });
+await browser.close();
+"
+```
+
+Use 1280×900 with `{ count: 5 }` for desktop, `{ count: 0, name: 'Min profil', avatar: '' }`
+for the empty state, or 320×844 with a long `name` for truncation.
+Open `#profile-chip` or `#new-set-button` for panel/editor captures, blur the focused
+control and move the pointer away before capturing. The fixture writes only into
+an empty browser context, so reloads do not overwrite subsequent interactions.
 
 To check the production NGINX MIME types, headers, profile workflow, and
 service-worker upgrade/offline behavior, start the deployment container described

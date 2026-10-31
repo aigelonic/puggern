@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openProfilePanel } from './helpers.mjs';
 
 async function saveAfterMinimumTime(page, name, exerciseConfig = {}) {
   await page.waitForTimeout(300);
@@ -157,16 +158,17 @@ async function answer(page, value) {
   ).toBeEnabled();
 }
 
-async function expectCompletion(page, learned, firstTry) {
+async function expectCompletion(page, learned, firstTry, { restored = false } = {}) {
   const heading = page.getByRole('heading', { name: 'Godt jobbet!' });
+  const focusTarget = restored ? page.locator('body') : heading;
   await expect(heading).toBeVisible();
-  await expect(heading).toBeFocused();
+  await expect(focusTarget).toBeFocused();
   await expect(page.locator('#completion-message')).toHaveText(
     `Du lærte ${learned} øveoppføringer. ${firstTry} riktige på første forsøk.`,
   );
   await expect(page.locator('#answer')).toBeHidden();
   await page.locator('#answer').evaluate((input) => input.focus());
-  await expect(heading).toBeFocused();
+  await expect(focusTarget).toBeFocused();
   await expect(page.getByRole('button', { name: 'Fortsett øvingen' })).toBeHidden();
 }
 
@@ -188,7 +190,7 @@ for (const { source, direction, count } of [
       'Ingen ord trengte ekstra øving denne gangen.',
     );
     await page.reload();
-    await expectCompletion(page, count, count);
+    await expectCompletion(page, count, count, { restored: true });
     await page.getByRole('button', { name: 'Øv på samme sett igjen' }).click();
     await expect(page.getByLabel('Stavingen din')).toBeFocused();
     await expect(page.locator('#progress-label')).toHaveText(
@@ -286,7 +288,7 @@ test('focuses the saved-set heading when returning to a full set list', async ({
     localStorage.setItem('puggern.word-sets', JSON.stringify(storage));
   });
   await page.reload();
-  await expectCompletion(page, 1, 1);
+  await expectCompletion(page, 1, 1, { restored: true });
 
   await page.getByRole('button', { name: 'Til ordsettene' }).click();
 
@@ -316,7 +318,7 @@ test('resumes corrections offline and finishes with one correct answer', async (
     `${missedPrompt} → ${answers[missedPrompt]} · 1 feilsvar`,
   );
   await page.reload();
-  await expectCompletion(page, 1, 0);
+  await expectCompletion(page, 1, 0, { restored: true });
   await page.getByRole('button', { name: 'Til ordsettene' }).click();
   await expect(page.getByRole('heading', { name: 'Øveord' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Fortsett øvingen' })).toBeHidden();
@@ -363,12 +365,13 @@ test('restores the latest summary for the active profile after revisiting an old
   await answer(page, 'dog');
   await expectCompletion(page, 1, 1);
   await page.reload();
-  await expectCompletion(page, 1, 1);
+  await expectCompletion(page, 1, 1, { restored: true });
   await page.getByRole('button', { name: 'Til ordsettene' }).click();
-  await page.getByRole('button', { name: 'Legg til profil' }).click();
+  await openProfilePanel(page);
+  await page.getByRole('button', { name: 'Legg til profil', exact: true }).click();
   await page.getByLabel('Navn', { exact: true }).fill('Ny profil');
   await saveAfterMinimumTime(page, 'Lagre profil');
-  await expect(page.getByLabel('Profil').locator('option:checked')).toHaveText('Ny profil');
+  await expect(page.locator('#profile-select option:checked')).toHaveText('Ny profil');
   await page.reload();
   await expect(page.locator('#complete-view')).toBeHidden();
   await expect(page.getByRole('button', { name: 'Start øving' })).toHaveCount(2);
@@ -408,16 +411,17 @@ test('restarts a summary for its original profile after another tab switches pro
   const otherPage = await context.newPage();
   await otherPage.goto('/');
   await otherPage.getByRole('button', { name: 'Til ordsettene' }).click();
-  await otherPage.getByRole('button', { name: 'Legg til profil' }).click();
+  await openProfilePanel(otherPage);
+  await otherPage.getByRole('button', { name: 'Legg til profil', exact: true }).click();
   await otherPage.getByLabel('Navn', { exact: true }).fill('Ny profil');
   await saveAfterMinimumTime(otherPage, 'Lagre profil');
-  await expect(otherPage.getByLabel('Profil').locator('option:checked')).toHaveText('Ny profil');
+  await expect(otherPage.locator('#profile-select option:checked')).toHaveText('Ny profil');
   await otherPage.getByRole('button', { name: 'Start øving' }).click();
   await otherPage.getByRole('dialog').getByRole('button', { name: 'Start øving' }).click();
   await expect(otherPage.getByLabel('Stavingen din')).toBeFocused();
   await answer(otherPage, 'wrong');
   await expect(otherPage.getByLabel('Skriv ordet én gang')).toBeFocused();
-  await expect(page.getByLabel('Profil').locator('option:checked')).toHaveText('Ny profil');
+  await expect(page.locator('#profile-select option:checked')).toHaveText('Ny profil');
   await page.getByRole('button', { name: 'Øv på samme sett igjen' }).click();
   await expect(page.getByLabel('Stavingen din')).toBeFocused();
   const progress = await page.evaluate(() => {
@@ -449,7 +453,8 @@ test('starts pending setup for the profile that opened it after another tab swit
 
   const otherPage = await context.newPage();
   await otherPage.goto('/');
-  await otherPage.getByRole('button', { name: 'Legg til profil' }).click();
+  await openProfilePanel(otherPage);
+  await otherPage.getByRole('button', { name: 'Legg til profil', exact: true }).click();
   await otherPage.getByLabel('Navn', { exact: true }).fill('Ny profil');
   await saveAfterMinimumTime(otherPage, 'Lagre profil');
   await otherPage.getByRole('button', { name: 'Start øving' }).click();
@@ -513,7 +518,7 @@ test('saves points and combos across reloads and rewards each word once', async 
   );
   await expect(page.locator('.celebration')).toBeVisible();
   await page.reload();
-  await expectCompletion(page, 3, 2);
+  await expectCompletion(page, 3, 2, { restored: true });
   await page.getByRole('button', { name: 'Øv på samme sett igjen' }).click();
   await expect(page.locator('#practice-rewards')).toHaveText('0 poeng · 0 riktige på rad');
   for (let index = 0; index < 3; index += 1) {
@@ -523,13 +528,15 @@ test('saves points and combos across reloads and rewards each word once', async 
   await expect(page.locator('#profile-rewards')).toHaveText(
     '60 poeng totalt · Beste rekke: 3 · 2 sett fullført',
   );
-  await page.getByRole('button', { name: 'Legg til profil' }).click();
+  await openProfilePanel(page);
+  await page.getByRole('button', { name: 'Legg til profil', exact: true }).click();
   await page.getByLabel('Navn', { exact: true }).fill('Ny profil');
   await saveAfterMinimumTime(page, 'Lagre profil');
   await expect(page.locator('#profile-rewards')).toHaveText(
     '0 poeng totalt · Beste rekke: 0 · 0 sett fullført',
   );
-  await page.getByLabel('Profil', { exact: true }).selectOption({ label: 'Min profil' });
+  await openProfilePanel(page);
+  await page.getByLabel('Hvem øver?', { exact: true }).selectOption({ label: 'Min profil' });
   await expect(page.locator('#profile-rewards')).toHaveText(
     '60 poeng totalt · Beste rekke: 3 · 2 sett fullført',
   );
@@ -557,7 +564,7 @@ test('keeps pending rewards on save failure and credits them once when storage r
   await expectCompletion(page, 2, 2);
   await expect(page.locator('#progress-warning')).toBeHidden();
   await page.reload();
-  await expectCompletion(page, 2, 2);
+  await expectCompletion(page, 2, 2, { restored: true });
   await page.getByRole('button', { name: 'Til ordsettene' }).click();
   await expect(page.locator('#profile-rewards')).toHaveText(
     '20 poeng totalt · Beste rekke: 2 · 1 sett fullført',
