@@ -810,6 +810,12 @@ function repositionOpenWordSetMenus() {
   wordSetList.querySelectorAll('.set-action-menu[open]').forEach(positionWordSetActionMenu);
 }
 
+function closeWordSetActionMenu(details) {
+  details.open = false;
+  if (details.contains(document.activeElement) || document.activeElement === document.body)
+    details.querySelector('summary').focus();
+}
+
 function makeSetActionButton(label, action, details, trigger, className) {
   const button = makeButton(
     label,
@@ -843,13 +849,13 @@ function makeSetActionButton(label, action, details, trigger, className) {
 
 document.addEventListener('click', (event) => {
   wordSetList.querySelectorAll('.set-action-menu[open]').forEach((details) => {
-    if (!details.contains(event.target)) details.open = false;
+    if (!details.contains(event.target)) closeWordSetActionMenu(details);
   });
 });
 
 document.addEventListener('focusin', (event) => {
   wordSetList.querySelectorAll('.set-action-menu[open]').forEach((details) => {
-    if (!details.contains(event.target)) details.open = false;
+    if (!details.contains(event.target)) closeWordSetActionMenu(details);
   });
 });
 

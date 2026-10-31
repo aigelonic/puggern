@@ -829,8 +829,13 @@ test('word-set action disclosure supports keyboard and mobile without starting p
   await expect(set.getByRole('button', { name: 'Rediger' })).toHaveCount(0);
 
   await trigger.click();
+  await set.getByRole('button', { name: 'Rediger' }).focus();
+  await page
+    .locator('#saved-sets-title')
+    .evaluate((heading) => heading.removeAttribute('tabindex'));
   await page.locator('#saved-sets-title').click();
   await expect(set.getByRole('button', { name: 'Rediger' })).toHaveCount(0);
+  await expect(trigger).toBeFocused();
   await page.evaluate(() => {
     Object.assign(document.querySelector('.word-set-item').style, {
       position: 'fixed',
