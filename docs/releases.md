@@ -66,14 +66,15 @@ The adoption check found **no tags and no GitHub Releases**. The manifest and
 pre-adoption boundary. Older commits are deliberately excluded from the first
 release notes; commits after that boundary are included normally.
 
-Merge the implementation with the squash title **`feat(ci): adopt release-please`**.
-The root package temporarily sets `"release-as": "0.1.0"` so the first release is
-deterministic. **Mandatory follow-up immediately after publishing `v0.1.0`: remove
-`release-as` from `packages["."]` in `release-please-config.json` in a reviewed
-maintenance PR, before merging further release-worthy changes.** Otherwise it
-continues forcing `0.1.0`. Retain `bootstrap-sha` as a historical boundary; the
-latest release becomes the normal boundary. Never reset the manifest to the seed.
-The fixture tests model this cleanup and prove subsequent bumps are not pinned.
+The initial adoption merged with the squash title **`feat(ci): adopt release-please`**.
+The root package temporarily set `"release-as": "0.1.0"` to make the first release
+deterministic. The **Mandatory follow-up immediately after publishing `v0.1.0`**
+was to remove `release-as` from `packages["."]` in `release-please-config.json`;
+that cleanup is now complete. Keep it absent: this persistent override would pin
+every subsequent release to `0.1.0`. Retain `bootstrap-sha` as a historical
+boundary; the latest release becomes the normal boundary. Never reset the manifest
+to the seed. The fixture models the first release with a synthetic temporary
+override and plans later releases from the checked-in config.
 
 If a real stable application release/tag appears before adoption merges, align
 the manifest and version file to that latest stable version, remove `release-as`,
@@ -156,8 +157,8 @@ or bypass review to work around a restriction.
    GitHub Release. Confirm the manifest/version, tag name and target commit,
    release name/notes, and release link under the repository's **Releases** page.
    No release artifacts are published on non-release runs.
-6. After the first release, complete the `release-as` cleanup above. A safe rerun
-   should leave exactly one tag/release and no duplicate pending PRs.
+6. The first-release `release-as` cleanup is complete. Keep the override absent; a
+   safe rerun should leave exactly one tag/release and no duplicate pending PRs.
 
 ## Recovery and pausing
 
@@ -168,6 +169,17 @@ or dispatch it against `main`; the job guard refuses other branches. Runs are
 serialized without cancelling an in-progress write. Release-please reuses its
 tracked PR and recognizes already-published releases, so rerunning is safe.
 Do not remove its tracking labels or independently create tags/releases.
+
+If an existing pending release PR is incorrectly pinned to `0.1.0`, remove
+`release-as` in a reviewed config change and merge that fix to `main`. Let the
+normal push workflow or a maintainer dispatch against `main` regenerate the
+existing pending release PR. Do not manually edit its title or body, remove the
+`autorelease: pending` tracking label, or create a replacement PR. Verify that the
+bot update includes the intended post-release commits and advances the manifest,
+`version.txt`, module, and worker version markers together; it must not duplicate
+historical changelog entries or alter the published `v0.1.0` tag. After the bot's
+final update, use your own GitHub account to close and reopen the PR, then verify
+the required checks on its new current head SHA as described above.
 
 Never delete or move a published tag as routine recovery. Reverting application
 code requires a new reviewed commit and a new release, not rewriting a published
@@ -201,8 +213,9 @@ supports the explicit token, target-branch, config-file, and manifest-file input
 used here. It bundles release-please **17.6.0**. Configuration is validated against
 that version's packaged
 [upstream schema](https://github.com/googleapis/release-please/blob/v17.6.0/schemas/config.json).
-The first-release `release-as` option is supported but deprecated upstream;
-it is intentionally temporary under the cleanup policy above.
+The first-release `release-as` option is supported but deprecated upstream. It was
+used only for the initial `v0.1.0` release and must remain absent now that cleanup
+is complete.
 
 Live publication can only be verified after merging to `main`. A maintainer must
 confirm: one release PR opens/updates; human close/reopen runs all required checks
