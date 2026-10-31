@@ -872,6 +872,20 @@ test('word-set action disclosure supports keyboard and mobile without starting p
   await expect(page.locator('#word-set-form')).toBeVisible();
   await expect(page.locator('#exercise-config-dialog')).toBeHidden();
   await expect(set.getByRole('button', { name: 'Rediger' })).toHaveCount(0);
+  await page.locator('#cancel-edit-button').click();
+  await clickSetAction(set, 'Arkiver');
+  await page.getByRole('button', { name: 'Vis arkiv' }).click();
+  const archivedSet = page.getByRole('listitem').filter({ hasText: 'Mobilsett' });
+  await archivedSet.locator('.set-action-trigger').click();
+  const archivedMenu = archivedSet.locator('.set-action-menu-items');
+  await expect(archivedMenu).toBeVisible();
+  const archivedMenuBounds = await archivedMenu.boundingBox();
+  expect(archivedMenuBounds).not.toBeNull();
+  expect(archivedMenuBounds.x).toBeGreaterThanOrEqual(0);
+  expect(archivedMenuBounds.x + archivedMenuBounds.width).toBeLessThanOrEqual(320);
+  await archivedSet.getByRole('button', { name: 'Gjenopprett' }).click();
+  await page.getByRole('button', { name: 'Vis aktive ordsett' }).click();
+  await expect(page.getByRole('heading', { name: 'Mobilsett' })).toBeVisible();
 });
 
 test('keeps malformed rows invalid until repaired and retains preview edits in the source', async ({

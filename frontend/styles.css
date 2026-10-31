@@ -450,6 +450,10 @@ select:focus {
   gap: 0.5rem;
 }
 
+.archived-set-actions {
+  justify-content: flex-end;
+}
+
 .set-actions .button {
   min-height: 2.75rem;
   padding: 0.6rem 0.7rem;

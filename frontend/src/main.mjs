@@ -1098,7 +1098,7 @@ function renderWordSets() {
     details.append(name, summary);
 
     const actions = document.createElement('div');
-    actions.className = 'set-actions';
+    actions.className = set.archived ? 'set-actions archived-set-actions' : 'set-actions';
     const actionMenu = document.createElement('details');
     actionMenu.className = 'set-action-menu';
     const actionTrigger = document.createElement('summary');
