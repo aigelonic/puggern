@@ -1,4 +1,4 @@
-const APP_VERSION = '0.1.0'; // x-release-please-version
+const APP_VERSION = '0.2.0'; // x-release-please-version
 const SHELL_REVISION = '19';
 const CACHE_NAME = `puggern-app-shell-${APP_VERSION}-${SHELL_REVISION}`;
 const SCOPE = new URL(self.registration.scope);

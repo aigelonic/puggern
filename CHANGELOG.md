@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2.0](https://github.com/aigelonic/puggern/compare/v0.1.0...v0.2.0) (2026-10-31)
+
+
+### Features
+
+* **practice:** highlight spelling differences after incorrect answers ([#72](https://github.com/aigelonic/puggern/issues/72)) ([45e809f](https://github.com/aigelonic/puggern/commit/45e809f9d4c98a6a7b644296ebfe305cd9322786))
+* **word-sets:** simplify cards with actions menu ([#71](https://github.com/aigelonic/puggern/issues/71)) ([f047463](https://github.com/aigelonic/puggern/commit/f0474635c8ec145c30cc24c45d1628d1809da3ab))
+
+
+### Bug Fixes
+
+* **release:** remove stale first-release override ([#76](https://github.com/aigelonic/puggern/issues/76)) ([a40fb70](https://github.com/aigelonic/puggern/commit/a40fb70b78ee174ff35c77d47817197a76aba0ed))
+
 ## 0.1.0 (2026-10-30)
 
 
