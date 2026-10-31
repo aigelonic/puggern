@@ -676,19 +676,13 @@ for (const viewport of [
   });
 }
 
-test('native standalone app window keeps the update and confirmation keyboard-safe at 320px and tablet sizes', async () => {
-  const standalone = await startStandaloneApp();
+test('installed PWA window keeps the update and confirmation keyboard-safe at 320px and tablet sizes', async () => {
+  const standalone = await startStandaloneApp(fixture.origin);
   try {
     await trackLoads(standalone.context);
-    const page = standalone.context.pages()[0];
+    const { page } = standalone;
     await openApp(page);
-    const isStandalone = await page.evaluate(
-      () => matchMedia('(display-mode: standalone)').matches,
-    );
-    test.skip(
-      !isStandalone,
-      'This Chromium app window does not expose display-mode: standalone in the current environment.',
-    );
+    expect(await page.evaluate(() => matchMedia('(display-mode: standalone)').matches)).toBe(true);
     await createPractice(page);
     await page.locator('#answer').fill('behold svaret');
     await offer(page);
