@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { createShareUrl, parseShareUrl } from '../../frontend/src/share-word-set.mjs';
 import { MAX_WORD_SETS } from '../../frontend/src/word-sets.mjs';
+import { clickSetAction } from './helpers.mjs';
 
 const content = {
   name: 'Uke 42 🐶',
@@ -73,27 +74,23 @@ test('imports optional language names and renders markup-like labels as plain te
   await page.goto(createShareUrl(namedContent, baseURL));
   await saveImport(page);
   const imported = page.locator('#word-set-list > li').first();
-  await imported.getByRole('button', { name: 'Rediger' }).click();
+  await clickSetAction(imported, 'Rediger');
   await expect(page.getByLabel('Språk for hint (valgfritt)')).toHaveValue('<em>Norsk</em>');
   await expect(page.getByLabel('Språk for svar (valgfritt)')).toHaveValue('English');
   await page.getByRole('button', { name: 'Avbryt', exact: true }).click();
 
-  await imported.getByRole('button', { name: 'Kopier' }).click();
+  await clickSetAction(imported, 'Kopier');
   const copy = page.locator('#word-set-list > li').first();
-  await copy.getByRole('button', { name: 'Rediger' }).click();
+  await clickSetAction(copy, 'Rediger');
   await expect(page.getByLabel('Språk for hint (valgfritt)')).toHaveValue('<em>Norsk</em>');
   await expect(page.getByLabel('Språk for svar (valgfritt)')).toHaveValue('English');
   await page.getByRole('button', { name: 'Avbryt', exact: true }).click();
-  await copy.getByRole('button', { name: 'Arkiver' }).click();
+  await clickSetAction(copy, 'Arkiver');
   await page.getByRole('button', { name: 'Vis arkiv' }).click();
-  await page
-    .locator('#word-set-list > li')
-    .first()
-    .getByRole('button', { name: 'Gjenopprett' })
-    .click();
+  await clickSetAction(page.locator('#word-set-list > li').first(), 'Gjenopprett');
   await page.getByRole('button', { name: 'Vis aktive ordsett' }).click();
   const restoredCopy = page.locator('#word-set-list > li').first();
-  await restoredCopy.getByRole('button', { name: 'Rediger' }).click();
+  await clickSetAction(restoredCopy, 'Rediger');
   await expect(page.getByLabel('Språk for hint (valgfritt)')).toHaveValue('<em>Norsk</em>');
   await page.getByRole('button', { name: 'Avbryt', exact: true }).click();
 
@@ -243,17 +240,17 @@ test('uses native sharing for active and archived sets without transferring loca
     });
   }, localSet());
   await page.goto('/');
-  await page.getByRole('button', { name: 'Del', exact: true }).click();
+  await clickSetAction(page.locator('.word-set-item').first(), 'Del');
   await expect.poll(() => page.evaluate(() => window.sharedData?.url)).toBeTruthy();
   const shared = await page.evaluate(() => window.sharedData);
   expect(parseShareUrl(shared.url)).toMatchObject(content);
   expect(shared.url).not.toContain('old-0');
-  await page.getByRole('button', { name: 'Arkiver', exact: true }).click();
+  await clickSetAction(page.locator('.word-set-item').first(), 'Arkiver');
   await page.getByRole('button', { name: 'Vis arkiv', exact: true }).click();
   await page.evaluate(() => {
     window.sharedData = null;
   });
-  await page.getByRole('button', { name: 'Del', exact: true }).click();
+  await clickSetAction(page.locator('.word-set-item').first(), 'Del');
   await expect.poll(() => page.evaluate(() => window.sharedData?.url)).toBeTruthy();
 });
 
@@ -276,7 +273,7 @@ test('falls back to clipboard, then a selectable manual link when APIs fail', as
     });
   }, localSet());
   await page.goto('/');
-  await page.getByRole('button', { name: 'Del', exact: true }).click();
+  await clickSetAction(page.locator('.word-set-item').first(), 'Del');
   await expect.poll(() => page.evaluate(() => window.copiedLink)).toBeTruthy();
   expect(parseShareUrl(await page.evaluate(() => window.copiedLink))).toMatchObject(content);
   await page.evaluate(() => {
@@ -284,8 +281,9 @@ test('falls back to clipboard, then a selectable manual link when APIs fail', as
       throw new Error('Clipboard unavailable');
     };
   });
-  const trigger = page.getByRole('button', { name: 'Del', exact: true });
-  await trigger.click();
+  const set = page.locator('.word-set-item').first();
+  const trigger = set.locator('.set-action-trigger');
+  await clickSetAction(set, 'Del');
   const input = page.locator('#share-link-input');
   await expect(input).toBeVisible();
   await expect(input).toBeFocused();
@@ -328,24 +326,10 @@ test('native cancellation does not copy and oversized sets never reach sharing A
     [localSet(), { ...oversized, id: 'large', name: 'Stort sett' }],
   );
   await page.goto('/');
-  await page
-    .locator('.word-set-item')
-    .filter({ hasText: content.name })
-    .getByRole('button', {
-      name: 'Del',
-      exact: true,
-    })
-    .click();
+  await clickSetAction(page.locator('.word-set-item').filter({ hasText: content.name }), 'Del');
   await expect.poll(() => page.evaluate(() => window.nativeShareCount)).toBe(1);
   expect(await page.evaluate(() => window.clipboardUsed)).toBeUndefined();
-  await page
-    .locator('.word-set-item')
-    .filter({ hasText: 'Stort sett' })
-    .getByRole('button', {
-      name: 'Del',
-      exact: true,
-    })
-    .click();
+  await clickSetAction(page.locator('.word-set-item').filter({ hasText: 'Stort sett' }), 'Del');
   await expect(page.locator('#share-error')).toContainText('Reduser');
   expect(await page.evaluate(() => window.nativeShareCount)).toBe(1);
 });

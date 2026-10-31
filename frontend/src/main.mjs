@@ -631,13 +631,13 @@ async function startSessionOperation(
   renderPractice();
 }
 
-function openExerciseSetup(set) {
+function openExerciseSetup(set, trigger = document.activeElement) {
   const savedConfig = wordSetProgress(set.id)?.session.exerciseConfig;
   const directionMode = savedConfig?.directionMode ?? directionModeForSet(set);
   document.querySelector('#exercise-direction').value = directionMode;
   document.querySelector('#exercise-order').value = savedConfig?.orderMode ?? 'shuffled';
   document.querySelector('#exercise-config-title').textContent = `Start øving: ${set.name}`;
-  exerciseConfigTrigger = document.activeElement;
+  exerciseConfigTrigger = trigger;
   pendingExerciseSet = set;
   pendingExerciseProfileId = profileState.activeProfileId;
   exerciseConfigDialog.showModal();
@@ -784,6 +784,94 @@ function makeButton(label, action, className = 'button secondary') {
   return button;
 }
 
+function focusWordSetActions(trigger) {
+  const target = trigger?.isConnected
+    ? trigger
+    : (wordSetList.querySelector('.set-action-trigger') ?? archiveToggle);
+  target.focus();
+}
+
+function positionWordSetActionMenu(details) {
+  const trigger = details.querySelector('summary');
+  const menu = details.querySelector('.set-action-menu-items');
+  const bounds = trigger.getBoundingClientRect();
+  const spaceAbove = Math.max(0, bounds.top - 8);
+  const spaceBelow = Math.max(0, window.innerHeight - bounds.bottom - 8);
+  const menuHeight = Math.min(menu.scrollHeight, window.innerHeight * 0.7, 384);
+  const placeAbove = spaceBelow < menuHeight && spaceAbove > spaceBelow;
+  details.dataset.placement = placeAbove ? 'above' : 'below';
+  menu.style.setProperty(
+    '--available-height',
+    `${Math.max(44, Math.min(placeAbove ? spaceAbove : spaceBelow, window.innerHeight - 16))}px`,
+  );
+}
+
+function repositionOpenWordSetMenus() {
+  wordSetList.querySelectorAll('.set-action-menu[open]').forEach(positionWordSetActionMenu);
+}
+
+function closeWordSetActionMenu(details) {
+  details.open = false;
+  if (details.contains(document.activeElement) || document.activeElement === document.body)
+    details.querySelector('summary').focus();
+}
+
+function makeSetActionButton(label, action, details, trigger, className) {
+  const button = makeButton(
+    label,
+    () => {
+      details.open = false;
+      const result = action(button);
+      if (
+        details.contains(document.activeElement) ||
+        !document.activeElement?.isConnected ||
+        document.activeElement === document.body
+      ) {
+        focusWordSetActions(trigger);
+      }
+      if (result && typeof result.then === 'function') {
+        void Promise.resolve(result).then(
+          () => {
+            if (!document.activeElement?.isConnected || document.activeElement === document.body)
+              focusWordSetActions(trigger);
+          },
+          () => {
+            if (!document.activeElement?.isConnected || document.activeElement === document.body)
+              focusWordSetActions(trigger);
+          },
+        );
+      }
+    },
+    className,
+  );
+  return button;
+}
+
+document.addEventListener('click', (event) => {
+  wordSetList.querySelectorAll('.set-action-menu[open]').forEach((details) => {
+    if (!details.contains(event.target)) closeWordSetActionMenu(details);
+  });
+});
+
+document.addEventListener('focusin', (event) => {
+  wordSetList.querySelectorAll('.set-action-menu[open]').forEach((details) => {
+    if (!details.contains(event.target)) closeWordSetActionMenu(details);
+  });
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape') return;
+  const details = wordSetList.querySelector('.set-action-menu[open]');
+  if (!details) return;
+  event.preventDefault();
+  event.stopPropagation();
+  details.open = false;
+  details.querySelector('summary').focus();
+});
+
+window.addEventListener('resize', repositionOpenWordSetMenus);
+window.addEventListener('scroll', repositionOpenWordSetMenus, true);
+
 function restoreDialogFocus(trigger) {
   const target =
     trigger?.isConnected && !trigger.closest('[hidden]') && !trigger.disabled
@@ -802,7 +890,7 @@ function showShareFeedback(message = '', error = '') {
   shareError.hidden = !error;
 }
 
-async function shareWordSet(set, trigger) {
+async function shareWordSet(set, trigger, focusTrigger = trigger) {
   if (trigger.disabled) return;
   trigger.disabled = true;
   showShareFeedback();
@@ -829,7 +917,7 @@ async function shareWordSet(set, trigger) {
         // Manuell kopiering fungerer også uten tilgang til utklippstavlen.
       }
     }
-    shareLinkTrigger = trigger;
+    shareLinkTrigger = focusTrigger;
     shareLinkInput.value = url;
     shareLinkDialog.showModal();
     shareLinkInput.focus();
@@ -1016,28 +1104,86 @@ function renderWordSets() {
     details.append(name, summary);
 
     const actions = document.createElement('div');
-    actions.className = 'set-actions';
+    actions.className = set.archived ? 'set-actions archived-set-actions' : 'set-actions';
+    const actionMenu = document.createElement('details');
+    actionMenu.className = 'set-action-menu';
+    const actionTrigger = document.createElement('summary');
+    actionTrigger.className = 'button secondary set-action-trigger';
+    actionTrigger.setAttribute('aria-label', `Flere handlinger for ${set.name}`);
+    actionTrigger.textContent = '⋯';
+    actionMenu.append(actionTrigger);
+    const menuItems = document.createElement('div');
+    menuItems.className = 'set-action-menu-items';
+    actionMenu.append(menuItems);
+    actionMenu.addEventListener('toggle', () => {
+      if (!actionMenu.open) {
+        delete actionMenu.dataset.placement;
+        menuItems.style.removeProperty('--available-height');
+        return;
+      }
+      requestAnimationFrame(() => {
+        if (actionMenu.open) positionWordSetActionMenu(actionMenu);
+      });
+    });
+
     if (!set.archived) {
       if (progress && progress.session.queue.length > 0) {
         actions.append(
-          makeButton('Fortsett øvingen', () => continueWordSet(set), 'button primary'),
+          makeButton(
+            'Fortsett øvingen',
+            () => continueWordSet(set),
+            'button primary practice-action',
+          ),
         );
-        actions.append(makeButton('Start på nytt', () => openExerciseSetup(set)));
+        menuItems.append(
+          makeSetActionButton(
+            'Start på nytt',
+            () => openExerciseSetup(set, actionTrigger),
+            actionMenu,
+            actionTrigger,
+          ),
+        );
       } else if (progress) {
-        actions.append(makeButton('Øv på nytt', () => openExerciseSetup(set), 'button primary'));
+        actions.append(
+          makeButton('Øv på nytt', () => openExerciseSetup(set), 'button primary practice-action'),
+        );
       } else {
-        actions.append(makeButton('Start øving', () => openExerciseSetup(set), 'button primary'));
+        actions.append(
+          makeButton('Start øving', () => openExerciseSetup(set), 'button primary practice-action'),
+        );
       }
-      actions.append(makeButton('Rediger', () => openEditor(set)));
-      actions.append(makeButton('Kopier', () => duplicateWordSet(set)));
-      actions.append(makeButton('Arkiver', () => changeArchived(set, true)));
+      menuItems.append(
+        makeSetActionButton('Rediger', () => openEditor(set), actionMenu, actionTrigger),
+        makeSetActionButton('Kopier', () => duplicateWordSet(set), actionMenu, actionTrigger),
+        makeSetActionButton('Arkiver', () => changeArchived(set, true), actionMenu, actionTrigger),
+      );
     } else {
-      actions.append(makeButton('Gjenopprett', () => changeArchived(set, false)));
-      actions.append(makeButton('Rediger', () => openEditor(set)));
+      menuItems.append(
+        makeSetActionButton(
+          'Gjenopprett',
+          () => changeArchived(set, false),
+          actionMenu,
+          actionTrigger,
+        ),
+        makeSetActionButton('Rediger', () => openEditor(set), actionMenu, actionTrigger),
+      );
     }
-    const shareButton = makeButton('Del', () => shareWordSet(set, shareButton));
-    actions.append(shareButton);
-    actions.append(makeButton('Slett', () => deleteWordSet(set), 'button danger'));
+    menuItems.append(
+      makeSetActionButton(
+        'Del',
+        (shareButton) => shareWordSet(set, shareButton, actionTrigger),
+        actionMenu,
+        actionTrigger,
+      ),
+      makeSetActionButton(
+        'Slett',
+        () => deleteWordSet(set),
+        actionMenu,
+        actionTrigger,
+        'button danger',
+      ),
+    );
+    actions.append(actionMenu);
     item.append(details, actions);
     wordSetList.append(item);
   });
