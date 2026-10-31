@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { clickSetAction } from './helpers.mjs';
 
 async function saveAfterMinimumTime(page, name) {
   await page.waitForTimeout(300);
@@ -308,9 +309,9 @@ test('does not exceed the set limit when copies are requested concurrently', asy
   });
   await page.evaluate(() => window.creationLockAcquired);
 
-  const copyButton = page.getByRole('button', { name: 'Kopier' }).first();
-  await copyButton.click();
-  await copyButton.click();
+  const firstSet = page.locator('.word-set-item').first();
+  await clickSetAction(firstSet, 'Kopier');
+  await clickSetAction(firstSet, 'Kopier');
   await page.evaluate(() => window.releaseCreationLock());
 
   await expect(page.locator('#word-set-list > li')).toHaveCount(50);
@@ -573,9 +574,9 @@ test('keeps each profile progress separate and offers continue or restart', asyn
   await page.getByLabel('Profil').selectOption({ label: 'Min profil' });
   set = page.getByRole('listitem').filter({ hasText: 'Frukt' });
   await expect(set.getByRole('button', { name: 'Fortsett øvingen' })).toBeVisible();
-  await expect(set.getByRole('button', { name: 'Start på nytt' })).toBeVisible();
+  await expect(set.getByRole('button', { name: 'Start på nytt' })).toHaveCount(0);
 
-  await set.getByRole('button', { name: 'Start på nytt' }).click();
+  await clickSetAction(set, 'Start på nytt');
   await page.getByRole('dialog').getByRole('button', { name: 'Start øving' }).click();
   await expect(page.getByLabel('Stavingen din')).toBeVisible();
   await expect(page.getByLabel('Skriv riktig svar')).toHaveCount(0);
@@ -756,33 +757,94 @@ test('highlights malformed entries and supports set editing, duplication, archiv
   await page.getByRole('button', { name: 'Lagre ordsett' }).click();
   let set = page.getByRole('listitem').filter({ hasText: 'Uke 43' });
   await expect(set).toBeVisible();
+  await set.locator('.set-action-trigger').click();
+  await expect(set.getByRole('button', { name: 'Rediger' })).toBeVisible();
+  await expect(set.getByRole('button', { name: 'Kopier' })).toBeVisible();
+  await expect(set.getByRole('button', { name: 'Arkiver' })).toBeVisible();
+  await expect(set.getByRole('button', { name: 'Del' })).toBeVisible();
+  await expect(set.getByRole('button', { name: 'Slett' })).toBeVisible();
+  await expect(set.getByRole('button', { name: 'Gjenopprett' })).toHaveCount(0);
   await set.getByRole('button', { name: 'Rediger' }).click();
   await page.getByLabel('Navn på ordsettet').fill('Uke 44');
   await page.getByRole('button', { name: 'Lagre ordsett' }).click();
 
   set = page.getByRole('listitem').filter({ hasText: 'Uke 44' });
-  await set.getByRole('button', { name: 'Kopier' }).click();
+  await clickSetAction(set, 'Kopier');
   await expect(page.getByRole('heading', { name: 'Uke 44 (kopi)' })).toBeVisible();
   set = page.getByRole('listitem').filter({
     has: page.getByRole('heading', { name: 'Uke 44', exact: true }),
   });
-  await set.getByRole('button', { name: 'Arkiver' }).click();
+  await clickSetAction(set, 'Arkiver');
   await page.getByRole('button', { name: 'Vis arkiv' }).click();
   const archivedSet = page.getByRole('listitem').filter({
     has: page.getByRole('heading', { name: 'Uke 44', exact: true }),
   });
   await expect(archivedSet).toBeVisible();
+  await archivedSet.locator('.set-action-trigger').click();
+  await expect(archivedSet.getByRole('button', { name: 'Gjenopprett' })).toBeVisible();
+  await expect(archivedSet.getByRole('button', { name: 'Rediger' })).toBeVisible();
+  await expect(archivedSet.getByRole('button', { name: 'Del' })).toBeVisible();
+  await expect(archivedSet.getByRole('button', { name: 'Slett' })).toBeVisible();
+  await expect(archivedSet.getByRole('button', { name: 'Kopier' })).toHaveCount(0);
   await archivedSet.getByRole('button', { name: 'Gjenopprett' }).click();
   await page.getByRole('button', { name: 'Vis aktive ordsett' }).click();
   await expect(page.getByRole('heading', { name: 'Uke 44', exact: true })).toBeVisible();
 
   page.once('dialog', (dialog) => dialog.accept());
-  await page
-    .getByRole('listitem')
-    .filter({ hasText: 'Uke 44 (kopi)' })
-    .getByRole('button', { name: 'Slett' })
-    .click();
+  await clickSetAction(page.getByRole('listitem').filter({ hasText: 'Uke 44 (kopi)' }), 'Slett');
   await expect(page.getByRole('heading', { name: 'Uke 44 (kopi)' })).toHaveCount(0);
+});
+
+test('word-set action disclosure supports keyboard and mobile without starting practice', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Nytt ordsett' }).click();
+  await page.getByLabel('Navn på ordsettet').fill('Mobilsett');
+  await page.getByLabel('Hint og svar').fill('hund;dog');
+  await saveAfterMinimumTime(page, 'Lagre ordsett');
+
+  const set = page.getByRole('listitem').filter({ hasText: 'Mobilsett' });
+  const trigger = set.locator('.set-action-trigger');
+  await expect(trigger).toHaveAccessibleName('Flere handlinger for Mobilsett');
+  await trigger.focus();
+  await page.keyboard.press('Enter');
+  await expect(set.getByRole('button', { name: 'Rediger' })).toBeVisible();
+  await expect(page.locator('#practice-view')).toBeHidden();
+  await expect(page.locator('#exercise-config-dialog')).toBeHidden();
+  await page.keyboard.press('Escape');
+  await expect(trigger).toBeFocused();
+  await expect(set.getByRole('button', { name: 'Rediger' })).toHaveCount(0);
+
+  await trigger.click();
+  await page.locator('#saved-sets-title').click();
+  await expect(set.getByRole('button', { name: 'Rediger' })).toHaveCount(0);
+  await trigger.click();
+  const menu = set.locator('.set-action-menu-items');
+  const menuBounds = await menu.boundingBox();
+  expect(menuBounds).not.toBeNull();
+  expect(menuBounds.x).toBeGreaterThanOrEqual(0);
+  expect(menuBounds.x + menuBounds.width).toBeLessThanOrEqual(320);
+  const actionSizes = await menu.locator('button').evaluateAll((buttons) =>
+    buttons.map((button) => {
+      const { width, height } = button.getBoundingClientRect();
+      return { width, height };
+    }),
+  );
+  expect(actionSizes).toHaveLength(5);
+  for (const { width, height } of actionSizes) {
+    expect(width).toBeGreaterThanOrEqual(44);
+    expect(height).toBeGreaterThanOrEqual(44);
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+
+  await set.getByRole('button', { name: 'Rediger' }).click();
+  await expect(page.locator('#word-set-form')).toBeVisible();
+  await expect(page.locator('#exercise-config-dialog')).toBeHidden();
+  await expect(set.getByRole('button', { name: 'Rediger' })).toHaveCount(0);
 });
 
 test('keeps malformed rows invalid until repaired and retains preview edits in the source', async ({
@@ -913,26 +975,23 @@ test('preserves existing sets above the cap while blocking further creation', as
   await expect(page.getByRole('heading', { name: 'Set 50' })).toBeVisible();
 
   const set = page.getByRole('listitem').filter({ hasText: 'Set 0' });
-  await set.getByRole('button', { name: 'Rediger' }).click();
+  await clickSetAction(set, 'Rediger');
   await page.getByLabel('Navn på ordsettet').fill('Oppdatert sett');
   await page.getByRole('button', { name: 'Lagre ordsett' }).click();
   await expect(page.getByRole('heading', { name: 'Oppdatert sett' })).toBeVisible();
 
   page.once('dialog', (dialog) => dialog.accept());
-  await page
-    .getByRole('listitem')
-    .filter({ hasText: 'Oppdatert sett' })
-    .getByRole('button', { name: 'Slett' })
-    .click();
+  await clickSetAction(page.getByRole('listitem').filter({ hasText: 'Oppdatert sett' }), 'Slett');
   await expect(page.locator('#new-set-button')).toBeDisabled();
   await expect(page.locator('#set-limit-help')).toBeVisible();
 
   page.once('dialog', (dialog) => dialog.accept());
-  await page
-    .getByRole('listitem')
-    .filter({ has: page.getByRole('heading', { name: 'Set 1', exact: true }) })
-    .getByRole('button', { name: 'Slett' })
-    .click();
+  await clickSetAction(
+    page
+      .getByRole('listitem')
+      .filter({ has: page.getByRole('heading', { name: 'Set 1', exact: true }) }),
+    'Slett',
+  );
   await expect(page.locator('#new-set-button')).toBeEnabled();
   await expect(page.locator('#set-limit-help')).toBeHidden();
 });
