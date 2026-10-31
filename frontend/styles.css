@@ -7,51 +7,270 @@
 }
 
 #history-dialog {
-  width: min(calc(100% - 2rem), 700px);
-  max-height: 90vh;
+  width: min(calc(100% - 2rem), 1120px);
+  max-height: calc(100dvh - 2rem);
   overflow: auto;
   overflow-wrap: anywhere;
+  padding: clamp(1rem, 3vw, 1.75rem);
+  border: 1px solid #aeb8a9;
+  border-radius: 18px;
+  background: #fffefa;
+  color: #263a32;
+  box-shadow: 0 16px 48px #263a3226;
+}
+
+#history-dialog::backdrop {
+  background: #263a3270;
+}
+
+.history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+}
+
+.history-heading-group {
+  min-width: 0;
+}
+
+#history-heading {
+  margin: 0;
+  font-size: clamp(1.7rem, 4vw, 2.3rem);
+}
+
+#history-profile,
+.history-context,
+.history-chart-heading p,
+.history-chart-latest,
+.history-metric-detail,
+#history-variant-metadata {
+  margin: 0;
+  color: #46574e;
+  font-family: 'Trebuchet MS', sans-serif;
+}
+
+#history-profile {
+  margin-top: 0.2rem;
+  overflow-wrap: anywhere;
+}
+
+.history-header > form {
+  margin: 0;
+}
+
+.history-header .button {
+  min-height: 44px;
+}
+
+#history-help {
+  min-width: 0;
+}
+
+#history-help > summary {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 0.45rem;
+  color: #245d43;
+  font-family: 'Trebuchet MS', sans-serif;
+  font-weight: 700;
+}
+
+#history-help > summary span {
+  display: grid;
+  width: 1.5rem;
+  height: 1.5rem;
+  place-items: center;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+}
+
+.history-help-content {
+  width: min(100%, 56rem);
+  max-height: min(60vh, 30rem);
+  overflow: auto;
+  margin-top: 0.35rem;
+  padding: 1rem;
+  border: 1px solid #a0ada5;
+  border-radius: 12px;
+  background: #fffefa;
+  box-shadow: 0 4px 16px #263a321a;
+  font-family: 'Trebuchet MS', sans-serif;
+  line-height: 1.5;
+}
+
+.history-help-content p:first-child {
+  margin-top: 0;
+}
+
+.history-help-content p:last-child {
+  margin-bottom: 0;
+}
+
+.history-context {
+  margin: 0.75rem 0 1.1rem;
+  font-size: 0.9rem;
+}
+
+.history-empty {
+  padding: 1.5rem;
+  border: 1px dashed #82948a;
+  border-radius: 14px;
+  background: #f7f5ef;
+  font-family: 'Trebuchet MS', sans-serif;
+  text-align: center;
+}
+
+#history-variant-controls {
+  display: grid;
+  gap: 0.35rem;
+  max-width: 42rem;
+  margin-bottom: 1rem;
+}
+
+#history-variant-controls label {
+  margin: 0;
 }
 
 #history-variant {
   width: 100%;
   min-width: 0;
+  min-height: 44px;
 }
 
-#history-list {
-  padding-left: 1.5rem;
+#history-variant-metadata {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.5;
 }
 
-#history-list > li {
-  padding-bottom: 1rem;
-  border-bottom: 1px solid #587064;
+.history-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
 }
 
-#history-dialog summary {
-  cursor: pointer;
-  padding: 0.5rem 0;
+.history-metric {
+  min-width: 0;
+  padding: 0.9rem 1rem;
+  border: 1px solid #d5ddd6;
+  border-radius: 14px;
+  background: #f8f8f2;
+  box-shadow: 0 2px 6px #263a320a;
+}
+
+.history-metric h3 {
+  margin: 0;
+  color: #46574e;
+  font-family: 'Trebuchet MS', sans-serif;
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.history-metric-value {
+  margin: 0.3rem 0 0.15rem;
+  color: #245d43;
+  font-size: clamp(1.6rem, 3vw, 2.15rem);
+  font-weight: 700;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+
+.history-metric-detail {
+  font-size: 0.79rem;
+  line-height: 1.4;
+}
+
+.history-chart-panel {
+  margin: 0 0 1.5rem;
+  padding: 1rem clamp(0.75rem, 2vw, 1.5rem);
+  border: 1px solid #d5ddd6;
+  border-radius: 16px;
+  background: #f7f8f2;
+}
+
+.history-chart-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+}
+
+.history-chart-heading h3,
+#history-runs-heading {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.history-chart-heading p,
+.history-chart-latest {
+  font-size: 0.88rem;
+}
+
+.history-chart-latest {
+  margin-top: 0.3rem;
+  color: #245d43;
+  font-weight: 700;
+}
+
+#history-chart-description {
+  margin: 0.25rem 0 0.2rem;
+  font-size: 0.82rem;
 }
 
 #history-chart {
+  display: block;
   width: 100%;
+  max-width: 520px;
   height: auto;
+  margin: 0 auto;
   font:
-    13px 'Trebuchet MS',
+    11px 'Trebuchet MS',
     sans-serif;
   fill: #263a32;
 }
 
 .chart-grid {
-  stroke: #a0ada5;
+  stroke: #b7c1ba;
+  stroke-width: 1;
+}
+
+.chart-axis-label,
+.chart-attempt-label {
+  fill: #46574e;
 }
 
 .chart-line {
-  stroke: #263a32;
-  stroke-width: 2;
+  stroke: #245d43;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.chart-area {
+  fill: #34745720;
 }
 
 .chart-point {
-  fill: #263a32;
+  fill: #fffefa;
+  stroke: #245d43;
+  stroke-width: 2.5;
+}
+
+.chart-point-latest {
+  fill: #245d43;
+  stroke: #fffefa;
+  stroke-width: 2;
+}
+
+#history-table-details > summary,
+#history-list summary {
+  min-height: 44px;
 }
 
 #history-chart-table {
@@ -59,15 +278,122 @@
   table-layout: fixed;
   border-collapse: collapse;
   font:
-    0.9rem 'Trebuchet MS',
+    0.85rem 'Trebuchet MS',
     sans-serif;
+}
+
+#history-chart-table caption {
+  padding: 0.75rem 0.25rem;
+  font-weight: 700;
+  text-align: left;
 }
 
 #history-chart-table th,
 #history-chart-table td {
+  overflow-wrap: anywhere;
   text-align: left;
   padding: 0.5rem 0.25rem;
   border-bottom: 1px solid #a0ada5;
+}
+
+#history-chart-table th:first-child,
+#history-chart-table td:first-child {
+  width: 4rem;
+}
+
+#history-runs {
+  margin-top: 1.5rem;
+}
+
+#history-runs-heading {
+  margin-bottom: 0.75rem;
+}
+
+#history-list {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#history-list > li {
+  min-width: 0;
+  padding: 0.8rem 1rem;
+  border: 1px solid #d5ddd6;
+  border-radius: 12px;
+  background: #fffefa;
+}
+
+#history-list h3 {
+  margin: 0 0 0.2rem;
+  font-size: 1.05rem;
+}
+
+#history-list > li > p {
+  margin: 0.2rem 0;
+  color: #46574e;
+  font-family: 'Trebuchet MS', sans-serif;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+#history-list .history-run-accuracy {
+  color: #245d43;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+#history-dialog summary {
+  cursor: pointer;
+  padding: 0.5rem 0;
+}
+
+@media (max-width: 650px) {
+  .history-header {
+    align-items: flex-start;
+  }
+
+  .history-header > form {
+    flex-basis: 100%;
+  }
+
+  .history-header .button {
+    width: 100%;
+  }
+
+  .history-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
+  }
+
+  .history-metric {
+    padding: 0.75rem;
+  }
+
+  .history-metric-value {
+    font-size: clamp(1.45rem, 7vw, 1.85rem);
+  }
+
+  .history-chart-panel {
+    padding: 0.8rem 0.6rem;
+  }
+}
+
+@media (max-width: 350px) {
+  #history-dialog {
+    width: calc(100% - 1rem);
+    padding: 0.75rem;
+  }
+
+  .history-metric h3,
+  .history-metric-detail {
+    font-size: 0.75rem;
+  }
+
+  #history-chart {
+    font-size: 10px;
+  }
 }
 
 * {

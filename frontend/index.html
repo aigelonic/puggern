@@ -8,7 +8,7 @@
     <meta name="robots" content="noindex, nofollow, noarchive" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" type="image/png" sizes="192x192" href="./icons/pug-192.png" />
-    <link rel="stylesheet" href="./styles.css?v=14" />
+    <link rel="stylesheet" href="./styles.css?v=15" />
     <title>Puggern</title>
   </head>
   <body>
@@ -377,25 +377,46 @@
         </div>
       </section>
       <dialog id="history-dialog" aria-labelledby="history-heading">
-        <h2 id="history-heading" tabindex="-1">Øvingshistorikk</h2>
-        <p id="history-profile"></p>
-        <p class="field-help">
-          Bare fullførte øvinger fra etter at historikkfunksjonen ble installert, tas med. Eldre
-          øvinger er ikke inkludert. De siste 500 resultatene per profil beholdes. Rekorder gjelder
-          bare lagret historikk, ikke alle øvinger du noen gang har gjort.
+        <header class="history-header">
+          <div class="history-heading-group">
+            <h2 id="history-heading" tabindex="-1">Øvingshistorikk</h2>
+            <p id="history-profile"></p>
+          </div>
+          <details id="history-help">
+            <summary><span aria-hidden="true">?</span> Om historikken</summary>
+            <div class="history-help-content">
+              <p>
+                Her vises bare fullførte øvinger som er samlet inn etter at historikkfunksjonen ble
+                installert. De siste 500 resultatene per profil beholdes, og rekorder gjelder bare
+                denne lagrede historikken.
+              </p>
+              <p>
+                Riktig på første forsøk er andelen øveoppføringer som ble svart riktig uten feil.
+                Beste rekke er flere riktige svar på rad <strong>i én øving</strong>, ikke en daglig
+                rekke. Bare øvinger med samme ordinnhold, retning, rekkefølge og svarinnstillinger
+                kan sammenlignes.
+              </p>
+              <p>
+                Historikken lagres bare i denne nettleseren, uten konto eller synkronisering. Lokale
+                profiler er ikke tilgangsbeskyttelse eller kryptering. Andre som bruker samme
+                nettleser, kan se dataene. Sletter du nettleserdataene, forsvinner historikken.
+              </p>
+            </div>
+          </details>
+          <form method="dialog">
+            <button class="button secondary" type="submit">Tilbake til profilen</button>
+          </form>
+        </header>
+        <p class="history-context">
+          Fullførte øvinger for denne profilen · lagret i denne nettleseren
         </p>
-        <p class="field-help">
-          Historikken lagres bare i denne nettleseren, uten konto eller synkronisering. Lokale
-          profiler er ikke tilgangsbeskyttelse eller kryptering. Andre som bruker samme nettleser,
-          kan se dataene. Sletter du nettleserdataene, forsvinner historikken.
+        <p id="history-empty" class="history-empty">
+          Fullfør en øving, så dukker resultatet opp her.
         </p>
-        <p id="history-empty">Fullførte øvinger vil vises her, bare i denne nettleseren.</p>
         <div id="history-variant-controls" hidden>
           <label for="history-variant">Øvingsvariant for sammenligning</label>
           <select id="history-variant"></select>
-          <p class="field-help">
-            Bare samme ordinnhold, retning, rekkefølge og svarinnstillinger sammenlignes.
-          </p>
+          <p id="history-variant-metadata" class="field-help"></p>
         </div>
         <p
           id="history-status"
@@ -404,36 +425,67 @@
           aria-live="polite"
           aria-atomic="true"
         ></p>
-        <section id="history-trend" aria-labelledby="history-trend-heading" hidden>
-          <h3 id="history-trend-heading">Riktig på første forsøk over tid</h3>
-          <p id="history-comparison"></p>
-          <p id="history-records"></p>
-          <p id="history-chart-description" class="field-help">
-            De siste 10 sammenlignbare øvingene, eldst til nyest. Avstanden viser forsøksrekkefølge,
-            ikke tiden mellom øvingene. Skalaen er alltid 0–100 %. Datoer og verdier står i
-            tabellen.
-          </p>
-          <svg id="history-chart" viewBox="0 0 560 185" aria-hidden="true"></svg>
-          <table id="history-chart-table">
-            <caption>
-              Førsteforsøksnøyaktighet for de siste sammenlignbare øvingene
-            </caption>
-            <thead>
-              <tr>
-                <th scope="col">Forsøk</th>
-                <th scope="col">Fullført</th>
-                <th scope="col">Riktig på første forsøk</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
+        <section id="history-metrics" class="history-metrics" aria-label="Nøkkeltall" hidden>
+          <article class="history-metric">
+            <h3>Riktig på første forsøk</h3>
+            <p id="history-latest-value" class="history-metric-value"></p>
+            <p id="history-latest-detail" class="history-metric-detail"></p>
+          </article>
+          <article class="history-metric">
+            <h3>Endring fra forrige</h3>
+            <p id="history-delta-value" class="history-metric-value"></p>
+            <p id="history-delta-detail" class="history-metric-detail"></p>
+          </article>
+          <article class="history-metric">
+            <h3>Beste førsteforsøk</h3>
+            <p id="history-best-value" class="history-metric-value"></p>
+            <p class="history-metric-detail">I lagret historikk for varianten</p>
+          </article>
+          <article class="history-metric">
+            <h3>Beste rekke</h3>
+            <p id="history-streak-value" class="history-metric-value"></p>
+            <p class="history-metric-detail">Riktige svar på rad i én øving</p>
+          </article>
         </section>
-        <h3>Fullførte øvinger · nyeste først</h3>
-        <ol id="history-list"></ol>
-        <button id="history-more" class="button secondary" type="button" hidden>Vis flere</button>
-        <form method="dialog">
-          <button class="button secondary" type="submit">Tilbake til profilen</button>
-        </form>
+        <section
+          id="history-trend"
+          class="history-chart-panel"
+          aria-labelledby="history-trend-heading"
+          hidden
+        >
+          <div class="history-chart-heading">
+            <h3 id="history-trend-heading">Riktig på første forsøk</h3>
+            <p id="history-chart-context"></p>
+          </div>
+          <p id="history-chart-latest" class="history-chart-latest"></p>
+          <p id="history-chart-description" class="field-help">
+            Avstand viser øvingsrekkefølge, ikke tid. Skalaen går fra 0 til 100 %.
+          </p>
+          <svg id="history-chart" viewBox="0 0 320 205" aria-hidden="true"></svg>
+          <details id="history-table-details" aria-describedby="history-chart-description">
+            <summary>Vis tall og datoer</summary>
+            <table id="history-chart-table">
+              <caption>
+                Førsteforsøksnøyaktighet for de siste sammenlignbare øvingene
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Forsøk</th>
+                  <th scope="col">Fullført</th>
+                  <th scope="col">Riktig på første forsøk</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </details>
+          <p id="history-comparison" class="visually-hidden"></p>
+          <p id="history-records" class="visually-hidden"></p>
+        </section>
+        <section id="history-runs" aria-labelledby="history-runs-heading" hidden>
+          <h3 id="history-runs-heading">Fullførte øvinger · nyeste først</h3>
+          <ol id="history-list"></ol>
+          <button id="history-more" class="button secondary" type="button" hidden>Vis flere</button>
+        </section>
       </dialog>
       <footer class="app-footer" aria-label="Appversjon og oppdateringer">
         <span id="app-version"></span>

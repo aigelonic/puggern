@@ -17,12 +17,34 @@ const decimal = (value) =>
 const modes = (result) =>
   `${directions[result.directionMode] ?? directions.unknown} · ${orders[result.orderMode]}`;
 const settings = (result) =>
-  `Store og små bokstaver: ${result.caseSensitive ? 'skilles' : 'skilles ikke'}. Aksenter: ${result.accentSensitive ? 'skilles' : 'skilles ikke'}.`;
+  `Store og små bokstaver ${result.caseSensitive ? 'skilles' : 'skilles ikke'} · Aksenter ${result.accentSensitive ? 'skilles' : 'skilles ikke'}`;
 
 function element(tag, text) {
   const node = document.createElement(tag);
   if (text !== undefined) node.textContent = text;
   return node;
+}
+
+function variantLabels(variants) {
+  const totals = new Map();
+  for (const result of variants) {
+    const key = `${result.setName}\u0000${directions[result.directionMode] ?? directions.unknown}`;
+    totals.set(key, (totals.get(key) ?? 0) + 1);
+  }
+  const indexes = new Map();
+  return variants.map((result) => {
+    const direction = directions[result.directionMode] ?? directions.unknown;
+    const key = `${result.setName}\u0000${direction}`;
+    const index = (indexes.get(key) ?? 0) + 1;
+    indexes.set(key, index);
+    return {
+      result,
+      label:
+        totals.get(key) > 1
+          ? `${result.setName} · ${direction} · variant ${index}`
+          : `${result.setName} · ${direction}`,
+    };
+  });
 }
 
 export function createHistoryView({ dialog, getProfile, getHistory }) {
@@ -34,26 +56,65 @@ export function createHistoryView({ dialog, getProfile, getHistory }) {
   let selectedKey = null;
   const itemCache = new Map();
 
-  function renderTrend(history) {
+  function renderTrend(history, announce = false) {
     const trend = variantTrend(history, selectedKey);
     const container = dialog.querySelector('#history-trend');
+    const metrics = dialog.querySelector('#history-metrics');
     const status = dialog.querySelector('#history-status');
     container.hidden = !trend.latest;
+    metrics.hidden = !trend.latest;
     if (!trend.latest) {
       status.textContent = '';
       return;
     }
-    const comparison =
-      `Siste førsteforsøksnøyaktighet: ${percent(accuracy(trend.latest))}. ` +
-      (trend.delta === null
-        ? 'Fullfør en ny, sammenlignbar øving for å se endring.'
-        : trend.delta === 0
-          ? 'Uendret fra forrige sammenlignbare øving (0,0 prosentpoeng).'
-          : `${decimal(Math.abs(trend.delta))} prosentpoeng ${trend.delta > 0 ? 'høyere' : 'lavere'} enn forrige sammenlignbare øving. Hver øving gir ny trening.`);
-    const records = `Rekorder i lagret historikk for denne varianten: ${percent(trend.bestAccuracy)} på første forsøk · Beste rekke: ${trend.bestStreak}.`;
+
+    const latestAccuracy = accuracy(trend.latest);
+    let comparison;
+    let announcement;
+    if (trend.delta === null) {
+      comparison = 'Utgangspunkt. Fullfør en ny, sammenlignbar øving for å se endring.';
+      announcement = 'Utgangspunkt for denne øvingsvarianten.';
+      dialog.querySelector('#history-delta-value').textContent = '—';
+      dialog.querySelector('#history-delta-detail').textContent =
+        'Utgangspunkt · én øving til for trend';
+    } else if (trend.delta === 0) {
+      comparison = 'Uendret fra forrige sammenlignbare øving (0,0 prosentpoeng).';
+      announcement = 'Uendret fra forrige sammenlignbare øving.';
+      dialog.querySelector('#history-delta-value').textContent = '—';
+      dialog.querySelector('#history-delta-detail').textContent =
+        'Uendret fra forrige sammenlignbare øving';
+    } else {
+      const direction = trend.delta > 0 ? 'høyere' : 'lavere';
+      comparison = `${decimal(Math.abs(trend.delta))} prosentpoeng ${direction} enn forrige sammenlignbare øving. Hver øving gir ny trening.`;
+      announcement = `${decimal(Math.abs(trend.delta))} prosentpoeng ${direction} enn forrige sammenlignbare øving.`;
+      dialog.querySelector('#history-delta-value').textContent =
+        `${trend.delta > 0 ? '↑' : '↓'} ${decimal(Math.abs(trend.delta))} pp`;
+      dialog.querySelector('#history-delta-detail').textContent =
+        `${direction} enn forrige sammenlignbare øving`;
+    }
+    const records = `Beste førsteforsøk i lagret historikk for varianten: ${percent(trend.bestAccuracy)}. Beste rekke: ${trend.bestStreak} riktige svar på rad i én øving.`;
+    dialog.querySelector('#history-latest-value').textContent = percent(latestAccuracy);
+    dialog.querySelector('#history-latest-detail').textContent =
+      `${trend.latest.firstTryCount}/${trend.latest.practicedCount} riktige på første forsøk`;
+    dialog.querySelector('#history-best-value').textContent = percent(trend.bestAccuracy);
+    dialog.querySelector('#history-streak-value').textContent = String(trend.bestStreak);
     dialog.querySelector('#history-comparison').textContent = comparison;
     dialog.querySelector('#history-records').textContent = records;
-    status.textContent = `Sammenligning oppdatert. ${comparison} ${records}`;
+    if (announce) status.textContent = `Sammenligning oppdatert. ${announcement}`;
+
+    const count = trend.recent.length;
+    const context =
+      count === 1
+        ? 'Siste 1 sammenlignbar øving · eldst → nyest'
+        : `Siste ${count} sammenlignbare øvinger · eldst → nyest`;
+    dialog.querySelector('#history-chart-context').textContent = context;
+    dialog.querySelector('#history-chart-latest').textContent =
+      `Siste øving: ${percent(latestAccuracy)}`;
+    dialog.querySelector('#history-chart-description').textContent =
+      count === 1
+        ? 'Avstand viser øvingsrekkefølge, ikke tid. Skalaen går fra 0 til 100 %. Fullfør en øving til i denne varianten for å se en trend.'
+        : 'Avstand viser øvingsrekkefølge, ikke tid. Skalaen går fra 0 til 100 %.';
+
     const svg = dialog.querySelector('#history-chart');
     svg.replaceChildren();
     function shape(tag, attributes, text) {
@@ -63,28 +124,54 @@ export function createHistoryView({ dialog, getProfile, getHistory }) {
       svg.append(node);
       return node;
     }
+
+    const chart = { left: 42, right: 304, top: 20, bottom: 154 };
     for (const value of [0, 50, 100]) {
-      const y = 145 - value * 1.2;
-      shape('line', { x1: 48, x2: 535, y1: y, y2: y, class: 'chart-grid' });
-      shape('text', { x: 2, y: y + 4 }, `${value} %`);
+      const y = chart.bottom - (value / 100) * (chart.bottom - chart.top);
+      shape('line', {
+        x1: chart.left,
+        x2: chart.right,
+        y1: y,
+        y2: y,
+        class: 'chart-grid',
+      });
+      shape('text', { x: 2, y: y + 4, class: 'chart-axis-label' }, `${value} %`);
     }
     const points = trend.recent.map((result, index) => ({
-      x: trend.recent.length === 1 ? 290 : 65 + (index / (trend.recent.length - 1)) * 455,
-      y: 145 - accuracy(result) * 1.2,
+      x:
+        trend.recent.length === 1
+          ? (chart.left + chart.right) / 2
+          : chart.left + (index / (trend.recent.length - 1)) * (chart.right - chart.left),
+      y: chart.bottom - (accuracy(result) / 100) * (chart.bottom - chart.top),
       result,
     }));
     if (points.length > 1) {
+      const first = points[0];
+      const last = points.at(-1);
+      shape('path', {
+        d: `M ${first.x} ${chart.bottom} L ${points.map(({ x, y }) => `${x} ${y}`).join(' L ')} L ${last.x} ${chart.bottom} Z`,
+        class: 'chart-area',
+      });
       shape('polyline', {
         points: points.map(({ x, y }) => `${x},${y}`).join(' '),
         class: 'chart-line',
         fill: 'none',
       });
     }
-    points.forEach(({ x, y, result }, index) => {
-      shape('circle', { cx: x, cy: y, r: 4, class: 'chart-point' });
-      shape('text', { x, y: 168, 'text-anchor': 'middle' }, String(index + 1));
-      shape('title', {}, `${date(result)}: ${percent(accuracy(result))}`);
+    points.forEach(({ x, y }, index) => {
+      shape('circle', {
+        cx: x,
+        cy: y,
+        r: index === points.length - 1 ? 5 : 4,
+        class: index === points.length - 1 ? 'chart-point chart-point-latest' : 'chart-point',
+      });
+      shape(
+        'text',
+        { x, y: 180, 'text-anchor': 'middle', class: 'chart-attempt-label' },
+        String(index + 1),
+      );
     });
+
     const body = dialog.querySelector('#history-chart-table tbody');
     body.replaceChildren();
     trend.recent.forEach((result, index) => {
@@ -108,26 +195,29 @@ export function createHistoryView({ dialog, getProfile, getHistory }) {
     const history = newestFirst(getHistory());
     dialog.querySelector('#history-profile').textContent = `Profil: ${profile.name}`;
     dialog.querySelector('#history-empty').hidden = history.length > 0;
+    dialog.querySelector('#history-runs').hidden = history.length === 0;
     const byVariant = new Map();
     for (const result of history) {
       if (!byVariant.has(result.comparisonKey)) byVariant.set(result.comparisonKey, result);
     }
-    const variants = [...byVariant.values()];
-    if (!variants.some(({ comparisonKey }) => comparisonKey === selectedKey)) {
+    const variants = variantLabels([...byVariant.values()]);
+    if (!variants.some(({ result }) => result.comparisonKey === selectedKey)) {
       selectedKey = history[0]?.comparisonKey ?? null;
     }
     selector.replaceChildren();
-    variants.forEach((result, index) => {
-      const option = element(
-        'option',
-        `${result.setName} · ${modes(result)} · ${settings(result)} · Variant ${index + 1}`,
-      );
+    variants.forEach(({ result, label }) => {
+      const option = element('option', label);
       option.value = result.comparisonKey;
       option.selected = result.comparisonKey === selectedKey;
       selector.append(option);
     });
     dialog.querySelector('#history-variant-controls').hidden = history.length === 0;
+    const selected = history.find(({ comparisonKey }) => comparisonKey === selectedKey);
+    dialog.querySelector('#history-variant-metadata').textContent = selected
+      ? `${orders[selected.orderMode]} · Store og små bokstaver ${selected.caseSensitive ? 'skilles' : 'skilles ikke'} · Aksenter ${selected.accentSensitive ? 'skilles' : 'skilles ikke'}`
+      : '';
     renderTrend(history);
+
     const focusedItem = document.activeElement.closest?.('#history-list > li');
     const focusedKey = focusedItem?.dataset.historyKey;
     const focusedPosition = focusedItem ? [...list.children].indexOf(focusedItem) : -1;
@@ -144,9 +234,13 @@ export function createHistoryView({ dialog, getProfile, getHistory }) {
         element('h3', result.setName),
         element('p', date(result)),
         element('p', modes(result)),
+        element('p', `${result.firstTryCount}/${result.practicedCount} riktig på første forsøk`),
+      );
+      item.lastElementChild.className = 'history-run-accuracy';
+      item.append(
         element(
           'p',
-          `${result.points} poeng · ${result.firstTryCount}/${result.practicedCount} riktige på første forsøk (${percent(accuracy(result))}) · ${result.totalErrors} feilsvar · Beste rekke: ${result.bestStreak}`,
+          `${percent(accuracy(result))} · ${result.points} poeng · ${result.totalErrors} feilsvar · beste rekke ${result.bestStreak}`,
         ),
       );
       const details = element('details');
@@ -154,7 +248,7 @@ export function createHistoryView({ dialog, getProfile, getHistory }) {
         element('summary', 'Vis øvingsdetaljer'),
         element(
           'p',
-          `${result.practicedCount} øveoppføringer · ${result.extraPracticeCount} trengte mer øving.`,
+          `${result.practicedCount} øveoppføringer · ${result.totalErrors} feilsvar · ${result.extraPracticeCount} trengte mer øving.`,
         ),
         element('p', settings(result)),
       );
@@ -180,9 +274,16 @@ export function createHistoryView({ dialog, getProfile, getHistory }) {
     }
     more.hidden = history.length <= visibleCount;
   }
+
   selector.addEventListener('change', () => {
     selectedKey = selector.value;
-    renderTrend(getHistory());
+    renderTrend(getHistory(), true);
+    const selected = newestFirst(getHistory()).find(
+      ({ comparisonKey }) => comparisonKey === selectedKey,
+    );
+    dialog.querySelector('#history-variant-metadata').textContent = selected
+      ? `${orders[selected.orderMode]} · Store og små bokstaver ${selected.caseSensitive ? 'skilles' : 'skilles ikke'} · Aksenter ${selected.accentSensitive ? 'skilles' : 'skilles ikke'}`
+      : '';
   });
   more.addEventListener('click', () => {
     const firstNew = visibleCount;
@@ -195,6 +296,8 @@ export function createHistoryView({ dialog, getProfile, getHistory }) {
     open() {
       visibleCount = HISTORY_PAGE_SIZE;
       selectedKey = null;
+      dialog.querySelector('#history-help').open = false;
+      dialog.querySelector('#history-table-details').open = false;
       render();
       dialog.showModal();
       dialog.querySelector('h2').focus();

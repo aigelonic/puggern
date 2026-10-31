@@ -74,12 +74,17 @@ unlockables, and leaderboards are not part of this MVP.
 
 ## Øvingshistorikk
 
-Choose **Øvingshistorikk** in the profile area to revisit that profile's completed
-runs, newest first (20 at a time, with **Vis flere**). Expand **Vis øvingsdetaljer**
-for practiced entries, entries needing extra practice, and saved answer settings.
-Results retain the set name and settings captured at the start, even after a set
-is edited, renamed, archived, or deleted. History is read-only; viewing it never
-awards rewards or restarts practice.
+Choose **Øvingshistorikk** in the profile area to see a dashboard for the newest
+completed-run variant. Its cards summarize first-try accuracy, change from the
+previous comparable run, and the best accuracy and streak in retained history.
+Use **Om historikken** for collection, comparison, and privacy information, and
+**Vis tall og datoer** for the chart's equivalent table. The chart shows at most
+10 comparable runs, while the list below always includes all completed runs for
+the profile, newest first (20 at a time, with **Vis flere**). Expand **Vis
+øvingsdetaljer** for practiced entries, total errors, entries needing extra
+practice, and saved answer settings. Results retain the set name and settings
+captured at the start, even after a set is edited, renamed, archived, or deleted.
+History viewing is read-only; it never awards rewards or restarts practice.
 
 Collection is forward-only: old completed summaries and aggregate rewards are
 not converted into history. New runs receive a stable ID when started; unfinished
@@ -92,7 +97,8 @@ the practiced entry count, displayed as a whole percentage. Total errors sums al
 incorrect answers; entries needing extra practice counts entries with any errors.
 Correction-copy answers do not independently improve accuracy or award extra
 points. Points and best consecutive-correct streak come unchanged from the
-learning engine; higher points are not presented as better mastery.
+learning engine; higher points are not presented as better mastery. Best streak
+means consecutive correct answers within one exercise, not a daily streak.
 
 The variant selector compares only runs of the same set ID, ordered source
 hint/answer content, direction mode, order mode, and effective case/accent settings.

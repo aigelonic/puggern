@@ -25,7 +25,7 @@ import {
   saveProfileState,
 } from './profiles.mjs?v=12';
 import { completedResult, createRun, personalBestMessage } from './history.mjs?v=3';
-import { createHistoryView } from './history-view.mjs?v=2';
+import { createHistoryView } from './history-view.mjs?v=3';
 import {
   loadWordSets,
   saveWordSets,
