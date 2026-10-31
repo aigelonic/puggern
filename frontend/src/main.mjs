@@ -10,7 +10,7 @@ import {
   submitAnswer,
   wordsForExercise,
   wordsForDirection,
-} from './learning.mjs?v=9';
+} from './learning.mjs?v=10';
 import {
   addRewards,
   applyRunUpdates,
@@ -23,7 +23,7 @@ import {
   PROFILE_STATE_KEY,
   PROFILE_STATE_VERSION,
   saveProfileState,
-} from './profiles.mjs?v=11';
+} from './profiles.mjs?v=12';
 import { completedResult, createRun, personalBestMessage } from './history.mjs?v=3';
 import { createHistoryView } from './history-view.mjs?v=2';
 import {
@@ -31,7 +31,7 @@ import {
   saveWordSets,
   MAX_WORD_SET_NAME_LENGTH,
   MAX_WORD_SETS,
-} from './word-sets.mjs?v=10';
+} from './word-sets.mjs?v=11';
 import { recordCreationAttempt, MIN_CREATION_FORM_TIME_MS } from './creation-guard.mjs?v=3';
 import { APP_VERSION, isValidAppVersion } from './app-version.mjs';
 import { createAppUpdates } from './app-updates.mjs';
@@ -40,8 +40,9 @@ import {
   MAX_SHARE_URL_LENGTH,
   createShareUrl,
   parseShareUrl,
-} from './share-word-set.mjs?v=3';
+} from './share-word-set.mjs?v=4';
 import { answerFeedback, createPracticeEffects } from './practice-feedback.mjs?v=2';
+import { compareSpelling } from './spelling-feedback.mjs?v=1';
 
 const status = document.querySelector('#connection-status');
 const appError = document.querySelector('#app-error');
@@ -68,6 +69,10 @@ const correctionAnnouncement = document.querySelector('#correction-announcement'
 const languageContextAnnouncement = document.querySelector('#language-context-announcement');
 const correctionFeedback = document.querySelector('#correction-feedback');
 const correctAnswer = document.querySelector('#correct-answer');
+const correctionAttemptRow = document.querySelector('#correction-attempt');
+const submittedAnswer = document.querySelector('#submitted-answer');
+const correctionSummary = document.querySelector('#correction-summary');
+const correctionLegend = document.querySelector('#correction-legend');
 const correctionInstruction = document.querySelector('#correction-instruction');
 const progressLabel = document.querySelector('#progress-label');
 const prompt = document.querySelector('#prompt');
@@ -676,6 +681,19 @@ function wordSetProgress(setId) {
   return activeProfileProgress()[setId];
 }
 
+function renderSpellingSegments(target, segments) {
+  target.replaceChildren(
+    ...segments.map(({ text, changed }) => {
+      if (!changed) return document.createTextNode(text);
+      const marker = document.createElement('span');
+      marker.className = 'spelling-difference';
+      marker.dataset.difference = 'true';
+      marker.textContent = text;
+      return marker;
+    }),
+  );
+}
+
 function renderPractice(message = '', { announceCorrection = false, points = 0, icon = '✓' } = {}) {
   const word = currentWord(session, words);
   if (!word) {
@@ -702,10 +720,36 @@ function renderPractice(message = '', { announceCorrection = false, points = 0, 
   if (cardChanged && document.activeElement === answerInput) {
     languageContextAnnouncement.textContent = `${hintLanguage.textContent}. ${answerLanguageInstruction.textContent}`;
   }
-  answerLabel.textContent = isCorrection ? 'Skriv riktig svar' : 'Stavingen din';
+  answerLabel.textContent = isCorrection ? 'Skriv ordet én gang' : 'Stavingen din';
   correctionFeedback.hidden = !isCorrection;
-  correctAnswer.textContent = isCorrection ? word.answer : '';
-  correctionInstruction.textContent = isCorrection ? 'Skriv riktig svar for å gå videre.' : '';
+  correctAnswer.replaceChildren();
+  submittedAnswer.replaceChildren();
+  correctionAttemptRow.hidden = true;
+  correctionSummary.hidden = true;
+  correctionLegend.hidden = true;
+  correctionSummary.textContent = '';
+  let spellingFeedback = null;
+  const savedAttempt = session.correctionAttempt;
+  if (
+    isCorrection &&
+    savedAttempt?.wordId === word.id &&
+    typeof savedAttempt.response === 'string'
+  ) {
+    spellingFeedback = compareSpelling(savedAttempt.response, word.answer, session.settings ?? {});
+    renderSpellingSegments(correctAnswer, spellingFeedback.expectedSegments);
+    correctionAttemptRow.hidden = false;
+    correctionSummary.hidden = false;
+    correctionSummary.textContent = spellingFeedback.summary;
+    correctionLegend.hidden = !spellingFeedback.canCompare;
+    if (spellingFeedback.response) {
+      renderSpellingSegments(submittedAnswer, spellingFeedback.responseSegments);
+    } else {
+      submittedAnswer.textContent = 'Ingen bokstaver';
+    }
+  } else if (isCorrection) {
+    correctAnswer.textContent = word.answer.trim();
+  }
+  correctionInstruction.textContent = isCorrection ? 'Skriv ordet én gang for å gå videre.' : '';
   feedback.textContent = isCorrection ? '' : message;
   if (!isCorrection && message) {
     const marker = document.createElement('span');
@@ -730,9 +774,15 @@ function renderPractice(message = '', { announceCorrection = false, points = 0, 
   );
   answerInput.value = '';
   showView(practiceView);
+  const firstDifference = spellingFeedback?.summaries[0];
+  const correctionDetail =
+    spellingFeedback &&
+    (spellingFeedback.operations.length > 3 || (firstDifference?.length ?? 0) > 100)
+      ? 'Det er flere endringer i stavemåten.'
+      : (firstDifference ?? 'Sammenlign stavemåtene for å finne forskjellen.');
   correctionAnnouncement.textContent = isCorrection
     ? announceCorrection
-      ? `Riktig stavemåte er ${word.answer}. Skriv riktig svar for å gå videre.`
+      ? `Riktig stavemåte er ${word.answer}. ${correctionDetail}`
       : 'Rettelsen vises ved svarfeltet.'
     : '';
   answerInput.focus();
@@ -1600,7 +1650,8 @@ answerForm.addEventListener(
     const submissionRevision = viewRevision;
     try {
       const answeredWord = currentWord(session, words);
-      const outcome = submitAnswer(session, answerInput.value, words, session.settings);
+      const submittedResponse = answerInput.value;
+      const outcome = submitAnswer(session, submittedResponse, words, session.settings);
       const cue = answerFeedback(session, outcome, answeredWord);
       const earned = {
         points: (outcome.session.points ?? 0) - (session.points ?? 0),
@@ -1609,6 +1660,15 @@ answerForm.addEventListener(
       };
       const justCompleted = outcome.result === 'complete' && session.queue.length > 0;
       session = outcome.session;
+      if (outcome.result === 'incorrect' && answeredWord) {
+        session = {
+          ...session,
+          correctionAttempt: { wordId: answeredWord.id, response: submittedResponse },
+        };
+      } else if ('correctionAttempt' in session) {
+        session = { ...session };
+        delete session.correctionAttempt;
+      }
       const result = justCompleted ? completedResult(session) : null;
       if (result) completionRecordMessage = '';
       queueRunUpdate(earned, result);
@@ -1617,7 +1677,7 @@ answerForm.addEventListener(
 
       if (outcome.result === 'incorrect') {
         renderPractice('', {
-          announceCorrection: document.activeElement === answerInput,
+          announceCorrection: true,
         });
         effects.play(cue);
         return;

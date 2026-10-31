@@ -323,16 +323,17 @@
             </p>
             <p id="correction-label" class="correction-label">Riktig stavemåte</p>
             <p id="correct-answer" class="correct-answer"></p>
+            <p id="correction-attempt" class="correction-attempt" hidden>
+              <span class="correction-label">Du skrev:</span>
+              <span id="submitted-answer"></span>
+            </p>
+            <p id="correction-summary" class="correction-summary" hidden></p>
+            <p id="correction-legend" class="correction-legend" hidden>
+              Markerte deler viser forskjellen.
+            </p>
             <p id="correction-instruction" class="correction-instruction"></p>
           </div>
-          <input
-            id="answer"
-            name="answer"
-            type="text"
-            autocomplete="off"
-            autocapitalize="off"
-            required
-          />
+          <input id="answer" name="answer" type="text" autocomplete="off" autocapitalize="off" />
           <p id="feedback" class="feedback" role="status" aria-live="polite"></p>
           <button class="button primary" type="submit">
             Sjekk svaret <span aria-hidden="true">&#8594;</span>
