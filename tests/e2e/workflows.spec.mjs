@@ -577,6 +577,9 @@ test('keeps each profile progress separate and offers continue or restart', asyn
   await expect(set.getByRole('button', { name: 'Start på nytt' })).toHaveCount(0);
 
   await clickSetAction(set, 'Start på nytt');
+  await page.getByRole('dialog').getByRole('button', { name: 'Avbryt' }).click();
+  await expect(set.locator('.set-action-trigger')).toBeFocused();
+  await clickSetAction(set, 'Start på nytt');
   await page.getByRole('dialog').getByRole('button', { name: 'Start øving' }).click();
   await expect(page.getByLabel('Stavingen din')).toBeVisible();
   await expect(page.getByLabel('Skriv riktig svar')).toHaveCount(0);
@@ -807,6 +810,7 @@ test('word-set action disclosure supports keyboard and mobile without starting p
 
   const set = page.getByRole('listitem').filter({ hasText: 'Mobilsett' });
   const trigger = set.locator('.set-action-trigger');
+  const menu = set.locator('.set-action-menu-items');
   await expect(trigger).toHaveAccessibleName('Flere handlinger for Mobilsett');
   await trigger.focus();
   await page.keyboard.press('Enter');
@@ -817,11 +821,34 @@ test('word-set action disclosure supports keyboard and mobile without starting p
   await expect(trigger).toBeFocused();
   await expect(set.getByRole('button', { name: 'Rediger' })).toHaveCount(0);
 
+  await trigger.focus();
+  await page.keyboard.press('Enter');
+  await menu.locator('button').last().focus();
+  await page.keyboard.press('Tab');
+  await expect(page.locator('#new-set-button')).toBeFocused();
+  await expect(set.getByRole('button', { name: 'Rediger' })).toHaveCount(0);
+
   await trigger.click();
   await page.locator('#saved-sets-title').click();
   await expect(set.getByRole('button', { name: 'Rediger' })).toHaveCount(0);
+  await page.evaluate(() => {
+    Object.assign(document.querySelector('.word-set-item').style, {
+      position: 'fixed',
+      bottom: '8px',
+      left: '8px',
+      right: '8px',
+    });
+  });
   await trigger.click();
-  const menu = set.locator('.set-action-menu-items');
+  await expect(set.locator('.set-action-menu')).toHaveAttribute('data-placement', 'above');
+  const verticalBounds = await menu.boundingBox();
+  expect(verticalBounds).not.toBeNull();
+  expect(verticalBounds.y).toBeGreaterThanOrEqual(0);
+  expect(verticalBounds.y + verticalBounds.height).toBeLessThanOrEqual(640);
+  await page.keyboard.press('Escape');
+  await expect(trigger).toBeFocused();
+  await page.evaluate(() => document.querySelector('.word-set-item').removeAttribute('style'));
+  await trigger.click();
   const menuBounds = await menu.boundingBox();
   expect(menuBounds).not.toBeNull();
   expect(menuBounds.x).toBeGreaterThanOrEqual(0);

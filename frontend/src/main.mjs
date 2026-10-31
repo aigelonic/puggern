@@ -631,13 +631,13 @@ async function startSessionOperation(
   renderPractice();
 }
 
-function openExerciseSetup(set) {
+function openExerciseSetup(set, trigger = document.activeElement) {
   const savedConfig = wordSetProgress(set.id)?.session.exerciseConfig;
   const directionMode = savedConfig?.directionMode ?? directionModeForSet(set);
   document.querySelector('#exercise-direction').value = directionMode;
   document.querySelector('#exercise-order').value = savedConfig?.orderMode ?? 'shuffled';
   document.querySelector('#exercise-config-title').textContent = `Start øving: ${set.name}`;
-  exerciseConfigTrigger = document.activeElement;
+  exerciseConfigTrigger = trigger;
   pendingExerciseSet = set;
   pendingExerciseProfileId = profileState.activeProfileId;
   exerciseConfigDialog.showModal();
@@ -791,6 +791,25 @@ function focusWordSetActions(trigger) {
   target.focus();
 }
 
+function positionWordSetActionMenu(details) {
+  const trigger = details.querySelector('summary');
+  const menu = details.querySelector('.set-action-menu-items');
+  const bounds = trigger.getBoundingClientRect();
+  const spaceAbove = Math.max(0, bounds.top - 8);
+  const spaceBelow = Math.max(0, window.innerHeight - bounds.bottom - 8);
+  const menuHeight = Math.min(menu.scrollHeight, window.innerHeight * 0.7, 384);
+  const placeAbove = spaceBelow < menuHeight && spaceAbove > spaceBelow;
+  details.dataset.placement = placeAbove ? 'above' : 'below';
+  menu.style.setProperty(
+    '--available-height',
+    `${Math.max(44, Math.min(placeAbove ? spaceAbove : spaceBelow, window.innerHeight - 16))}px`,
+  );
+}
+
+function repositionOpenWordSetMenus() {
+  wordSetList.querySelectorAll('.set-action-menu[open]').forEach(positionWordSetActionMenu);
+}
+
 function makeSetActionButton(label, action, details, trigger, className) {
   const button = makeButton(
     label,
@@ -828,15 +847,24 @@ document.addEventListener('click', (event) => {
   });
 });
 
-wordSetList.addEventListener('keydown', (event) => {
+document.addEventListener('focusin', (event) => {
+  wordSetList.querySelectorAll('.set-action-menu[open]').forEach((details) => {
+    if (!details.contains(event.target)) details.open = false;
+  });
+});
+
+document.addEventListener('keydown', (event) => {
   if (event.key !== 'Escape') return;
-  const details = event.target.closest('.set-action-menu[open]');
+  const details = wordSetList.querySelector('.set-action-menu[open]');
   if (!details) return;
   event.preventDefault();
   event.stopPropagation();
   details.open = false;
   details.querySelector('summary').focus();
 });
+
+window.addEventListener('resize', repositionOpenWordSetMenus);
+window.addEventListener('scroll', repositionOpenWordSetMenus, true);
 
 function restoreDialogFocus(trigger) {
   const target =
@@ -1081,6 +1109,16 @@ function renderWordSets() {
     const menuItems = document.createElement('div');
     menuItems.className = 'set-action-menu-items';
     actionMenu.append(menuItems);
+    actionMenu.addEventListener('toggle', () => {
+      if (!actionMenu.open) {
+        delete actionMenu.dataset.placement;
+        menuItems.style.removeProperty('--available-height');
+        return;
+      }
+      requestAnimationFrame(() => {
+        if (actionMenu.open) positionWordSetActionMenu(actionMenu);
+      });
+    });
 
     if (!set.archived) {
       if (progress && progress.session.queue.length > 0) {
@@ -1094,7 +1132,7 @@ function renderWordSets() {
         menuItems.append(
           makeSetActionButton(
             'Start på nytt',
-            () => openExerciseSetup(set),
+            () => openExerciseSetup(set, actionTrigger),
             actionMenu,
             actionTrigger,
           ),
