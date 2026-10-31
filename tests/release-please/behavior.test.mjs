@@ -3,12 +3,40 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import releasePlease from 'release-please';
 import { check } from 'prettier';
+import { RepositoryFileCache } from '@google-automations/git-file-utils';
 
 const sourceConfig = JSON.parse(
   readFileSync(new URL('../../release-please-config.json', import.meta.url), 'utf8'),
 );
 const { Manifest, setLogger } = releasePlease;
 setLogger({ info() {}, warn() {}, debug() {}, error() {} });
+
+test('release file discovery remains compatible with the patched glob matcher', async () => {
+  const paths = ['frontend/src/main.mjs', 'frontend/service-worker.js', 'tests/engine.test.mjs'];
+  const cache = new RepositoryFileCache(
+    {
+      git: {
+        async getTree() {
+          return {
+            data: {
+              truncated: false,
+              tree: paths.map((path) => ({ path, type: 'blob', mode: '100644' })),
+            },
+          };
+        },
+      },
+    },
+    { owner: 'fixture', repo: 'application' },
+  );
+  assert.deepEqual(
+    await cache.findFilesByGlob('frontend/**/*.{js,mjs}', 'main'),
+    paths.slice(0, 2),
+  );
+  assert.deepEqual(await cache.findFilesByGlob('frontend/**/*.mjs', 'main', 'frontend'), [
+    'src/main.mjs',
+  ]);
+  assert.deepEqual(await cache.findFilesByGlob('**/*.json', 'main'), []);
+});
 
 function fixture({ version = '0.0.0', initial = false, messages = [] } = {}) {
   const config = structuredClone(sourceConfig);

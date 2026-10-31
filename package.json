@@ -9,6 +9,9 @@
     "lint": "eslint frontend tests playwright.config.mjs eslint.config.js",
     "format:check": "prettier --check ."
   },
+  "overrides": {
+    "minimatch": "^11.0.3"
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.55.0",
