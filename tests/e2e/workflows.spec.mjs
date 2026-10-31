@@ -11,6 +11,58 @@ async function saveAfterMinimumTime(page, name) {
   }
 }
 
+test('reloads saved word sets before creating after a storage read failure', async ({ page }) => {
+  await page.addInitScript(() => {
+    const timestamp = new Date().toISOString();
+    localStorage.setItem(
+      'puggern.word-sets',
+      JSON.stringify({
+        version: 1,
+        sets: [
+          {
+            id: 'existing-set',
+            name: 'Lagret sett',
+            words: [{ id: '0', prompt: 'hund', answer: 'dog' }],
+            direction: 'prompt-to-answer',
+            settings: { caseSensitive: false, accentSensitive: false },
+            archived: false,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+          },
+        ],
+      }),
+    );
+    window.allowWordSetRead = false;
+    const getItem = Storage.prototype.getItem;
+    Storage.prototype.getItem = function (key) {
+      if (key === 'puggern.word-sets' && !window.allowWordSetRead) {
+        throw new DOMException('Storage unavailable', 'SecurityError');
+      }
+      return getItem.call(this, key);
+    };
+  });
+  await page.goto('/');
+  await expect(page.locator('#app-error')).toContainText('Kunne ikke laste ordsettene');
+  await page.evaluate(() => {
+    window.allowWordSetRead = true;
+  });
+  await page.getByRole('button', { name: 'Nytt ordsett' }).click();
+  await page.getByLabel('Navn på ordsettet').fill('Nytt sett');
+  await page.getByLabel('Hint og svar').fill('katt\tcat');
+  await saveAfterMinimumTime(page, 'Lagre ordsett');
+  await expect(page.locator('#setup-error')).toContainText('lastet på nytt');
+  expect(
+    await page.evaluate(() => JSON.parse(localStorage.getItem('puggern.word-sets')).sets),
+  ).toHaveLength(1);
+
+  await saveAfterMinimumTime(page, 'Lagre ordsett');
+  await expect(page.getByRole('heading', { name: 'Nytt sett' })).toBeVisible();
+  const sets = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('puggern.word-sets')).sets,
+  );
+  expect(sets.map(({ name }) => name).sort()).toEqual(['Lagret sett', 'Nytt sett']);
+});
+
 test('shows prominent correction feedback and practices a missed word until it is learned', async ({
   page,
 }) => {

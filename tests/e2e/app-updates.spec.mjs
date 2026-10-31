@@ -1,4 +1,6 @@
 import { expect, test } from '@playwright/test';
+import { createSession, parseWordSet, PROGRESS_VERSION } from '../../frontend/src/learning.mjs';
+import { createProfileState } from '../../frontend/src/profiles.mjs';
 import { startAppShellFixture, startStandaloneApp } from './fixtures/app-shell.mjs';
 import { workerMessage } from './fixtures/service-worker.mjs';
 
@@ -177,6 +179,46 @@ test('update information remains available when profile storage cannot be read',
   await page.locator('#check-updates').click();
   await expect(page.locator('#update-banner')).toBeVisible();
   await expect(page.locator('#update-status')).toContainText('Ny versjon 2.0.0 er klar.');
+});
+
+test('profile writes preserve saved profiles, progress, and rewards after a read recovers', async ({
+  page,
+}) => {
+  const savedState = createProfileState('saved-profile');
+  savedState.profiles[0].name = 'Ada';
+  savedState.profiles[0].rewards = { points: 40, bestStreak: 3, completedSets: 2 };
+  const words = parseWordSet('hund\tdog');
+  savedState.progress['saved-profile']['saved-set'] = {
+    version: PROGRESS_VERSION,
+    words,
+    session: createSession(words),
+  };
+  await page.addInitScript((state) => {
+    localStorage.setItem('puggern.profile-state', JSON.stringify(state));
+    window.allowProfileRead = false;
+    const getItem = Storage.prototype.getItem;
+    Storage.prototype.getItem = function (key) {
+      if (key === 'puggern.profile-state' && !window.allowProfileRead) {
+        throw new DOMException('Storage unavailable', 'SecurityError');
+      }
+      return getItem.call(this, key);
+    };
+  }, savedState);
+  await openApp(page);
+  await expect(page.locator('#app-error')).toContainText('Kunne ikke laste profiler og øving');
+
+  await page.evaluate(() => {
+    window.allowProfileRead = true;
+  });
+  await page.getByRole('button', { name: 'Legg til profil' }).click();
+  await page.locator('#profile-name').fill('Nora');
+  await saveForm(page, '#profile-form', 'Lagre profil');
+
+  const storedState = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('puggern.profile-state')),
+  );
+  expect(storedState.profiles.slice(0, savedState.profiles.length)).toEqual(savedState.profiles);
+  expect(storedState.progress['saved-profile']).toEqual(savedState.progress['saved-profile']);
 });
 
 test('a real waiting update leaves A loaded, Later dismisses only the banner and the footer reopens it', async ({
