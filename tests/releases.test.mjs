@@ -76,18 +76,23 @@ test('one simple application owns the version, manifest, changelog and v tags', 
   assert.equal(JSON.parse(read('package-lock.json')).packages[''].version, undefined);
 });
 
-test('bootstrap and temporary override allow first release and later cleanup', () => {
+test('first-release override is restricted to the unreleased seed', () => {
   assert.equal(config['bootstrap-sha'], '1cf401a8b93b6be048e66179f7683d8ffff9efa6');
-  if (pkg['release-as'] !== undefined) {
-    assert.equal(pkg['release-as'], '0.1.0');
-    assert.ok(['0.0.0', '0.1.0'].includes(manifest['.']), 'remove the first-release override');
-  } else {
-    assert.notEqual(manifest['.'], '0.0.0', 'publish the first release before cleanup');
-  }
-  const cleaned = structuredClone(config);
-  delete cleaned.packages['.']['release-as'];
-  assert.equal(cleaned.packages['.']['release-as'], undefined);
-  assert.equal(cleaned['bootstrap-sha'], config['bootstrap-sha']);
+  const assertOverrideState = (version, releaseAs) => {
+    if (releaseAs === undefined) {
+      assert.notEqual(version, '0.0.0', 'publish the first release before cleanup');
+      return;
+    }
+    assert.equal(releaseAs, '0.1.0');
+    assert.equal(version, '0.0.0', 'remove the first-release override');
+  };
+  assertOverrideState(manifest['.'], pkg['release-as']);
+  assert.doesNotThrow(() => assertOverrideState('0.0.0', '0.1.0'));
+  assert.throws(
+    () => assertOverrideState('0.1.0', '0.1.0'),
+    /remove the first-release override/,
+    'a published 0.1.0 config must reject the obsolete override',
+  );
 });
 
 test('release instructions cover setup, current-head CI, cleanup and recovery', () => {
@@ -104,6 +109,9 @@ test('release instructions cover setup, current-head CI, cleanup and recovery', 
     'every subsequent bot update',
     'release-as',
     'Mandatory follow-up',
+    'existing pending release PR',
+    'Do not manually edit its title or body',
+    'autorelease: pending',
     'BREAKING CHANGE:',
     'feat!',
     'Never delete or move a published tag',

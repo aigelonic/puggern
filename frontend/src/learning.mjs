@@ -203,7 +203,11 @@ export function submitAnswer(session, response, words, settings) {
 }
 
 export function saveProgress(storage, session, words) {
-  storage.setItem(PROGRESS_KEY, JSON.stringify({ version: PROGRESS_VERSION, session, words }));
+  const progress = { version: PROGRESS_VERSION, session, words };
+  storage.setItem(
+    PROGRESS_KEY,
+    JSON.stringify(isValidProgress(progress) ? normalizeProgress(progress) : progress),
+  );
 }
 
 export function loadProgress(storage) {
@@ -226,15 +230,30 @@ export function normalizeProgress(progress) {
   const learnedIds = new Set(learned);
   const queue = [...new Set(session.queue.filter((id) => !learnedIds.has(id)))];
   const currentWasRemoved = session.queue.length > 0 && !queue.includes(session.queue[0]);
+  const correction = session.correction && !currentWasRemoved && queue.length > 0;
+  const attempt = session.correctionAttempt;
+  const validAttempt =
+    correction &&
+    attempt &&
+    typeof attempt === 'object' &&
+    !Array.isArray(attempt) &&
+    Object.keys(attempt).length === 2 &&
+    typeof attempt.wordId === 'string' &&
+    typeof attempt.response === 'string' &&
+    attempt.response.length <= MAX_WORD_LENGTH &&
+    attempt.wordId === queue[0];
+  const normalizedSession = { ...session, queue, learned, correction };
+  delete normalizedSession.correctionAttempt;
+  if (validAttempt) {
+    normalizedSession.correctionAttempt = {
+      wordId: attempt.wordId,
+      response: attempt.response,
+    };
+  }
 
   return {
     ...progress,
-    session: {
-      ...session,
-      queue,
-      learned,
-      correction: session.correction && !currentWasRemoved && queue.length > 0,
-    },
+    session: normalizedSession,
   };
 }
 

@@ -41,7 +41,6 @@ test('release file discovery remains compatible with the patched glob matcher', 
 function fixture({ version = '0.0.0', initial = false, messages = [] } = {}) {
   const config = structuredClone(sourceConfig);
   if (initial) config.packages['.']['release-as'] = '0.1.0';
-  else delete config.packages['.']['release-as'];
   const boundary = initial ? config['bootstrap-sha'] : 'b'.repeat(40);
   const files = new Map([
     ['release-please-config.json', JSON.stringify(config)],
@@ -206,6 +205,26 @@ test('first release generates consistent files, tag, release name and notes with
   state.addCommit('fix: repair a post-release regression');
   const [next] = await (await state.plan()).buildPullRequests();
   assert.equal(next.version.toString(), '0.1.1');
+});
+
+test('checked-in config plans 0.2.0 from the v0.1.0 feature release', async () => {
+  const state = fixture({
+    version: '0.1.0',
+    messages: ['feat(word-sets): simplify cards with actions menu'],
+  });
+  const config = JSON.parse(state.files.get('release-please-config.json'));
+  assert.equal(config.packages['.']['release-as'], undefined);
+
+  const [pull] = await (await state.plan()).createPullRequests();
+  assert.equal(pull.title, 'chore(main): release 0.2.0');
+  assert.match(pull.body, /v0\.1\.0\.\.\.v0\.2\.0/);
+  assert.deepEqual(JSON.parse(pull.generated.get('.release-please-manifest.json')), {
+    '.': '0.2.0',
+  });
+  assert.equal(pull.generated.get('version.txt'), '0.2.0\n');
+  assertVersionCopies(pull, '0.2.0');
+  assert.match(pull.generated.get('CHANGELOG.md'), /simplify cards with actions menu/);
+  assert.doesNotMatch(pull.generated.get('CHANGELOG.md'), /excluded/);
 });
 
 for (const [version, message, expected] of [

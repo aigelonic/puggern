@@ -143,7 +143,7 @@ test('keeps correction only while its original word is still pending', async ({ 
     correction: true,
   });
   await page.getByRole('button', { name: 'Fortsett øvingen' }).click();
-  await expect(page.getByLabel('Skriv riktig svar')).toBeFocused();
+  await expect(page.getByLabel('Skriv ordet én gang')).toBeFocused();
   await expect(page.locator('#correct-answer')).toHaveText('cat');
 });
 
@@ -200,7 +200,7 @@ test('a mistake followed by reload and continue never grows or repeats the queue
   await expect(page.locator('#progress-label')).toHaveText('1 av 3 lært · 2 oppgaver igjen');
   await page.reload();
   await page.getByRole('button', { name: 'Fortsett øvingen' }).click();
-  await expect(page.getByLabel('Skriv riktig svar')).toBeFocused();
+  await expect(page.getByLabel('Skriv ordet én gang')).toBeFocused();
   await expect(page.locator('#progress-label')).toHaveText('1 av 3 lært · 2 oppgaver igjen');
   await answer(page, 'cat');
   await expect(page.locator('#prompt')).toHaveText('fugl');

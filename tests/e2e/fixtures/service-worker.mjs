@@ -8,6 +8,26 @@ const workerSource = await readFile(
 const shellPaths = [
   './',
   './index.html',
+  './styles.css?v=14',
+  './manifest.webmanifest',
+  './icons/pug-192.png',
+  './icons/pug-512.png',
+  './src/main.mjs?v=18',
+  './src/history.mjs?v=3',
+  './src/history-view.mjs?v=2',
+  './src/practice-feedback.mjs?v=2',
+  './src/learning.mjs?v=10',
+  './src/spelling-feedback.mjs?v=1',
+  './src/profiles.mjs?v=12',
+  './src/word-sets.mjs?v=11',
+  './src/creation-guard.mjs?v=3',
+  './src/app-version.mjs',
+  './src/app-updates.mjs',
+  './src/share-word-set.mjs?v=4',
+];
+const legacyShellPaths = [
+  './',
+  './index.html',
   './styles.css?v=11',
   './manifest.webmanifest',
   './icons/pug-192.png',
@@ -52,7 +72,7 @@ export async function startWorkerFixture() {
         response.end(`
           const name = 'puggern-app-shell-v8';
           self.addEventListener('install', event => event.waitUntil(
-            caches.open(name).then(cache => cache.addAll(${JSON.stringify(shellPaths)}))
+            caches.open(name).then(cache => cache.addAll(${JSON.stringify(legacyShellPaths)}))
               .then(() => self.skipWaiting())));
           self.addEventListener('activate', event => event.waitUntil(self.clients.claim()));
           self.addEventListener('fetch', event => event.respondWith(
@@ -83,9 +103,9 @@ export async function startWorkerFixture() {
     if (path === '/app/' || path === '/app/index.html' || path === '/outside/') {
       response.setHeader('content-type', 'text/html');
       response.end(`<!doctype html><html lang="en"><head><meta charset="utf-8">
-        <title>Shell ${state.shell}</title><link rel="stylesheet" href="./styles.css?v=11">
+        <title>Shell ${state.shell}</title><link rel="stylesheet" href="./styles.css?v=14">
         </head><body><h1 id="identity">${state.version}:${state.shell}</h1>
-        <script type="module" src="./src/main.mjs?v=14"></script></body></html>`);
+        <script type="module" src="./src/main.mjs?v=18"></script></body></html>`);
       return;
     }
     if (path === '/app/styles.css') {

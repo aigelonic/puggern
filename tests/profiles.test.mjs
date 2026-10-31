@@ -42,6 +42,27 @@ test('saves independent per-word-set progress for multiple profiles', () => {
   assert.equal(JSON.parse(storage.values.get(PROFILE_STATE_KEY)).version, PROFILE_STATE_VERSION);
 });
 
+test('sanitizes optional correction attempts on profile-state writes', () => {
+  const storage = makeStorage();
+  const state = createProfileState('profile-1');
+  const words = parseWordSet('A;one');
+  const session = createSession(words);
+  session.correction = true;
+  session.correctionAttempt = { wordId: 'other', response: 'wrong' };
+  state.progress['profile-1']['set-1'] = {
+    version: PROGRESS_VERSION,
+    session,
+    words,
+  };
+
+  saveProfileState(storage, state);
+
+  const saved = JSON.parse(storage.values.get(PROFILE_STATE_KEY)).progress['profile-1']['set-1'];
+  assert.equal(saved.session.correction, true);
+  assert.equal('correctionAttempt' in saved.session, false);
+  assert.ok(loadProfileState(storage));
+});
+
 test('persists language snapshots and continues accepting legacy cards without metadata', () => {
   const storage = makeStorage();
   const state = createProfileState('profile-1');
