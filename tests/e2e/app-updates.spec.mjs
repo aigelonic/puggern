@@ -159,6 +159,26 @@ test('first install shows the loaded release or seed, without a banner, navigati
   }
 });
 
+test('update information remains available when profile storage cannot be read', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const getItem = Storage.prototype.getItem;
+    Storage.prototype.getItem = function (key) {
+      if (key === 'puggern.profile-state') {
+        throw new DOMException('Storage unavailable', 'SecurityError');
+      }
+      return getItem.call(this, key);
+    };
+  });
+  await openApp(page);
+  await expect(page.locator('#app-error')).toContainText('Kunne ikke laste profiler og øving');
+  fixture.deploy({ version: '2.0.0', shell: 'B' });
+  await page.locator('#check-updates').click();
+  await expect(page.locator('#update-banner')).toBeVisible();
+  await expect(page.locator('#update-status')).toContainText('Ny versjon 2.0.0 er klar.');
+});
+
 test('a real waiting update leaves A loaded, Later dismisses only the banner and the footer reopens it', async ({
   page,
 }) => {

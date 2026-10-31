@@ -106,7 +106,12 @@ const effects = createPracticeEffects({
   soundToggle: document.querySelector('#sound-toggle'),
 });
 let viewRevision = 0;
-let wordSets = loadWordSets(window.localStorage);
+let wordSets = [];
+try {
+  wordSets = loadWordSets(window.localStorage);
+} catch (error) {
+  setAppError(`Kunne ikke laste ordsettene: ${error.message}`);
+}
 let profileState = readProfileState();
 let showArchived = false;
 let editorSetId = null;
@@ -271,12 +276,17 @@ for (const eventType of ['click', 'submit', 'input', 'change', 'keydown']) {
 }
 
 function readProfileState() {
-  return loadProfileState(window.localStorage, () => {
-    const warning = document.querySelector('#history-warning');
-    warning.textContent =
-      'Noe ugyldig øvingshistorikk eller øvingsidentitet ble ignorert. Andre profiler, belønninger og fremgang er beholdt.';
-    warning.hidden = false;
-  });
+  try {
+    return loadProfileState(window.localStorage, () => {
+      const warning = document.querySelector('#history-warning');
+      warning.textContent =
+        'Noe ugyldig øvingshistorikk eller øvingsidentitet ble ignorert. Andre profiler, belønninger og fremgang er beholdt.';
+      warning.hidden = false;
+    });
+  } catch (error) {
+    setAppError(`Kunne ikke laste profiler og øving: ${error.message}`);
+    return null;
+  }
 }
 
 function assertSupportedProfileState() {
