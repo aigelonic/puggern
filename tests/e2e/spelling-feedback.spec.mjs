@@ -187,8 +187,10 @@ test('allows an empty submission and renders HTML-like answers literally', async
   await page.getByRole('button', { name: 'Sjekk svaret' }).click();
   await expect(page.locator('#correct-answer')).toHaveText(htmlAnswer);
   await expect(page.locator('#submitted-answer')).toHaveText('Ingen bokstaver');
-  await expect(page.locator('#correction-announcement')).toContainText(htmlAnswer);
-  await expect(page.locator('#correction-announcement')).toContainText('Legg til');
+  await expect(page.locator('#correction-announcement')).toHaveText(
+    'Rettelsen vises ved svarfeltet.',
+  );
+  await expect(page.locator('#answer')).toHaveAccessibleDescription(/Riktig stavemåte.*Legg til/);
   await expect(page.locator('#correction-feedback img')).toHaveCount(0);
   await expect(page.locator('#correction-summary')).toContainText('Legg til');
 

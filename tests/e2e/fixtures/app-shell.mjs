@@ -122,7 +122,7 @@ export async function startAppShellFixture() {
   };
 }
 
-export async function startStandaloneApp() {
+export async function startStandaloneApp(origin) {
   const display = spawn(
     'Xvfb',
     ['-displayfd', '1', '-screen', '0', '1280x1024x24', '-nolisten', 'tcp'],
@@ -156,11 +156,33 @@ export async function startStandaloneApp() {
     context = await chromium.launchPersistentContext('', {
       headless: false,
       viewport: { width: 320, height: 568 },
-      args: ['--app=about:blank'],
+      args: [],
       env: { ...process.env, DISPLAY: `:${number}` },
     });
+    const installPage = await context.newPage();
+    const appUrl = new URL('./', `${origin}/app/`).href;
+    await installPage.goto(appUrl);
+    const cdp = await context.newCDPSession(installPage);
+    await cdp.send('PWA.install', { manifestId: appUrl });
+    await cdp.send('PWA.openCurrentPageInApp', { manifestId: appUrl });
+    let appPage;
+    const deadline = Date.now() + 5000;
+    while (!appPage && Date.now() < deadline) {
+      for (const page of context.pages()) {
+        if (
+          page.url().startsWith(appUrl) &&
+          (await page.evaluate(() => matchMedia('(display-mode: standalone)').matches))
+        ) {
+          appPage = page;
+          break;
+        }
+      }
+      if (!appPage) await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    if (!appPage) throw new Error('Chrome did not open the installed PWA in standalone mode.');
     return {
       context,
+      page: appPage,
       async close() {
         try {
           await context.close();
