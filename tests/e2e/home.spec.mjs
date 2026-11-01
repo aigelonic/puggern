@@ -217,6 +217,15 @@ test('sharing and copying require the privacy warning before using browser APIs'
   const dialog = page.locator('#share-link-dialog');
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText(/Ikke del sensitive opplysninger/);
+  await expect(page.locator('#share-link-share-button')).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(page.locator('#share-link-input')).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(page.locator('#close-share-link-button')).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.locator('#share-link-input')).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.locator('#share-link-share-button')).toBeFocused();
   expect(await page.evaluate(() => [window.shareCalls.length, window.copyCalls.length])).toEqual([
     0, 0,
   ]);

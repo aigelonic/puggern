@@ -8,7 +8,7 @@ const workerSource = await readFile(
 const shellPaths = [
   './',
   './index.html',
-  './styles.css?v=15',
+  './styles.css?v=16',
   './manifest.webmanifest',
   './icons/pug-192.png',
   './icons/pug-512.png',
@@ -103,7 +103,7 @@ export async function startWorkerFixture() {
     if (path === '/app/' || path === '/app/index.html' || path === '/outside/') {
       response.setHeader('content-type', 'text/html');
       response.end(`<!doctype html><html lang="en"><head><meta charset="utf-8">
-        <title>Shell ${state.shell}</title><link rel="stylesheet" href="./styles.css?v=15">
+        <title>Shell ${state.shell}</title><link rel="stylesheet" href="./styles.css?v=16">
         </head><body><h1 id="identity">${state.version}:${state.shell}</h1>
         <script type="module" src="./src/main.mjs?v=20"></script></body></html>`);
       return;

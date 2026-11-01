@@ -281,6 +281,7 @@ test('falls back to clipboard, then a selectable manual link when APIs fail', as
   await expect(page.locator('#share-link-dialog')).toBeVisible();
   await page.locator('#share-link-share-button').click();
   await expect(page.locator('#share-dialog-status')).toContainText('mislyktes');
+  await expect(page.locator('#share-link-share-button')).toBeFocused();
   await page.locator('#share-link-copy-button').click();
   await expect.poll(() => page.evaluate(() => window.copiedLink)).toBeTruthy();
   expect(parseShareUrl(await page.evaluate(() => window.copiedLink))).toMatchObject(content);

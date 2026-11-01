@@ -1078,6 +1078,7 @@ async function useShareLink(method) {
   } finally {
     shareNativeButton.disabled = false;
     shareCopyButton.disabled = false;
+    if (shareLinkDialog.open && method === 'share') shareNativeButton.focus();
   }
 }
 
@@ -1963,6 +1964,22 @@ document.querySelector('#close-share-link-button').addEventListener('click', () 
 });
 shareNativeButton.addEventListener('click', () => useShareLink('share'));
 shareCopyButton.addEventListener('click', () => useShareLink('copy'));
+shareLinkDialog.addEventListener('keydown', (event) => {
+  if (event.key !== 'Tab') return;
+  const focusable = [
+    ...shareLinkDialog.querySelectorAll('button:not([disabled]), textarea:not([disabled])'),
+  ].filter((element) => element.getClientRects().length > 0);
+  const first = focusable[0];
+  const last = focusable.at(-1);
+  if (!first || !last) return;
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+});
 shareLinkDialog.addEventListener('close', () => {
   shareLinkInput.value = '';
   shareDialogStatus.textContent = '';

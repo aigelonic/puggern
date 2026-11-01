@@ -268,6 +268,11 @@ textarea {
   margin: 0;
 }
 
+#share-dialog-status:empty {
+  min-height: 0;
+  margin: 0;
+}
+
 .setup-view button,
 .profile-controls button,
 .setup-view summary {

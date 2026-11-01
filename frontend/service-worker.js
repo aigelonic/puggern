@@ -1,12 +1,12 @@
 const APP_VERSION = '0.2.0'; // x-release-please-version
-const SHELL_REVISION = '21';
+const SHELL_REVISION = '22';
 const CACHE_NAME = `puggern-app-shell-${APP_VERSION}-${SHELL_REVISION}`;
 const SCOPE = new URL(self.registration.scope);
 let requestedActivation = false;
 const APP_SHELL = [
   './',
   './index.html',
-  './styles.css?v=15',
+  './styles.css?v=16',
   './manifest.webmanifest',
   './icons/pug-192.png',
   './icons/pug-512.png',
