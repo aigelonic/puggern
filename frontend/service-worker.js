@@ -1,5 +1,5 @@
 const APP_VERSION = '0.2.0'; // x-release-please-version
-const SHELL_REVISION = '22';
+const SHELL_REVISION = '23';
 const CACHE_NAME = `puggern-app-shell-${APP_VERSION}-${SHELL_REVISION}`;
 const SCOPE = new URL(self.registration.scope);
 let requestedActivation = false;
@@ -12,7 +12,7 @@ const APP_SHELL = [
   './icons/pug-512.png',
   './src/main.mjs?v=20',
   './src/history.mjs?v=3',
-  './src/history-view.mjs?v=2',
+  './src/history-view.mjs?v=3',
   './src/practice-feedback.mjs?v=3',
   './src/learning.mjs?v=10',
   './src/spelling-feedback.mjs?v=1',

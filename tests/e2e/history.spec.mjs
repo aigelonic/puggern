@@ -74,6 +74,50 @@ async function state(page) {
   return page.evaluate((key) => JSON.parse(localStorage.getItem(key)), stateKey);
 }
 
+async function seedDashboardHistory(page, records) {
+  const saved = await state(page);
+  const setId = 'synthetic-set';
+  const common = {
+    setId,
+    setName: 'Farger og former',
+    directionMode: 'forward',
+    orderMode: 'original',
+    caseSensitive: false,
+    accentSensitive: false,
+    points: 40,
+    practicedCount: 10,
+    totalErrors: 4,
+    extraPracticeCount: 2,
+  };
+  saved.history = {
+    p1: records.map((record, index) => ({
+      ...common,
+      id: `synthetic-run-${index + 1}`,
+      setName: record.variant ? 'Tall og bokstaver' : common.setName,
+      practicedCount: record.practicedCount ?? common.practicedCount,
+      comparisonKey: record.variant ?? 'a'.repeat(64),
+      completedAt: `2026-10-${String(index + 1).padStart(2, '0')}T12:00:00.000Z`,
+      firstTryCount: record.firstTryCount,
+      bestStreak: record.bestStreak,
+    })),
+  };
+  await page.evaluate(({ key, value }) => localStorage.setItem(key, JSON.stringify(value)), {
+    key: stateKey,
+    value: saved,
+  });
+  await page.reload();
+}
+
+async function seedDashboardScreenshotFixture(page) {
+  await seedDashboardHistory(page, [
+    { firstTryCount: 10, bestStreak: 20, variant: 'b'.repeat(64) },
+    { firstTryCount: 4, bestStreak: 5 },
+    { firstTryCount: 6, bestStreak: 7 },
+    { firstTryCount: 7, bestStreak: 8 },
+    { firstTryCount: 8, bestStreak: 9 },
+  ]);
+}
+
 async function openHistory(page) {
   if (await page.locator('#complete-view').isVisible()) {
     await page.getByRole('button', { name: 'Til ordsettene', exact: true }).click();
@@ -115,8 +159,11 @@ test('empty history, completion metrics, restart trend, details, focus and reloa
   await expect(page.locator('#history-list > li')).toHaveCount(1);
   await expect(page.locator('#history-comparison')).toContainText('Fullfør en ny');
   await expect(page.locator('#history-chart circle')).toHaveCount(1);
+  await expect(page.locator('#history-table-details')).not.toHaveAttribute('open', '');
+  await page.getByText('Vis tall og datoer', { exact: true }).click();
   await expect(page.locator('#history-chart-table tbody tr')).toHaveCount(1);
   await expect(page.locator('#history-chart-table tbody')).toContainText('50 %');
+  await page.getByText('Vis tall og datoer', { exact: true }).click();
   await page.locator('#history-list summary').focus();
   await page.keyboard.press('Enter');
   await expect(page.locator('#history-list details')).toHaveAttribute('open', '');
@@ -472,13 +519,12 @@ test('history paginates, isolates variants/profiles, preserves deleted set snaps
   await expect(page.locator('#history-list > li').nth(20).locator('summary')).toBeFocused();
   await expect(page.locator('#history-more')).toBeHidden();
   await expect(page.locator('#history-status')).toHaveAttribute('aria-live', 'polite');
-  await expect(page.locator('#history-status')).toContainText(
-    'Uendret fra forrige sammenlignbare øving',
-  );
   await page.locator('#history-variant').selectOption('b'.repeat(64));
   await expect(page.locator('#history-chart circle')).toHaveCount(1);
   await expect(page.locator('#history-comparison')).toContainText('Fullfør en ny');
-  await expect(page.locator('#history-status')).toContainText('Fullfør en ny, sammenlignbar øving');
+  await expect(page.locator('#history-status')).toContainText(
+    'Utgangspunkt for denne øvingsvarianten',
+  );
   await page.keyboard.press('Escape');
   await openProfilePanel(page);
   await page.getByLabel('Hvem øver?', { exact: true }).selectOption('p2');
@@ -568,7 +614,7 @@ test('cached history works offline on mobile with reduced motion and equivalent 
   await openHistory(page);
   await expect(page.locator('#history-list > li')).toHaveCount(1);
   await expect(page.locator('#history-chart-table tbody')).toContainText('100 %');
-  expect(await page.locator('#history-chart circle').getAttribute('cy')).toBe('25');
+  expect(await page.locator('#history-chart circle').getAttribute('cy')).toBe('20');
   expect(
     await page
       .locator('#history-dialog')
@@ -581,4 +627,223 @@ test('cached history works offline on mobile with reduced motion and equivalent 
   ).toBe(0);
   await page.keyboard.press('Escape');
   await expect(page.locator('#history-button')).toBeFocused();
+});
+
+test('dashboard cards, help, table, variant announcement, and responsive layout', async ({
+  page,
+}) => {
+  await seed(page);
+  await seedDashboardHistory(page, [
+    { firstTryCount: 7, bestStreak: 7, variant: 'c'.repeat(64) },
+    { firstTryCount: 7, bestStreak: 8, variant: 'c'.repeat(64) },
+    { firstTryCount: 10, bestStreak: 40, variant: 'b'.repeat(64) },
+    { firstTryCount: 6, bestStreak: 7 },
+    { firstTryCount: 8, bestStreak: 9 },
+  ]);
+  await openHistory(page);
+
+  await expect(page.locator('#history-help')).not.toHaveAttribute('open', '');
+  await expect(page.locator('#history-table-details')).not.toHaveAttribute('open', '');
+  await expect(page.locator('#history-latest-value')).toHaveText('80 %');
+  await expect(page.locator('#history-latest-detail')).toHaveText('8/10 riktige på første forsøk');
+  await expect(page.locator('#history-delta-value')).toHaveText('↑ 20,0 pp');
+  await expect(page.locator('#history-delta-detail')).toContainText('høyere');
+  await expect(page.locator('#history-best-value')).toHaveText('80 %');
+  await expect(page.locator('#history-streak-value')).toHaveText('9');
+  await expect(page.locator('#history-chart circle')).toHaveCount(2);
+  await expect(page.locator('#history-chart polyline')).toHaveCount(1);
+  await expect(page.locator('#history-chart-context')).toContainText(
+    'Siste 2 sammenlignbare øvinger',
+  );
+
+  const before = await state(page);
+  await page.locator('#history-help summary').click();
+  await expect(page.locator('#history-help')).toHaveAttribute('open', '');
+  await expect(page.locator('#history-help')).toContainText('De siste 500 resultatene');
+  await expect(page.locator('#history-help')).toContainText('ikke en daglig rekke');
+  await page.locator('#history-table-details summary').click();
+  await expect(page.locator('#history-chart-table tbody tr')).toHaveCount(2);
+  await expect(page.locator('#history-chart-table tbody')).toContainText('80 %');
+  await expect(page.locator('#history-status')).toBeEmpty();
+  expect(await state(page)).toEqual(before);
+
+  await page.locator('#history-variant').selectOption('b'.repeat(64));
+  await expect(page.locator('#history-latest-value')).toHaveText('100 %');
+  await expect(page.locator('#history-delta-value')).toHaveText('—');
+  await expect(page.locator('#history-status')).toContainText('Utgangspunkt');
+  await page.locator('#history-variant').selectOption('c'.repeat(64));
+  await expect(page.locator('#history-delta-value')).toHaveText('—');
+  await expect(page.locator('#history-status')).toContainText('Uendret fra forrige');
+  await page.locator('#history-variant').selectOption('a'.repeat(64));
+  await expect(page.locator('#history-delta-value')).toHaveText('↑ 20,0 pp');
+  await expect(page.locator('#history-status')).toContainText('20,0 prosentpoeng høyere');
+  await expect(page.locator('#history-chart circle')).toHaveCount(2);
+  await expect(page.locator('#history-chart polyline')).toHaveCount(1);
+  await expect(page.locator('#history-variant-metadata')).toContainText('Opprinnelig rekkefølge');
+  expect(await state(page)).toEqual(before);
+
+  await page.getByRole('button', { name: 'Tilbake til profilen' }).click();
+  await openHistory(page);
+  await expect(page.locator('#history-help')).not.toHaveAttribute('open', '');
+  await expect(page.locator('#history-table-details')).not.toHaveAttribute('open', '');
+  await expect(page.locator('#history-latest-value')).toHaveText('80 %');
+  await expect(page.locator('#history-status')).toBeEmpty();
+
+  for (const width of [390, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    await expect(page.locator('#history-metrics .history-metric:visible')).toHaveCount(4);
+    expect(
+      await page
+        .locator('#history-dialog')
+        .evaluate((dialog) => dialog.scrollWidth <= dialog.clientWidth),
+    ).toBe(true);
+    await page.locator('#history-table-details summary').click();
+    expect(
+      await page
+        .locator('#history-dialog')
+        .evaluate((dialog) => dialog.scrollWidth <= dialog.clientWidth),
+    ).toBe(true);
+    await page.locator('#history-table-details summary').click();
+  }
+
+  await page.evaluate(() => {
+    const saved = JSON.parse(localStorage.getItem('puggern.profile-state'));
+    saved.profiles[0].name = 'Profilnavn med maksimalt antall tegn';
+    saved.history.p1.forEach((result) => {
+      result.setName = 'Ordsett med et langt navn '.repeat(3).slice(0, 80);
+    });
+    localStorage.setItem('puggern.profile-state', JSON.stringify(saved));
+  });
+  await page.reload();
+  await page.setViewportSize({ width: 640, height: 450 });
+  await openHistory(page);
+  await expect(page.locator('#history-profile')).toContainText(
+    'Profilnavn med maksimalt antall tegn',
+  );
+  expect(
+    await page
+      .locator('#history-dialog')
+      .evaluate((dialog) => dialog.scrollWidth <= dialog.clientWidth),
+  ).toBe(true);
+});
+
+test('variant numbers stay with comparison keys when a newer run changes recency', async ({
+  page,
+}) => {
+  await seed(page);
+  await start(page);
+  await finish(page);
+  const firstVariant = await page.evaluate(() => {
+    const saved = JSON.parse(localStorage.getItem('puggern.profile-state'));
+    const original = saved.history.p1[0];
+    original.completedAt = '2000-01-01T12:00:00.000Z';
+    saved.history.p1.push({
+      ...original,
+      id: 'synthetic-variant',
+      comparisonKey: 'b'.repeat(64),
+      completedAt: '2000-01-02T12:00:00.000Z',
+    });
+    localStorage.setItem('puggern.profile-state', JSON.stringify(saved));
+    return original.comparisonKey;
+  });
+  await page.reload();
+  await openHistory(page);
+
+  const labels = () =>
+    page
+      .locator('#history-variant option')
+      .evaluateAll((options) =>
+        Object.fromEntries(options.map(({ value, textContent }) => [value, textContent])),
+      );
+  const initialLabels = await labels();
+  expect(initialLabels['b'.repeat(64)]).toContain('variant 1');
+  expect(initialLabels[firstVariant]).toContain('variant 2');
+
+  await page.getByRole('button', { name: 'Tilbake til profilen' }).click();
+  await start(page);
+  await finish(page);
+  await openHistory(page);
+  const updatedLabels = await labels();
+  expect(updatedLabels['b'.repeat(64)]).toContain('variant 1');
+  expect(updatedLabels[firstVariant]).toContain('variant 2');
+});
+
+test('variant selection announcements identify variants with equal comparisons', async ({
+  page,
+}) => {
+  await seed(page);
+  await seedDashboardHistory(page, [
+    { firstTryCount: 6, bestStreak: 6, variant: 'a'.repeat(64) },
+    { firstTryCount: 7, bestStreak: 7, variant: 'a'.repeat(64) },
+    { firstTryCount: 7, bestStreak: 7, variant: 'b'.repeat(64) },
+    { firstTryCount: 8, bestStreak: 8, variant: 'b'.repeat(64) },
+  ]);
+  await openHistory(page);
+
+  await page.locator('#history-variant').selectOption('a'.repeat(64));
+  const firstAnnouncement = await page.locator('#history-status').textContent();
+  await page.locator('#history-variant').selectOption('b'.repeat(64));
+  const secondAnnouncement = await page.locator('#history-status').textContent();
+
+  expect(firstAnnouncement).toContain('variant 2');
+  expect(firstAnnouncement).toContain('10,0 prosentpoeng høyere');
+  expect(secondAnnouncement).toContain('variant 1');
+  expect(secondAnnouncement).toContain('10,0 prosentpoeng høyere');
+  expect(secondAnnouncement).not.toBe(firstAnnouncement);
+});
+
+test('fractional variant changes subtract unrounded first-try accuracy', async ({ page }) => {
+  await seed(page);
+  await seedDashboardHistory(page, [
+    {
+      firstTryCount: 1,
+      practicedCount: 3,
+      bestStreak: 1,
+      variant: 'b'.repeat(64),
+    },
+    {
+      firstTryCount: 2,
+      practicedCount: 7,
+      bestStreak: 2,
+      variant: 'b'.repeat(64),
+    },
+    { firstTryCount: 8, bestStreak: 8 },
+  ]);
+  await openHistory(page);
+  await expect(page.locator('#history-variant option')).toHaveCount(2);
+  await page.locator('#history-variant').selectOption('b'.repeat(64));
+  await expect(page.locator('#history-latest-value')).toHaveText('29 %');
+  await expect(page.locator('#history-delta-value')).toHaveText('↓ 4,8 pp');
+  await expect(page.locator('#history-delta-detail')).toContainText('lavere');
+  await expect(page.locator('#history-status')).toContainText('4,8 prosentpoeng lavere');
+});
+
+test('four-run screenshot fixture keeps the dashboard above the fold at desktop width', async ({
+  page,
+}) => {
+  await seed(page);
+  await seedDashboardScreenshotFixture(page);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await openHistory(page);
+  await expect(page.locator('#history-chart circle')).toHaveCount(4);
+  await expect(page.locator('#history-latest-value')).toHaveText('80 %');
+  await expect(page.locator('#history-delta-value')).toHaveText('↑ 10,0 pp');
+  const positions = await page.evaluate(() => {
+    const dialog = document.querySelector('#history-dialog');
+    const chart = document.querySelector('#history-chart').getBoundingClientRect();
+    const box = dialog.getBoundingClientRect();
+    return {
+      chartFitsDialog: chart.bottom <= box.bottom,
+      dialogFitsViewport: dialog.scrollHeight <= dialog.clientHeight,
+      chartVisible: chart.top >= box.top && chart.bottom <= box.bottom,
+    };
+  });
+  expect(positions.chartVisible, JSON.stringify(positions)).toBe(true);
+  expect(positions.chartFitsDialog).toBe(true);
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page
+      .locator('#history-dialog')
+      .evaluate((dialog) => dialog.scrollWidth <= dialog.clientWidth),
+  ).toBe(true);
 });
