@@ -106,8 +106,15 @@ const effects = createPracticeEffects({
   soundToggle: document.querySelector('#sound-toggle'),
 });
 let viewRevision = 0;
-let wordSets = loadWordSets(window.localStorage);
-let profileState = readProfileState();
+let wordSets = [];
+let wordSetsLoadFailed = false;
+try {
+  wordSets = readWordSets();
+} catch (error) {
+  wordSetsLoadFailed = true;
+  setAppError(`Kunne ikke laste ordsettene: ${error.message}`, 'word-sets');
+}
+let profileState = null;
 let showArchived = false;
 let editorSetId = null;
 let editorRows = [];
@@ -278,6 +285,25 @@ function readProfileState() {
       'Noe ugyldig øvingshistorikk eller øvingsidentitet ble ignorert. Andre profiler, belønninger og fremgang er beholdt.';
     warning.hidden = false;
   });
+}
+
+function readWordSets() {
+  const savedWordSets = loadWordSets(window.localStorage);
+  wordSetsLoadFailed = false;
+  if (appError.dataset.source === 'word-sets') setAppError('');
+  return savedWordSets;
+}
+
+function refreshWordSetsAfterLoadFailure() {
+  if (!wordSetsLoadFailed) return true;
+  try {
+    wordSets = readWordSets();
+    showSetupError('Ordsettene ble lastet på nytt. Prøv handlingen igjen.');
+    renderWordSets();
+  } catch (error) {
+    showSetupError(`Kunne ikke laste ordsettene: ${error.message}`);
+  }
+  return false;
 }
 
 function assertSupportedProfileState() {
@@ -1048,7 +1074,7 @@ async function saveImportedWordSet() {
   importSaveButton.disabled = true;
   showImportError();
   try {
-    if (loadWordSets(window.localStorage).length >= MAX_WORD_SETS) {
+    if (readWordSets().length >= MAX_WORD_SETS) {
       showImportError(`Du kan ha maksimalt ${MAX_WORD_SETS} ordsett på denne enheten.`);
       return;
     }
@@ -1058,7 +1084,7 @@ async function saveImportedWordSet() {
       showImportError(guardError);
       return;
     }
-    const latestSets = loadWordSets(window.localStorage);
+    const latestSets = readWordSets();
     if (latestSets.length >= MAX_WORD_SETS) {
       showImportError(`Du kan ha maksimalt ${MAX_WORD_SETS} ordsett på denne enheten.`);
       return;
@@ -1098,6 +1124,7 @@ async function saveImportedWordSet() {
 }
 
 function updateWordSets(nextWordSets, action) {
+  if (!refreshWordSetsAfterLoadFailure()) return false;
   if (nextWordSets.length > wordSets.length && nextWordSets.length > MAX_WORD_SETS) {
     showSetupError(`Du kan ha maksimalt ${MAX_WORD_SETS} ordsett på denne enheten.`);
     return false;
@@ -1335,6 +1362,7 @@ function renderPreview() {
 }
 
 async function saveEditorOperation(startAfterSave = false) {
+  if (!refreshWordSetsAfterLoadFailure()) return;
   const previous = wordSets.find((set) => set.id === editorSetId);
   const name = wordSetNameInput.value.trim();
   if (!name) {
@@ -1433,6 +1461,7 @@ function changeArchived(set, archived) {
 }
 
 async function duplicateWordSet(set) {
+  if (!refreshWordSetsAfterLoadFailure()) return;
   if (wordSets.length >= MAX_WORD_SETS) {
     showSetupError(`Du kan ha maksimalt ${MAX_WORD_SETS} ordsett på denne enheten.`);
     return;
@@ -1490,11 +1519,15 @@ function deleteWordSet(set) {
 
 window.addEventListener('storage', (event) => {
   if (event.key !== PROFILE_STATE_KEY) return;
-  const latestState = readProfileState();
-  if (!latestState) return;
-  profileState = latestState;
-  renderProfiles();
-  renderWordSets();
+  try {
+    const latestState = readProfileState();
+    if (!latestState) return;
+    profileState = latestState;
+    renderProfiles();
+    renderWordSets();
+  } catch (error) {
+    setAppError(`Kunne ikke laste profiler og øving: ${error.message}`);
+  }
 });
 
 window.addEventListener('online', updateConnectionStatus);
