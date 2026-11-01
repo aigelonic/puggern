@@ -114,8 +114,15 @@ const effects = createPracticeEffects({
   soundToggle: document.querySelector('#sound-toggle'),
 });
 let viewRevision = 0;
-let wordSets = loadWordSets(window.localStorage);
-let profileState = readProfileState();
+let wordSets = [];
+let wordSetsLoadFailed = false;
+try {
+  wordSets = readWordSets();
+} catch (error) {
+  wordSetsLoadFailed = true;
+  setAppError(`Kunne ikke laste ordsettene: ${error.message}`, 'word-sets');
+}
+let profileState = null;
 let showArchived = false;
 let editorSetId = null;
 let editorTrigger = null;
@@ -129,6 +136,7 @@ let lastRenderedPracticeCardId = null;
 let pendingExerciseSet = null;
 let pendingExerciseProfileId = null;
 let exerciseConfigTrigger = null;
+let answerSubmissionSource = null;
 let unsavedProgress = false;
 let pendingLegacyMigration = null;
 let shareLinkTrigger = null;
@@ -291,6 +299,25 @@ function readProfileState() {
       'Noe ugyldig øvingshistorikk eller øvingsidentitet ble ignorert. Andre profiler, belønninger og fremgang er beholdt.';
     warning.hidden = false;
   });
+}
+
+function readWordSets() {
+  const savedWordSets = loadWordSets(window.localStorage);
+  wordSetsLoadFailed = false;
+  if (appError.dataset.source === 'word-sets') setAppError('');
+  return savedWordSets;
+}
+
+function refreshWordSetsAfterLoadFailure() {
+  if (!wordSetsLoadFailed) return true;
+  try {
+    wordSets = readWordSets();
+    showSetupError('Ordsettene ble lastet på nytt. Prøv handlingen igjen.');
+    renderWordSets();
+  } catch (error) {
+    showSetupError(`Kunne ikke laste ordsettene: ${error.message}`);
+  }
+  return false;
 }
 
 function assertSupportedProfileState() {
@@ -868,7 +895,7 @@ function renderPractice(message = '', { announceCorrection = false, points = 0, 
       : (firstDifference ?? 'Sammenlign stavemåtene for å finne forskjellen.');
   correctionAnnouncement.textContent = isCorrection
     ? announceCorrection
-      ? `Riktig stavemåte er ${word.answer}. ${correctionDetail}`
+      ? `Riktig stavemåte er ${word.answer.trim()}. ${correctionDetail}`
       : 'Rettelsen vises ved svarfeltet.'
     : '';
   answerInput.focus();
@@ -1150,7 +1177,7 @@ async function saveImportedWordSet() {
   importSaveButton.disabled = true;
   showImportError();
   try {
-    if (loadWordSets(window.localStorage).length >= MAX_WORD_SETS) {
+    if (readWordSets().length >= MAX_WORD_SETS) {
       showImportError(`Du kan ha maksimalt ${MAX_WORD_SETS} ordsett på denne enheten.`);
       return;
     }
@@ -1160,7 +1187,7 @@ async function saveImportedWordSet() {
       showImportError(guardError);
       return;
     }
-    const latestSets = loadWordSets(window.localStorage);
+    const latestSets = readWordSets();
     if (latestSets.length >= MAX_WORD_SETS) {
       showImportError(`Du kan ha maksimalt ${MAX_WORD_SETS} ordsett på denne enheten.`);
       return;
@@ -1200,6 +1227,7 @@ async function saveImportedWordSet() {
 }
 
 function updateWordSets(nextWordSets, action) {
+  if (!refreshWordSetsAfterLoadFailure()) return false;
   if (nextWordSets.length > wordSets.length && nextWordSets.length > MAX_WORD_SETS) {
     showSetupError(`Du kan ha maksimalt ${MAX_WORD_SETS} ordsett på denne enheten.`);
     return false;
@@ -1473,6 +1501,7 @@ function renderPreview() {
 }
 
 async function saveEditorOperation(startAfterSave = false) {
+  if (!refreshWordSetsAfterLoadFailure()) return;
   const previous = wordSets.find((set) => set.id === editorSetId);
   const name = wordSetNameInput.value.trim();
   if (!name) {
@@ -1572,6 +1601,7 @@ function changeArchived(set, archived) {
 }
 
 async function duplicateWordSet(set) {
+  if (!refreshWordSetsAfterLoadFailure()) return;
   if (wordSets.length >= MAX_WORD_SETS) {
     showSetupError(`Du kan ha maksimalt ${MAX_WORD_SETS} ordsett på denne enheten.`);
     return;
@@ -1629,11 +1659,15 @@ function deleteWordSet(set) {
 
 window.addEventListener('storage', (event) => {
   if (event.key !== PROFILE_STATE_KEY) return;
-  const latestState = readProfileState();
-  if (!latestState) return;
-  profileState = latestState;
-  renderProfiles();
-  renderWordSets();
+  try {
+    const latestState = readProfileState();
+    if (!latestState) return;
+    profileState = latestState;
+    renderProfiles();
+    renderWordSets();
+  } catch (error) {
+    setAppError(`Kunne ikke laste profiler og øving: ${error.message}`);
+  }
 });
 
 window.addEventListener('online', updateConnectionStatus);
@@ -1782,10 +1816,29 @@ document
   .querySelector('#save-and-start-button')
   .addEventListener('click', async () => await saveEditor(true));
 
+answerInput.addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter') return;
+  answerSubmissionSource = 'input';
+});
+answerInput.addEventListener('keyup', (event) => {
+  if (event.key === 'Enter' && answerSubmissionSource === 'input') answerSubmissionSource = null;
+});
+answerButton.addEventListener('pointerdown', () => {
+  answerSubmissionSource = 'button';
+});
+answerButton.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter' || event.key === ' ') answerSubmissionSource = 'button';
+});
+answerButton.addEventListener('click', () => {
+  if (answerSubmissionSource !== 'input') answerSubmissionSource = 'button';
+});
+
 answerForm.addEventListener(
   'submit',
   trackOperation(async (event) => {
     event.preventDefault();
+    const announceCorrection = answerSubmissionSource === 'input';
+    answerSubmissionSource = null;
     if (
       answerButton.disabled ||
       !session?.queue.length ||
@@ -1826,7 +1879,7 @@ answerForm.addEventListener(
 
       if (outcome.result === 'incorrect') {
         renderPractice('', {
-          announceCorrection: true,
+          announceCorrection,
         });
         effects.play(cue);
         return;

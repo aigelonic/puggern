@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { createSession, parseWordSet, PROGRESS_VERSION } from '../../frontend/src/learning.mjs';
 import { createProfileState } from '../../frontend/src/profiles.mjs';
 import { startAppShellFixture, startStandaloneApp } from './fixtures/app-shell.mjs';
 import { workerMessage } from './fixtures/service-worker.mjs';
@@ -165,6 +166,67 @@ test('first install shows the loaded release or seed, without a banner, navigati
   } finally {
     await seedContext.close();
   }
+});
+
+test('update information remains available when profile storage cannot be read', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const getItem = Storage.prototype.getItem;
+    Storage.prototype.getItem = function (key) {
+      if (key === 'puggern.profile-state') {
+        throw new DOMException('Storage unavailable', 'SecurityError');
+      }
+      return getItem.call(this, key);
+    };
+  });
+  await openApp(page);
+  await expect(page.locator('#app-error')).toContainText('Kunne ikke laste profiler og øving');
+  fixture.deploy({ version: '2.0.0', shell: 'B' });
+  await page.locator('#check-updates').click();
+  await expect(page.locator('#update-banner')).toBeVisible();
+  await expect(page.locator('#update-status')).toContainText('Ny versjon 2.0.0 er klar.');
+});
+
+test('profile writes preserve saved profiles, progress, and rewards after a read recovers', async ({
+  page,
+}) => {
+  const savedState = createProfileState('saved-profile');
+  savedState.profiles[0].name = 'Ada';
+  savedState.profiles[0].rewards = { points: 40, bestStreak: 3, completedSets: 2 };
+  const words = parseWordSet('hund\tdog');
+  savedState.progress['saved-profile']['saved-set'] = {
+    version: PROGRESS_VERSION,
+    words,
+    session: createSession(words),
+  };
+  await page.addInitScript((state) => {
+    localStorage.setItem('puggern.profile-state', JSON.stringify(state));
+    window.allowProfileRead = false;
+    const getItem = Storage.prototype.getItem;
+    Storage.prototype.getItem = function (key) {
+      if (key === 'puggern.profile-state' && !window.allowProfileRead) {
+        throw new DOMException('Storage unavailable', 'SecurityError');
+      }
+      return getItem.call(this, key);
+    };
+  }, savedState);
+  await openApp(page);
+  await expect(page.locator('#app-error')).toContainText('Kunne ikke laste profiler og øving');
+
+  await page.evaluate(() => {
+    window.allowProfileRead = true;
+  });
+  await openProfilePanel(page);
+  await page.getByRole('button', { name: 'Legg til profil', exact: true }).click();
+  await page.locator('#profile-name').fill('Nora');
+  await saveForm(page, '#profile-form', 'Lagre profil');
+
+  const storedState = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('puggern.profile-state')),
+  );
+  expect(storedState.profiles.slice(0, savedState.profiles.length)).toEqual(savedState.profiles);
+  expect(storedState.progress['saved-profile']).toEqual(savedState.progress['saved-profile']);
 });
 
 test('a real waiting update leaves A loaded, Later dismisses only the banner and the footer reopens it', async ({
@@ -668,19 +730,13 @@ for (const viewport of [
   });
 }
 
-test('native standalone app window keeps the update and confirmation keyboard-safe at 320px and tablet sizes', async () => {
-  const standalone = await startStandaloneApp();
+test('installed PWA window keeps the update and confirmation keyboard-safe at 320px and tablet sizes', async () => {
+  const standalone = await startStandaloneApp(fixture.origin);
   try {
     await trackLoads(standalone.context);
-    const page = standalone.context.pages()[0];
+    const { page } = standalone;
     await openApp(page);
-    const isStandalone = await page.evaluate(
-      () => matchMedia('(display-mode: standalone)').matches,
-    );
-    test.skip(
-      !isStandalone,
-      'This Chromium app window does not expose display-mode: standalone in the current environment.',
-    );
+    expect(await page.evaluate(() => matchMedia('(display-mode: standalone)').matches)).toBe(true);
     await createPractice(page);
     await page.locator('#answer').fill('behold svaret');
     await offer(page);
