@@ -12,7 +12,7 @@ const shellPaths = [
   './manifest.webmanifest',
   './icons/pug-192.png',
   './icons/pug-512.png',
-  './src/main.mjs?v=18',
+  './src/main.mjs?v=19',
   './src/history.mjs?v=3',
   './src/history-view.mjs?v=2',
   './src/practice-feedback.mjs?v=2',
@@ -105,7 +105,7 @@ export async function startWorkerFixture() {
       response.end(`<!doctype html><html lang="en"><head><meta charset="utf-8">
         <title>Shell ${state.shell}</title><link rel="stylesheet" href="./styles.css?v=14">
         </head><body><h1 id="identity">${state.version}:${state.shell}</h1>
-        <script type="module" src="./src/main.mjs?v=18"></script></body></html>`);
+        <script type="module" src="./src/main.mjs?v=19"></script></body></html>`);
       return;
     }
     if (path === '/app/styles.css') {

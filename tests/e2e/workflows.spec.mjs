@@ -452,7 +452,10 @@ test('reloads and resumes a saved session during its correction step', async ({ 
   await expect(page.locator('#correct-answer')).toHaveText('eple');
   await expect(page.locator('#correction-instruction')).toBeVisible();
   await expect(page.locator('#correction-announcement')).toHaveText(
-    'Riktig stavemåte er eple. Bytt «pær» med «epl» på plass 1–3.',
+    'Rettelsen vises ved svarfeltet.',
+  );
+  await expect(page.locator('#answer')).toHaveAccessibleDescription(
+    /Riktig stavemåte eple Du skrev: pære Bytt «pær» med «epl» på plass 1–3\./,
   );
   await expect(page.locator('#answer')).toBeFocused();
 
