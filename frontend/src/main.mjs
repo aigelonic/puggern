@@ -119,6 +119,7 @@ let lastRenderedPracticeCardId = null;
 let pendingExerciseSet = null;
 let pendingExerciseProfileId = null;
 let exerciseConfigTrigger = null;
+let answerSubmissionSource = null;
 let unsavedProgress = false;
 let shareLinkTrigger = null;
 let importTrigger = null;
@@ -782,7 +783,7 @@ function renderPractice(message = '', { announceCorrection = false, points = 0, 
       : (firstDifference ?? 'Sammenlign stavemåtene for å finne forskjellen.');
   correctionAnnouncement.textContent = isCorrection
     ? announceCorrection
-      ? `Riktig stavemåte er ${word.answer}. ${correctionDetail}`
+      ? `Riktig stavemåte er ${word.answer.trim()}. ${correctionDetail}`
       : 'Rettelsen vises ved svarfeltet.'
     : '';
   answerInput.focus();
@@ -1633,10 +1634,29 @@ document
   .querySelector('#save-and-start-button')
   .addEventListener('click', async () => await saveEditor(true));
 
+answerInput.addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter') return;
+  answerSubmissionSource = 'input';
+});
+answerInput.addEventListener('keyup', (event) => {
+  if (event.key === 'Enter' && answerSubmissionSource === 'input') answerSubmissionSource = null;
+});
+answerButton.addEventListener('pointerdown', () => {
+  answerSubmissionSource = 'button';
+});
+answerButton.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter' || event.key === ' ') answerSubmissionSource = 'button';
+});
+answerButton.addEventListener('click', () => {
+  if (answerSubmissionSource !== 'input') answerSubmissionSource = 'button';
+});
+
 answerForm.addEventListener(
   'submit',
   trackOperation(async (event) => {
     event.preventDefault();
+    const announceCorrection = answerSubmissionSource === 'input';
+    answerSubmissionSource = null;
     if (
       answerButton.disabled ||
       !session?.queue.length ||
@@ -1677,7 +1697,7 @@ answerForm.addEventListener(
 
       if (outcome.result === 'incorrect') {
         renderPractice('', {
-          announceCorrection: true,
+          announceCorrection,
         });
         effects.play(cue);
         return;
