@@ -3,12 +3,18 @@ import { createSession, parseWordSet, PROGRESS_VERSION } from '../../frontend/sr
 import { createProfileState } from '../../frontend/src/profiles.mjs';
 import { startAppShellFixture, startStandaloneApp } from './fixtures/app-shell.mjs';
 import { workerMessage } from './fixtures/service-worker.mjs';
+import { openProfilePanel } from './helpers.mjs';
 
 let fixture;
 
 test.beforeEach(async ({ context }) => {
   fixture = await startAppShellFixture();
   await trackLoads(context);
+  await context.addInitScript((state) => {
+    if (localStorage.getItem('puggern.profile-state') === null) {
+      localStorage.setItem('puggern.profile-state', JSON.stringify(state));
+    }
+  }, createProfileState('profile-fixture'));
 });
 
 async function trackLoads(context) {
@@ -77,6 +83,7 @@ async function saveForm(page, form, button) {
 
 async function createPractice(page, { profile = false, single = false } = {}) {
   if (profile) {
+    await openProfilePanel(page);
     await page.locator('#new-profile-button').click();
     await page.locator('#profile-name').fill('Ada');
     await saveForm(page, '#profile-form', 'Lagre profil');
@@ -210,7 +217,8 @@ test('profile writes preserve saved profiles, progress, and rewards after a read
   await page.evaluate(() => {
     window.allowProfileRead = true;
   });
-  await page.getByRole('button', { name: 'Legg til profil' }).click();
+  await openProfilePanel(page);
+  await page.getByRole('button', { name: 'Legg til profil', exact: true }).click();
   await page.locator('#profile-name').fill('Nora');
   await saveForm(page, '#profile-form', 'Lagre profil');
 
@@ -284,6 +292,7 @@ for (const draft of ['editor', 'profile', 'answer']) {
       input = page.locator('#word-set');
       warning = 'endringer i ordsettet';
     } else {
+      await openProfilePanel(page);
       await page.locator('#new-profile-button').click();
       input = page.locator('#profile-name');
       warning = 'ny profil';
@@ -328,8 +337,10 @@ for (const draft of ['editor', 'profile', 'answer']) {
 
 test('reports both dirty setup categories and Escape preserves both drafts', async ({ page }) => {
   await openApp(page);
+  await openProfilePanel(page);
   await page.locator('#new-profile-button').click();
   await page.locator('#profile-name').fill('Ulagret profil');
+  await page.locator('#profile-done-button').click();
   await page.locator('#new-set-button').click();
   await page.locator('#word-set-name').fill('Ulagret sett');
   await page.locator('#word-set').fill('ufullstendig');
@@ -586,6 +597,7 @@ test('reconnect and visible-state checks discover candidates without stealing dr
   await page.clock.setFixedTime(epoch);
   await openApp(page);
   await expect(page.locator('#update-status')).toHaveText('Ingen nedlastet oppdatering er klar.');
+  await openProfilePanel(page);
   await page.locator('#new-profile-button').click();
   await page.locator('#profile-name').fill('Ulagret');
   fixture.deploy({ version: '2.0.0', shell: 'B' });

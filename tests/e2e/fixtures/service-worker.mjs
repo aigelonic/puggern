@@ -8,14 +8,14 @@ const workerSource = await readFile(
 const shellPaths = [
   './',
   './index.html',
-  './styles.css?v=14',
+  './styles.css?v=16',
   './manifest.webmanifest',
   './icons/pug-192.png',
   './icons/pug-512.png',
-  './src/main.mjs?v=19',
+  './src/main.mjs?v=20',
   './src/history.mjs?v=3',
   './src/history-view.mjs?v=2',
-  './src/practice-feedback.mjs?v=2',
+  './src/practice-feedback.mjs?v=3',
   './src/learning.mjs?v=10',
   './src/spelling-feedback.mjs?v=1',
   './src/profiles.mjs?v=12',
@@ -103,9 +103,9 @@ export async function startWorkerFixture() {
     if (path === '/app/' || path === '/app/index.html' || path === '/outside/') {
       response.setHeader('content-type', 'text/html');
       response.end(`<!doctype html><html lang="en"><head><meta charset="utf-8">
-        <title>Shell ${state.shell}</title><link rel="stylesheet" href="./styles.css?v=14">
+        <title>Shell ${state.shell}</title><link rel="stylesheet" href="./styles.css?v=16">
         </head><body><h1 id="identity">${state.version}:${state.shell}</h1>
-        <script type="module" src="./src/main.mjs?v=19"></script></body></html>`);
+        <script type="module" src="./src/main.mjs?v=20"></script></body></html>`);
       return;
     }
     if (path === '/app/styles.css') {

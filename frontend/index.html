@@ -8,7 +8,7 @@
     <meta name="robots" content="noindex, nofollow, noarchive" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" type="image/png" sizes="192x192" href="./icons/pug-192.png" />
-    <link rel="stylesheet" href="./styles.css?v=15" />
+    <link rel="stylesheet" href="./styles.css?v=16" />
     <title>Puggern</title>
   </head>
   <body>
@@ -18,11 +18,80 @@
           <img src="./icons/pug-192.png" width="32" height="32" alt="" />
           Puggern<span>.</span>
         </a>
-        <p id="connection-status" role="status" aria-live="polite"></p>
+        <div class="header-actions">
+          <button
+            id="sound-toggle"
+            class="button secondary sound-toggle"
+            type="button"
+            aria-label="Lydeffekter: av"
+            aria-pressed="false"
+          >
+            <span aria-hidden="true">🔇</span>
+          </button>
+          <button
+            id="profile-chip"
+            class="button secondary profile-chip"
+            type="button"
+            aria-expanded="false"
+            aria-controls="profile-panel"
+          >
+            Min profil
+          </button>
+        </div>
       </header>
-      <button id="sound-toggle" class="button secondary" type="button" aria-pressed="false">
-        Lydeffekter: av
-      </button>
+      <p id="connection-status" role="status" aria-live="polite"></p>
+      <section id="profile-panel" class="profile-controls" aria-labelledby="profile-heading" hidden>
+        <h2 id="profile-heading">Profil</h2>
+        <label for="profile-select">Hvem øver?</label>
+        <select id="profile-select"></select>
+        <p id="profile-rewards" class="field-help"></p>
+        <button id="new-profile-button" class="button secondary" type="button">
+          Legg til profil
+        </button>
+        <form id="profile-form" hidden>
+          <div class="anti-bot-field" aria-hidden="true">
+            <label for="profile-website">Nettside</label>
+            <input
+              id="profile-website"
+              name="website"
+              type="text"
+              tabindex="-1"
+              autocomplete="off"
+            />
+          </div>
+          <label for="profile-name">Navn</label>
+          <input id="profile-name" type="text" maxlength="40" required autocomplete="off" />
+          <label for="profile-avatar">Valgfri emoji</label>
+          <input
+            id="profile-avatar"
+            type="text"
+            maxlength="8"
+            autocomplete="off"
+            aria-describedby="profile-help"
+          />
+          <p id="profile-help" class="field-help">Navnet lagres bare i denne nettleseren.</p>
+          <p
+            id="profile-creation-error"
+            class="feedback error creation-error"
+            role="alert"
+            hidden
+          ></p>
+          <div class="actions">
+            <button class="button primary" type="submit">Lagre profil</button>
+            <button id="cancel-profile-button" class="button secondary" type="button">
+              Avbryt
+            </button>
+          </div>
+        </form>
+        <button id="profile-done-button" class="button secondary" type="button">Ferdig</button>
+      </section>
+      <p
+        id="profile-announcement"
+        class="visually-hidden"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      ></p>
       <p
         id="correction-announcement"
         class="visually-hidden"
@@ -52,78 +121,24 @@
       </div>
 
       <section id="setup-view" class="view setup-view">
-        <p class="eyebrow">Litt øving gjør susen</p>
-        <h1>Klar, ferdig, stav!</h1>
-        <p class="intro">Lag et ordsett med hint og svar, og øv i ditt eget tempo.</p>
-        <section class="profile-controls" aria-labelledby="profile-heading">
-          <h2 id="profile-heading">Hvem øver?</h2>
-          <label for="profile-select">Profil</label>
-          <div class="profile-picker">
-            <select id="profile-select"></select>
-            <button id="new-profile-button" class="button secondary" type="button">
-              Legg til profil
-            </button>
-          </div>
-          <p id="profile-rewards" class="field-help"></p>
-          <button id="history-button" class="button secondary" type="button">
-            Øvingshistorikk
-          </button>
-          <form id="profile-form" hidden>
-            <div class="anti-bot-field" aria-hidden="true">
-              <label for="profile-website">Nettside</label>
-              <input
-                id="profile-website"
-                name="website"
-                type="text"
-                tabindex="-1"
-                autocomplete="off"
-              />
-            </div>
-            <label for="profile-name">Navn</label>
-            <input id="profile-name" type="text" maxlength="40" required autocomplete="off" />
-            <label for="profile-avatar">Valgfri emoji</label>
-            <input
-              id="profile-avatar"
-              type="text"
-              maxlength="8"
-              autocomplete="off"
-              aria-describedby="profile-help"
-            />
-            <p id="profile-help" class="field-help">Navnet lagres bare i denne nettleseren.</p>
-            <p
-              id="profile-creation-error"
-              class="feedback error creation-error"
-              role="alert"
-              hidden
-            ></p>
-            <div class="actions">
-              <button class="button primary" type="submit">Lagre profil</button>
-              <button id="cancel-profile-button" class="button secondary" type="button">
-                Avbryt
-              </button>
-            </div>
-          </form>
-        </section>
+        <h1 id="setup-greeting">Klar, ferdig, stav!</h1>
+        <div class="setup-summary">
+          <p id="greeting-rewards" class="field-help"></p>
+          <button id="history-button" class="text-button" type="button">Øvingshistorikk</button>
+        </div>
         <div class="saved-sets-heading">
           <h2 id="saved-sets-title" tabindex="-1">Ordsettene dine</h2>
+          <button id="new-set-button" class="button primary" type="button">
+            <span aria-hidden="true">+</span> Nytt ordsett
+          </button>
+          <button id="import-link-button" class="button secondary" type="button">
+            Importer lenke
+          </button>
           <button id="archive-toggle" class="text-button" type="button">Vis arkiv</button>
         </div>
         <p id="setup-error" class="feedback error" role="alert" hidden></p>
         <p id="share-status" class="feedback" role="status" aria-live="polite"></p>
         <p id="share-error" class="feedback error" role="alert" hidden></p>
-        <ul id="word-set-list" class="word-set-list" aria-labelledby="saved-sets-title"></ul>
-        <p id="empty-sets" class="field-help">Ingen ordsett ennå. Lag ditt første under.</p>
-        <button id="new-set-button" class="button secondary new-set-button" type="button">
-          Nytt ordsett
-        </button>
-        <button id="import-link-button" class="button secondary" type="button">
-          Importer lenke
-        </button>
-        <p class="field-help">
-          Deling tar bare med navn, ord, retning og innstillinger, ikke profiler eller fremgang.
-          Innholdet er lesbart for alle som har lenken og kan bli liggende i historikk og meldinger.
-          Ikke del sensitive opplysninger.
-        </p>
         <p id="set-limit-help" class="field-help" role="status" hidden>
           Du har nådd grensen på 50 ordsett på denne enheten.
         </p>
@@ -204,6 +219,24 @@
             </button>
           </div>
         </form>
+        <ul id="word-set-list" class="word-set-list" aria-labelledby="saved-sets-title"></ul>
+        <section id="empty-sets" class="empty-sets" aria-labelledby="empty-sets-title">
+          <h3 id="empty-sets-title">Ingen ordsett ennå.</h3>
+          <p id="empty-sets-hint" class="field-help">Lag et ordsett med ord du vil øve på.</p>
+          <div id="empty-sets-actions" class="actions">
+            <button id="empty-create-button" class="button primary" type="button">
+              Lag ditt første ordsett
+            </button>
+            <button
+              id="empty-import-button"
+              class="button secondary"
+              type="button"
+              aria-label="Importer ditt første ordsett fra lenke"
+            >
+              Importer lenke
+            </button>
+          </div>
+        </section>
       </section>
 
       <dialog
@@ -214,11 +247,20 @@
       >
         <h2 id="share-link-title">Del ordsett</h2>
         <p id="share-link-help" class="field-help">
-          Kopier den markerte lenken manuelt. Alle som har lenken kan lese innholdet.
+          Før du deler eller kopierer: Deling tar bare med navn, ord, retning og innstillinger, ikke
+          profiler eller fremgang. Innholdet er lesbart for alle som har lenken og kan bli liggende
+          i historikk og meldinger. Ikke del sensitive opplysninger.
         </p>
         <label for="share-link-input">Lenke til ordsettet</label>
         <textarea id="share-link-input" rows="3" readonly spellcheck="false"></textarea>
+        <p id="share-dialog-status" class="feedback" role="status" aria-live="polite"></p>
         <div class="actions">
+          <button id="share-link-share-button" class="button primary" type="button" hidden>
+            Del lenke
+          </button>
+          <button id="share-link-copy-button" class="button secondary" type="button" hidden>
+            Kopier lenke
+          </button>
           <button id="close-share-link-button" class="button secondary" type="button">Lukk</button>
         </div>
       </dialog>
@@ -233,6 +275,9 @@
         <p id="import-help" class="field-help">
           Lenken leses lokalt, uten å hente innhold fra nettet. Ordsettet lagres som et nytt sett på
           denne enheten, uten profiler eller fremgang. Like ordsett kan importeres flere ganger.
+          Deling tar bare med navn, ord, retning og innstillinger, ikke profiler eller fremgang.
+          Innholdet er lesbart for alle som har lenken og kan bli liggende i historikk og meldinger.
+          Ikke del sensitive opplysninger.
         </p>
         <form id="import-link-form">
           <label for="import-link-input">Lenke til ordsettet</label>
@@ -518,6 +563,6 @@
         <button class="button primary" value="update">Forkast inntasting og oppdater</button>
       </form>
     </dialog>
-    <script type="module" src="./src/main.mjs?v=19"></script>
+    <script type="module" src="./src/main.mjs?v=20"></script>
   </body>
 </html>

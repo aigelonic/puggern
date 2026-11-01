@@ -241,6 +241,8 @@ test('uses native sharing for active and archived sets without transferring loca
   }, localSet());
   await page.goto('/');
   await clickSetAction(page.locator('.word-set-item').first(), 'Del');
+  await expect(page.locator('#share-link-dialog')).toBeVisible();
+  await page.locator('#share-link-share-button').click();
   await expect.poll(() => page.evaluate(() => window.sharedData?.url)).toBeTruthy();
   const shared = await page.evaluate(() => window.sharedData);
   expect(parseShareUrl(shared.url)).toMatchObject(content);
@@ -251,6 +253,8 @@ test('uses native sharing for active and archived sets without transferring loca
     window.sharedData = null;
   });
   await clickSetAction(page.locator('.word-set-item').first(), 'Del');
+  await expect(page.locator('#share-link-dialog')).toBeVisible();
+  await page.locator('#share-link-share-button').click();
   await expect.poll(() => page.evaluate(() => window.sharedData?.url)).toBeTruthy();
 });
 
@@ -274,6 +278,11 @@ test('falls back to clipboard, then a selectable manual link when APIs fail', as
   }, localSet());
   await page.goto('/');
   await clickSetAction(page.locator('.word-set-item').first(), 'Del');
+  await expect(page.locator('#share-link-dialog')).toBeVisible();
+  await page.locator('#share-link-share-button').click();
+  await expect(page.locator('#share-dialog-status')).toContainText('mislyktes');
+  await expect(page.locator('#share-link-share-button')).toBeFocused();
+  await page.locator('#share-link-copy-button').click();
   await expect.poll(() => page.evaluate(() => window.copiedLink)).toBeTruthy();
   expect(parseShareUrl(await page.evaluate(() => window.copiedLink))).toMatchObject(content);
   await page.evaluate(() => {
@@ -284,6 +293,7 @@ test('falls back to clipboard, then a selectable manual link when APIs fail', as
   const set = page.locator('.word-set-item').first();
   const trigger = set.locator('.set-action-trigger');
   await clickSetAction(set, 'Del');
+  await page.locator('#share-link-copy-button').click();
   const input = page.locator('#share-link-input');
   await expect(input).toBeVisible();
   await expect(input).toBeFocused();
@@ -327,8 +337,10 @@ test('native cancellation does not copy and oversized sets never reach sharing A
   );
   await page.goto('/');
   await clickSetAction(page.locator('.word-set-item').filter({ hasText: content.name }), 'Del');
+  await page.locator('#share-link-share-button').click();
   await expect.poll(() => page.evaluate(() => window.nativeShareCount)).toBe(1);
   expect(await page.evaluate(() => window.clipboardUsed)).toBeUndefined();
+  await page.locator('#close-share-link-button').click();
   await clickSetAction(page.locator('.word-set-item').filter({ hasText: 'Stort sett' }), 'Del');
   await expect(page.locator('#share-error')).toContainText('Reduser');
   expect(await page.evaluate(() => window.nativeShareCount)).toBe(1);

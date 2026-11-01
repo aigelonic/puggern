@@ -136,7 +136,8 @@ export function createPracticeEffects({
   soundToggle.addEventListener('click', () => {
     const enabled = soundToggle.getAttribute('aria-pressed') !== 'true';
     soundToggle.setAttribute('aria-pressed', String(enabled));
-    soundToggle.textContent = enabled ? 'Lydeffekter: på' : 'Lydeffekter: av';
+    soundToggle.setAttribute('aria-label', enabled ? 'Lydeffekter: på' : 'Lydeffekter: av');
+    soundToggle.querySelector('[aria-hidden="true"]').textContent = enabled ? '🔊' : '🔇';
     if (enabled) prepareSound();
     else stopSound();
   });

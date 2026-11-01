@@ -488,6 +488,7 @@ textarea {
 }
 
 .app-shell {
+  position: relative;
   width: min(100% - 2rem, 760px);
   min-height: 100vh;
   margin: 0 auto;
@@ -505,11 +506,123 @@ textarea {
 .brand {
   display: inline-flex;
   align-items: center;
+  min-height: 44px;
   gap: 0.5rem;
   color: #263a32;
   font-size: 1.55rem;
   font-weight: 700;
   text-decoration: none;
+}
+
+.app-header {
+  gap: 0.5rem;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.header-actions .sound-toggle {
+  flex: 0 0 44px;
+  width: 44px;
+  min-height: 44px;
+  padding: 0;
+  font-size: 1.4rem;
+}
+
+.sound-toggle span {
+  margin: 0;
+}
+
+.sound-toggle[aria-pressed='true'] {
+  border: 2px solid #286448;
+  background: #e9ede4;
+}
+
+.header-actions .profile-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  max-width: 15rem;
+  min-height: 44px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#profile-chip span {
+  margin: 0;
+}
+
+.profile-chip-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.view.setup-view {
+  width: 100%;
+  margin-top: 1.5rem;
+}
+
+.setup-view h1 {
+  font-size: clamp(1.65rem, 4vw, 2.25rem);
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.setup-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.setup-summary .field-help {
+  flex: 1 1 18rem;
+  margin: 0;
+}
+
+.setup-view .feedback:empty {
+  min-height: 0;
+  margin: 0;
+}
+
+#share-dialog-status:empty {
+  min-height: 0;
+  margin: 0;
+}
+
+.setup-view button,
+.profile-controls button,
+.setup-view summary {
+  min-width: 44px;
+  min-height: 44px;
+  max-width: 100%;
+}
+
+.setup-view .button,
+.profile-controls .button {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.empty-sets {
+  padding: 1.5rem;
+  border: 1px dashed #aeb8a9;
+  border-radius: 5px;
+  background: #fffefa;
+}
+
+.empty-sets h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.25rem;
 }
 
 .brand span {
@@ -526,6 +639,7 @@ label {
 }
 
 #connection-status {
+  margin: 0.5rem 0 0;
   color: #587064;
   font-size: 0.85rem;
 }
@@ -675,7 +789,17 @@ select:focus {
 }
 
 .profile-controls {
-  margin-bottom: 2rem;
+  position: absolute;
+  top: 6.5rem;
+  right: 0;
+  z-index: 3;
+  width: min(100%, 22rem);
+  padding: 1rem;
+  border: 1px solid #aeb8a9;
+  border-radius: 5px;
+  background: #fffefa;
+  box-shadow: 0 0.4rem 1rem #263a3230;
+  overflow-wrap: anywhere;
 }
 
 #profile-rewards {
@@ -696,17 +820,12 @@ select:focus {
   font-weight: 700;
 }
 
-.profile-picker {
-  display: flex;
-  gap: 0.75rem;
-}
-
-.profile-picker select {
-  flex: 1;
-}
-
 #profile-form {
   margin-top: 1rem;
+}
+
+#close-profile-button {
+  margin-top: 0.75rem;
 }
 
 .anti-bot-field {
@@ -726,7 +845,17 @@ select:focus {
 }
 
 .saved-sets-heading {
+  flex-wrap: wrap;
+  gap: 0.5rem;
   margin-bottom: 0.75rem;
+}
+
+.saved-sets-heading h2 {
+  flex: 1 1 100%;
+}
+
+.saved-sets-heading .text-button {
+  margin-left: auto;
 }
 
 .saved-sets-heading h2,
@@ -741,6 +870,8 @@ select:focus {
   margin: 0;
   padding: 0;
   list-style: none;
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-rows: 1fr;
 }
 
 .word-set-item {
@@ -750,6 +881,9 @@ select:focus {
   border: 1px solid #d0d6ca;
   border-radius: 5px;
   background: #fffefa;
+  min-width: 0;
+  grid-template-rows: 1fr auto;
+  min-height: 9rem;
 }
 
 .word-set-item:focus-within {
@@ -768,6 +902,7 @@ select:focus {
   color: #64766d;
   font-family: 'Trebuchet MS', sans-serif;
   font-size: 0.85rem;
+  overflow-wrap: anywhere;
 }
 
 .set-actions {
@@ -853,13 +988,9 @@ select:focus {
   color: #8d3325;
 }
 
-.new-set-button {
-  margin-top: 0.75rem;
-}
-
 #word-set-form {
-  margin-top: 2.5rem;
-  padding-top: 1.5rem;
+  margin: 1rem 0;
+  padding: 1rem 0;
   border-top: 1px solid #d0d6ca;
 }
 
@@ -1275,21 +1406,68 @@ select:focus {
 
 @media (max-width: 480px) {
   .app-shell {
-    width: min(100% - 1.25rem, 760px);
+    width: calc(100% - 1.25rem);
     padding-top: 1rem;
   }
 
   .app-header {
-    align-items: flex-start;
+    align-items: center;
+  }
+
+  .brand {
+    flex: 0 0 auto;
+    gap: 0.25rem;
+    font-size: 1.25rem;
+  }
+
+  .brand img {
+    width: 28px;
+    height: 28px;
+  }
+
+  .header-actions .profile-chip {
+    padding: 0.5rem;
+  }
+
+  .profile-controls {
+    position: static;
+    width: 100%;
+    margin-top: 0.75rem;
+    box-shadow: none;
+  }
+
+  .setup-summary {
+    gap: 0;
+  }
+
+  .saved-sets-heading {
+    gap: 0.5rem;
+  }
+
+  .saved-sets-heading .button {
+    flex: 1 1 8rem;
+    padding: 0.65rem 0.5rem;
+  }
+
+  .saved-sets-heading .text-button {
+    margin-left: 0;
+  }
+
+  .empty-sets {
+    padding: 1rem;
   }
 
   #connection-status {
-    max-width: 12rem;
-    text-align: right;
+    max-width: none;
+    text-align: left;
   }
 
   .view {
     margin-top: 3rem;
+  }
+
+  .view.setup-view {
+    margin-top: 1.25rem;
   }
 
   h1 {
@@ -1308,10 +1486,6 @@ select:focus {
     padding: 0.75rem;
   }
 
-  .profile-picker {
-    flex-direction: column;
-  }
-
   .set-actions {
     gap: 0.35rem;
   }
@@ -1322,6 +1496,22 @@ select:focus {
 
   .completion-stats {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 481px) {
+  .app-shell:has(> #setup-view:not([hidden])) {
+    width: min(100% - 2rem, 960px);
+  }
+}
+
+@media (min-width: 900px) {
+  .word-set-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .saved-sets-heading h2 {
+    flex: 1;
   }
 }
 
@@ -1355,6 +1545,25 @@ select:focus {
 }
 
 @media (forced-colors: active) {
+  .profile-controls,
+  .empty-sets,
+  .word-set-item,
+  .sound-toggle[aria-pressed='true'] {
+    border-color: CanvasText;
+  }
+
+  .sound-toggle[aria-pressed='true'] {
+    border-style: double;
+    border-width: 3px;
+  }
+
+  .setup-view :focus,
+  .profile-controls :focus,
+  .app-header :focus {
+    outline: 3px solid Highlight;
+    outline-offset: 3px;
+  }
+
   .language-badge {
     border-color: CanvasText;
     background: Canvas;
