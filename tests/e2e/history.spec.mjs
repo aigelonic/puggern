@@ -679,6 +679,7 @@ test('dashboard cards, help, table, variant announcement, and responsive layout'
   await expect(page.locator('#history-help')).not.toHaveAttribute('open', '');
   await expect(page.locator('#history-table-details')).not.toHaveAttribute('open', '');
   await expect(page.locator('#history-latest-value')).toHaveText('80 %');
+  await expect(page.locator('#history-status')).toBeEmpty();
 
   for (const width of [390, 320]) {
     await page.setViewportSize({ width, height: 844 });
@@ -716,6 +717,71 @@ test('dashboard cards, help, table, variant announcement, and responsive layout'
       .locator('#history-dialog')
       .evaluate((dialog) => dialog.scrollWidth <= dialog.clientWidth),
   ).toBe(true);
+});
+
+test('variant numbers stay with comparison keys when a newer run changes recency', async ({
+  page,
+}) => {
+  await seed(page);
+  await start(page);
+  await finish(page);
+  const firstVariant = await page.evaluate(() => {
+    const saved = JSON.parse(localStorage.getItem('puggern.profile-state'));
+    const original = saved.history.p1[0];
+    original.completedAt = '2000-01-01T12:00:00.000Z';
+    saved.history.p1.push({
+      ...original,
+      id: 'synthetic-variant',
+      comparisonKey: 'b'.repeat(64),
+      completedAt: '2000-01-02T12:00:00.000Z',
+    });
+    localStorage.setItem('puggern.profile-state', JSON.stringify(saved));
+    return original.comparisonKey;
+  });
+  await page.reload();
+  await openHistory(page);
+
+  const labels = () =>
+    page
+      .locator('#history-variant option')
+      .evaluateAll((options) =>
+        Object.fromEntries(options.map(({ value, textContent }) => [value, textContent])),
+      );
+  const initialLabels = await labels();
+  expect(initialLabels['b'.repeat(64)]).toContain('variant 1');
+  expect(initialLabels[firstVariant]).toContain('variant 2');
+
+  await page.getByRole('button', { name: 'Tilbake til profilen' }).click();
+  await start(page);
+  await finish(page);
+  await openHistory(page);
+  const updatedLabels = await labels();
+  expect(updatedLabels['b'.repeat(64)]).toContain('variant 1');
+  expect(updatedLabels[firstVariant]).toContain('variant 2');
+});
+
+test('variant selection announcements identify variants with equal comparisons', async ({
+  page,
+}) => {
+  await seed(page);
+  await seedDashboardHistory(page, [
+    { firstTryCount: 6, bestStreak: 6, variant: 'a'.repeat(64) },
+    { firstTryCount: 7, bestStreak: 7, variant: 'a'.repeat(64) },
+    { firstTryCount: 7, bestStreak: 7, variant: 'b'.repeat(64) },
+    { firstTryCount: 8, bestStreak: 8, variant: 'b'.repeat(64) },
+  ]);
+  await openHistory(page);
+
+  await page.locator('#history-variant').selectOption('a'.repeat(64));
+  const firstAnnouncement = await page.locator('#history-status').textContent();
+  await page.locator('#history-variant').selectOption('b'.repeat(64));
+  const secondAnnouncement = await page.locator('#history-status').textContent();
+
+  expect(firstAnnouncement).toContain('variant 2');
+  expect(firstAnnouncement).toContain('10,0 prosentpoeng høyere');
+  expect(secondAnnouncement).toContain('variant 1');
+  expect(secondAnnouncement).toContain('10,0 prosentpoeng høyere');
+  expect(secondAnnouncement).not.toBe(firstAnnouncement);
 });
 
 test('fractional variant changes subtract unrounded first-try accuracy', async ({ page }) => {

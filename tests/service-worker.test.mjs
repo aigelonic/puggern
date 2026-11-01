@@ -109,7 +109,7 @@ test('prepares the complete fresh shell without activating and reports its local
     requestId: 'request-1',
     ok: true,
     version: APP_VERSION,
-    shell: '20',
+    shell: '21',
   });
   assert.equal(state.skipped, 0);
 });
@@ -145,7 +145,7 @@ test('cache write failures remove only the incomplete candidate cache', async ()
   const state = worker();
   state.failWrite = true;
   await assert.rejects(state.dispatch('install'), /Cache write failed/);
-  assert.deepEqual(state.deleted, [`puggern-app-shell-${APP_VERSION}-20`]);
+  assert.deepEqual(state.deleted, [`puggern-app-shell-${APP_VERSION}-21`]);
   assert.equal(state.skipped, 0);
 });
 
@@ -168,7 +168,7 @@ test('controlled reload checks app windows without requesting activation', async
     requestId: 'request-1',
     ok: true,
     version: APP_VERSION,
-    shell: '20',
+    shell: '21',
   });
   assert.equal(state.skipped, 0);
   state.clients.push({ id: 'other', type: 'window', url: 'https://app.test/app/other' });

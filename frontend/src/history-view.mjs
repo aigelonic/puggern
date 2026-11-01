@@ -25,23 +25,29 @@ function element(tag, text) {
   return node;
 }
 
-function variantLabels(variants) {
+function variantLabels(variants, profileNumbers) {
   const totals = new Map();
   for (const result of variants) {
     const key = `${result.setName}\u0000${directions[result.directionMode] ?? directions.unknown}`;
     totals.set(key, (totals.get(key) ?? 0) + 1);
   }
-  const indexes = new Map();
   return variants.map((result) => {
     const direction = directions[result.directionMode] ?? directions.unknown;
     const key = `${result.setName}\u0000${direction}`;
-    const index = (indexes.get(key) ?? 0) + 1;
-    indexes.set(key, index);
+    let assignment = profileNumbers.get(result.comparisonKey);
+    if (!assignment || assignment.group !== key) {
+      const index = [...profileNumbers.values()].reduce(
+        (maximum, value) => (value.group === key ? Math.max(maximum, value.index) : maximum),
+        0,
+      );
+      assignment = { group: key, index: index + 1 };
+      profileNumbers.set(result.comparisonKey, assignment);
+    }
     return {
       result,
       label:
         totals.get(key) > 1
-          ? `${result.setName} · ${direction} · variant ${index}`
+          ? `${result.setName} · ${direction} · variant ${assignment.index}`
           : `${result.setName} · ${direction}`,
     };
   });
@@ -55,16 +61,17 @@ export function createHistoryView({ dialog, getProfile, getHistory }) {
   let profileId = null;
   let selectedKey = null;
   const itemCache = new Map();
+  const variantNumbersByProfile = new Map();
 
   function renderTrend(history, announce = false) {
     const trend = variantTrend(history, selectedKey);
     const container = dialog.querySelector('#history-trend');
     const metrics = dialog.querySelector('#history-metrics');
     const status = dialog.querySelector('#history-status');
+    if (!announce) status.textContent = '';
     container.hidden = !trend.latest;
     metrics.hidden = !trend.latest;
     if (!trend.latest) {
-      status.textContent = '';
       return;
     }
 
@@ -100,7 +107,10 @@ export function createHistoryView({ dialog, getProfile, getHistory }) {
     dialog.querySelector('#history-streak-value').textContent = String(trend.bestStreak);
     dialog.querySelector('#history-comparison').textContent = comparison;
     dialog.querySelector('#history-records').textContent = records;
-    if (announce) status.textContent = `Sammenligning oppdatert. ${announcement}`;
+    if (announce) {
+      const variantLabel = selector.selectedOptions[0]?.textContent ?? 'valgt øvingsvariant';
+      status.textContent = `Sammenligning oppdatert for ${variantLabel}. ${announcement}`;
+    }
 
     const count = trend.recent.length;
     const context =
@@ -200,7 +210,12 @@ export function createHistoryView({ dialog, getProfile, getHistory }) {
     for (const result of history) {
       if (!byVariant.has(result.comparisonKey)) byVariant.set(result.comparisonKey, result);
     }
-    const variants = variantLabels([...byVariant.values()]);
+    let variantNumbers = variantNumbersByProfile.get(profile.id);
+    if (!variantNumbers) {
+      variantNumbers = new Map();
+      variantNumbersByProfile.set(profile.id, variantNumbers);
+    }
+    const variants = variantLabels([...byVariant.values()], variantNumbers);
     if (!variants.some(({ result }) => result.comparisonKey === selectedKey)) {
       selectedKey = history[0]?.comparisonKey ?? null;
     }
