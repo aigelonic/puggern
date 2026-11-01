@@ -93,6 +93,10 @@ const shareStatus = document.querySelector('#share-status');
 const shareError = document.querySelector('#share-error');
 const shareLinkDialog = document.querySelector('#share-link-dialog');
 const shareLinkInput = document.querySelector('#share-link-input');
+const shareDialogStatus = document.querySelector('#share-dialog-status');
+const shareNativeButton = document.querySelector('#share-link-share-button');
+const shareCopyButton = document.querySelector('#share-link-copy-button');
+let shareLinkTitle = '';
 const importButton = document.querySelector('#import-link-button');
 const importDialog = document.querySelector('#import-link-dialog');
 const importLinkForm = document.querySelector('#import-link-form');
@@ -465,7 +469,12 @@ document.querySelector('#profile-done-button').addEventListener('click', () => {
   closeProfilePanel({ restoreFocus: true });
 });
 document.addEventListener('keydown', (event) => {
-  if (event.key !== 'Escape' || profilePanel.hidden || document.querySelector('dialog[open]'))
+  if (
+    event.key !== 'Escape' ||
+    profilePanel.hidden ||
+    !profilePanel.contains(event.target) ||
+    document.querySelector('dialog[open]')
+  )
     return;
   event.preventDefault();
   closeProfilePanel({ restoreFocus: true });
@@ -1017,42 +1026,58 @@ function showShareFeedback(message = '', error = '') {
   shareError.hidden = !error;
 }
 
-async function shareWordSet(set, trigger, focusTrigger = trigger) {
+function shareWordSet(set, trigger, focusTrigger = trigger) {
   if (trigger.disabled) return;
   trigger.disabled = true;
   showShareFeedback();
   try {
     const url = createShareUrl(set, window.location.href);
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: set.name, url });
-        showShareFeedback('Ordsettet er delt.');
-        return;
-      } catch (error) {
-        if (error.name === 'AbortError') {
-          showShareFeedback('Delingen ble avbrutt.');
-          return;
-        }
-      }
-    }
-    if (navigator.clipboard?.writeText) {
-      try {
-        await navigator.clipboard.writeText(url);
-        showShareFeedback('Lenken er kopiert. Du kan lime den inn og dele den.');
-        return;
-      } catch {
-        // Manuell kopiering fungerer også uten tilgang til utklippstavlen.
-      }
-    }
+    shareLinkTitle = set.name;
     shareLinkTrigger = focusTrigger;
     shareLinkInput.value = url;
+    shareDialogStatus.textContent = '';
+    shareNativeButton.hidden = typeof navigator.share !== 'function';
+    shareCopyButton.hidden = typeof navigator.clipboard?.writeText !== 'function';
     shareLinkDialog.showModal();
-    shareLinkInput.focus();
-    shareLinkInput.select();
+    const firstAction = !shareNativeButton.hidden
+      ? shareNativeButton
+      : !shareCopyButton.hidden
+        ? shareCopyButton
+        : shareLinkInput;
+    firstAction.focus();
+    if (firstAction === shareLinkInput) shareLinkInput.select();
   } catch (error) {
     showShareFeedback('', `Kunne ikke dele ordsettet: ${error.message}`);
   } finally {
     trigger.disabled = false;
+  }
+}
+
+async function useShareLink(method) {
+  shareNativeButton.disabled = true;
+  shareCopyButton.disabled = true;
+  try {
+    if (method === 'share') {
+      await navigator.share({ title: shareLinkTitle, url: shareLinkInput.value });
+      shareLinkDialog.close();
+      showShareFeedback('Ordsettet er delt.');
+    } else {
+      await navigator.clipboard.writeText(shareLinkInput.value);
+      shareLinkDialog.close();
+      showShareFeedback('Lenken er kopiert. Du kan lime den inn og dele den.');
+    }
+  } catch (error) {
+    shareDialogStatus.textContent =
+      error.name === 'AbortError'
+        ? 'Delingen ble avbrutt. Du kan kopiere lenken manuelt.'
+        : 'Handlingen mislyktes. Du kan kopiere lenken manuelt.';
+    if (method === 'copy') {
+      shareLinkInput.focus();
+      shareLinkInput.select();
+    }
+  } finally {
+    shareNativeButton.disabled = false;
+    shareCopyButton.disabled = false;
   }
 }
 
@@ -1350,7 +1375,7 @@ function openEditor(set = null, trigger = document.activeElement) {
   renderPreview();
   wordSetForm.hidden = false;
   editorBaseline = editorSnapshot();
-  wordSetNameInput.focus({ preventScroll: true });
+  wordSetNameInput.focus();
   wordSetForm.scrollIntoView({
     block: 'nearest',
     behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
@@ -1936,10 +1961,14 @@ importDialog.addEventListener('close', () => {
 document.querySelector('#close-share-link-button').addEventListener('click', () => {
   shareLinkDialog.close();
 });
+shareNativeButton.addEventListener('click', () => useShareLink('share'));
+shareCopyButton.addEventListener('click', () => useShareLink('copy'));
 shareLinkDialog.addEventListener('close', () => {
   shareLinkInput.value = '';
+  shareDialogStatus.textContent = '';
   restoreDialogFocus(shareLinkTrigger);
   shareLinkTrigger = null;
+  shareLinkTitle = '';
 });
 
 const incomingShareUrl = new URL(window.location.href);

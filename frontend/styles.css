@@ -264,7 +264,8 @@ textarea {
 }
 
 .setup-view .feedback:empty {
-  display: none;
+  min-height: 0;
+  margin: 0;
 }
 
 .setup-view button,

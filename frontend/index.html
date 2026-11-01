@@ -247,13 +247,20 @@
       >
         <h2 id="share-link-title">Del ordsett</h2>
         <p id="share-link-help" class="field-help">
-          Kopier den markerte lenken manuelt. Deling tar bare med navn, ord, retning og
-          innstillinger, ikke profiler eller fremgang. Innholdet er lesbart for alle som har lenken
-          og kan bli liggende i historikk og meldinger. Ikke del sensitive opplysninger.
+          Før du deler eller kopierer: Deling tar bare med navn, ord, retning og innstillinger, ikke
+          profiler eller fremgang. Innholdet er lesbart for alle som har lenken og kan bli liggende
+          i historikk og meldinger. Ikke del sensitive opplysninger.
         </p>
         <label for="share-link-input">Lenke til ordsettet</label>
         <textarea id="share-link-input" rows="3" readonly spellcheck="false"></textarea>
+        <p id="share-dialog-status" class="feedback" role="status" aria-live="polite"></p>
         <div class="actions">
+          <button id="share-link-share-button" class="button primary" type="button" hidden>
+            Del lenke
+          </button>
+          <button id="share-link-copy-button" class="button secondary" type="button" hidden>
+            Kopier lenke
+          </button>
           <button id="close-share-link-button" class="button secondary" type="button">Lukk</button>
         </div>
       </dialog>
@@ -504,6 +511,6 @@
         <button class="button primary" value="update">Forkast inntasting og oppdater</button>
       </form>
     </dialog>
-    <script type="module" src="./src/main.mjs?v=19"></script>
+    <script type="module" src="./src/main.mjs?v=20"></script>
   </body>
 </html>

@@ -92,6 +92,25 @@ test('switch updates greeting, rewards, progress and history; failed switch stay
   await expect(page.locator('#setup-greeting')).toHaveText('Hei, 🐱 Ada!');
 });
 
+test('Escape in a word set action menu preserves its focus behavior while a profile draft is open', async ({
+  page,
+}) => {
+  await seedHome(page);
+  await page.goto('/');
+  await openProfilePanel(page);
+  await page.locator('#new-profile-button').click();
+  await page.locator('#profile-name').fill('Uferdig profil');
+  const set = page.locator('#word-set-list > li').first();
+  const trigger = set.locator('.set-action-trigger');
+  await trigger.click();
+  await expect(set.locator('.set-action-menu[open]')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(set.locator('.set-action-menu[open]')).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  await expect(page.locator('#profile-panel')).toBeVisible();
+  await expect(page.locator('#profile-name')).toHaveValue('Uferdig profil');
+});
+
 test('cross-tab refresh preserves panel and focus while updating safely rendered names', async ({
   page,
   context,
@@ -154,6 +173,9 @@ test('sharing privacy is in both dialogs, not the home page; empty import uses t
   await page.goto('/');
   const warning = /Ikke del sensitive opplysninger/;
   await expect(page.locator('#setup-view')).not.toContainText(warning);
+  expect(
+    await page.locator('#share-status').evaluate((element) => getComputedStyle(element).display),
+  ).not.toBe('none');
   await page.evaluate(() => {
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
     Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
@@ -161,7 +183,7 @@ test('sharing privacy is in both dialogs, not the home page; empty import uses t
   await clickSetAction(page.locator('#word-set-list > li').first(), 'Del');
   for (const id of ['#share-link-help', '#import-help']) {
     await expect(page.locator(id)).toContainText(/navn,\s+ord,\s+retning og\s+innstillinger/);
-    await expect(page.locator(id)).toContainText(/ikke profiler eller\s+fremgang/);
+    await expect(page.locator(id)).toContainText(/ikke\s+profiler eller\s+fremgang/);
     await expect(page.locator(id)).toContainText(/alle som har lenken/);
     await expect(page.locator(id)).toContainText(/historikk og\s+meldinger/);
     await expect(page.locator(id)).toContainText(warning);
@@ -171,6 +193,49 @@ test('sharing privacy is in both dialogs, not the home page; empty import uses t
   await page.reload();
   await page.locator('#empty-import-button').click();
   await expect(page.locator('#import-link-dialog')).toBeVisible();
+});
+
+test('sharing and copying require the privacy warning before using browser APIs', async ({
+  page,
+}) => {
+  await seedHome(page);
+  await page.goto('/');
+  await page.evaluate(() => {
+    window.shareCalls = [];
+    window.copyCalls = [];
+    Object.defineProperty(navigator, 'share', {
+      configurable: true,
+      value: async (data) => window.shareCalls.push(data),
+    });
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: async (url) => window.copyCalls.push(url) },
+    });
+  });
+  const set = page.locator('#word-set-list > li').first();
+  await clickSetAction(set, 'Del');
+  const dialog = page.locator('#share-link-dialog');
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText(/Ikke del sensitive opplysninger/);
+  expect(await page.evaluate(() => [window.shareCalls.length, window.copyCalls.length])).toEqual([
+    0, 0,
+  ]);
+  await page.locator('#share-link-share-button').click();
+  await expect(dialog).toBeHidden();
+  await expect(page.locator('#share-status')).toHaveText('Ordsettet er delt.');
+  expect(await page.evaluate(() => [window.shareCalls.length, window.copyCalls.length])).toEqual([
+    1, 0,
+  ]);
+
+  await clickSetAction(set, 'Del');
+  await page.locator('#share-link-copy-button').click();
+  await expect(dialog).toBeHidden();
+  await expect(page.locator('#share-status')).toHaveText(
+    'Lenken er kopiert. Du kan lime den inn og dele den.',
+  );
+  expect(await page.evaluate(() => [window.shareCalls.length, window.copyCalls.length])).toEqual([
+    1, 1,
+  ]);
 });
 
 for (const viewport of [
