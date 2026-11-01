@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.0](https://github.com/aigelonic/puggern/compare/v0.2.0...v0.3.0) (2026-11-01)
+
+
+### Features
+
+* **history:** redesign the practice history dashboard ([#79](https://github.com/aigelonic/puggern/issues/79)) ([3306447](https://github.com/aigelonic/puggern/commit/3306447542ce4e12a249108419679751ded5bc00))
+* **home:** prioritize word sets with a compact profile switcher ([#81](https://github.com/aigelonic/puggern/issues/81)) ([d447fd6](https://github.com/aigelonic/puggern/commit/d447fd65c63d95e79a06f206241cc869952cae13))
+
+
+### Bug Fixes
+
+* **practice:** avoid duplicate correction announcements ([#74](https://github.com/aigelonic/puggern/issues/74)) ([92bc74c](https://github.com/aigelonic/puggern/commit/92bc74cc4ba128d9281d3a99b4f28a46ffac316f))
+* **pwa:** keep update access available after storage errors ([#77](https://github.com/aigelonic/puggern/issues/77)) ([7c094e3](https://github.com/aigelonic/puggern/commit/7c094e30f9d44d79d271767e39e6b561e9c0ae98))
+
 ## [0.2.0](https://github.com/aigelonic/puggern/compare/v0.1.0...v0.2.0) (2026-10-31)
 
 
